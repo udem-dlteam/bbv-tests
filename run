@@ -14,7 +14,7 @@ while [ "$#" != "0" ]; do
       SYSTEM="bigloo"
       ;;
     -c|--clean) # clean
-      rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o*
+      rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o* tests/*/*~
       exit
       ;;
     -*) # other options
@@ -59,22 +59,30 @@ for src in $SOURCES ; do
 
   if test "${src#*.gambit.scm}" = "$src" -a "${src#*.bigloo.scm}" = "$src" ; then
 
-     base="${src%.scm}"
+    base="${src%.scm}"
 
-     case "$SYSTEM" in
+    case "$SYSTEM" in
 
-       gambit)
-         $GAMBITDIR/gsi/gsi -:=$GAMBITDIR $GAMBITDIR/gsc/igsc.scm -gvm -cfg $base.gambit.scm
-         run_dot $base.gambit.cfg
-         run_pdfviewer $base.gambit.cfg.pdf
-         ;;
+      gambit)
+        gambitsrc="$base.gambit.scm"
+        if test -e "$gambitsrc" ; then
+          printf "========================================= $gambitsrc\n"
+          $GAMBITDIR/gsi/gsi -:=$GAMBITDIR $GAMBITDIR/gsc/igsc.scm -gvm -cfg $gambitsrc
+          run_dot $base.gambit.cfg
+          run_pdfviewer $base.gambit.cfg.pdf
+        fi
+        ;;
 
-       bigloo)
-         # TODO...
-         bigloo $base.bgl
-         ;;
+      bigloo)
+        bigloosrc="$base.bgl"
+        if test -e "$bigloosrc" ; then
+          printf "========================================= $bigloosrc\n"
+          # TODO...
+          bigloo "$bigloosrc"
+        fi
+        ;;
 
-     esac
+    esac
 
   fi
 
