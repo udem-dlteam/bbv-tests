@@ -23,7 +23,6 @@ while [ "$#" != "0" ]; do
       ;;
     *)
       SOURCES="$SOURCES $1"
-      shift
       ;;
   esac
   shift
@@ -77,8 +76,10 @@ for src in $SOURCES ; do
         bigloosrc="$base.bgl"
         if test -e "$bigloosrc" ; then
           printf "========================================= $bigloosrc\n"
-          # TODO...
-          bigloo "$bigloosrc"
+          bigloo $bigloosrc $base.scm -O3 -saw -fsaw-bbv && \
+	    bglcfg $base-program.bbv.cfg > $base-program.bbv.dot
+	  run_dot $base-program.bbv.dot
+	  run_pdfviewer $base-program.bbv.dot.pdf
         fi
         ;;
 

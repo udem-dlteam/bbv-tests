@@ -1,1 +1,2 @@
-(module test)
+(module test
+   (export (program unknown1)))
