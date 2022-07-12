@@ -1,0 +1,81 @@
+#!/bin/sh
+
+SYSTEM=gambit
+SOURCES=""
+
+GAMBITDIR=../gambit
+
+while [ "$#" != "0" ]; do
+  case "$1" in
+    -g|--gambit) # system
+      SYSTEM="gambit"
+      ;;
+    -b|--bigloo) # system
+      SYSTEM="bigloo"
+      ;;
+    -c|--clean) # clean
+      rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o*
+      exit
+      ;;
+    -*) # other options
+      echo "*** unknown option: $1"
+      exit 1
+      ;;
+    *)
+      SOURCES="$SOURCES $1"
+      shift
+      ;;
+  esac
+  shift
+done
+
+run_dot()
+{
+  if command -v dot > /dev/null 2>&1 ; then
+    dot -O -Tpdf $1
+  else
+    printf "dot program not found!\n"
+  fi
+}
+
+run_pdfviewer()
+{
+  if command -v okular > /dev/null 2>&1 ; then
+    okular $1
+  else
+    if command -v open > /dev/null 2>&1 ; then
+      open $1
+    else
+      printf "PDF viewer program not found!\n"
+    fi
+  fi
+}
+
+if test "$SOURCES" = "" ; then
+  SOURCES=tests/*/*.scm
+fi
+
+for src in $SOURCES ; do
+
+  if test "${src#*.gambit.scm}" = "$src" -a "${src#*.bigloo.scm}" = "$src" ; then
+
+     base="${src%.scm}"
+
+     case "$SYSTEM" in
+
+       gambit)
+         $GAMBITDIR/gsi/gsi -:=$GAMBITDIR $GAMBITDIR/gsc/igsc.scm -gvm -cfg $base.gambit.scm
+         run_dot $base.gambit.cfg
+         run_pdfviewer $base.gambit.cfg.pdf
+         ;;
+
+       bigloo)
+         # TODO...
+         bigloo $base.bgl
+         ;;
+
+     esac
+
+  fi
+
+done
