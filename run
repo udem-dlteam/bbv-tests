@@ -64,9 +64,18 @@ for src in $SOURCES ; do
 
       gambit)
         gambitsrc="$base.gambit.scm"
+        gambitgvm="$base.gambit.gvm"
         if test -e "$gambitsrc" ; then
           printf "========================================= $gambitsrc\n"
           $GAMBITDIR/gsi/gsi -:=$GAMBITDIR $GAMBITDIR/gsc/igsc.scm -gvm -cfg $gambitsrc
+
+          # Check if .gvm file contains expected code
+          line=$(grep '; CONTAINS: ' $src | sed 's/^.*CONTAINS: //')
+          if ! grep -q "$line" $gambitgvm
+          then
+            echo "ERROR not found in $gambitgvm: $line"
+          fi
+
           run_dot $base.gambit.cfg
           run_pdfviewer $base.gambit.cfg.pdf
         fi
