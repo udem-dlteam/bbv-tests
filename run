@@ -88,11 +88,11 @@ for test in $(find $TESTS -name "*.scm") ; do
         if test -e "$bigloosrc" ; then
           printf "==================================== $bigloosrc\n"
           bigloo $bigloosrc $base.scm -O3 -saw -fsaw-bbv -fsaw-bbv-fun program -t1 && \
-            bglcfg $base-program.bbv.cfg > $base-program.bbv.dot && \
+            bglcfg $base-program.bbv.cfg > $base.dot && \
             run_dot $base-program.bbv.dot
 
           CFGPDF=$base-program.bbv.dot.pdf
-          ANALYSISEXT=.cfg
+          ANALYSISEXT=-program.bbv.cfg
 
         fi
         ;;
