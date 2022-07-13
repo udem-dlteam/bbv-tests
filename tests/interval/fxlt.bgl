@@ -1,0 +1,4 @@
+(module test
+   (export (program x)))
+
+(define-macro (fx< . rest) (cons '<fx rest))

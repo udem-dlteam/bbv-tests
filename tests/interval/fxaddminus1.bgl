@@ -1,0 +1,11 @@
+(module test
+   (export (program x)))
+
+(define-macro (fx+ . _) (cons '+fx _))
+(define-macro (fx* . _) (cons '*fx _))
+(define-macro (fx- . _) (cons '-fx _))
+(define-macro (fx= . _) (cons '=fx _))
+(define-macro (fx< . _) (cons '<fx _))
+(define-macro (fx> . _) (cons '>fx _))
+(define-macro (fx<= . _) (cons '<=fx _))
+(define-macro (fx>= . _) (cons '>=fx _))

@@ -1,28 +1,32 @@
 #!/bin/sh
 
 SYSTEM=gambit
-SOURCES=""
+VIEW=no
+TESTS=""
 
 GAMBITDIR="${BBVGAMBITDIR:-../gambit}"
 
 while [ "$#" != "0" ]; do
   case "$1" in
     -g|--gambit) # system
-      SYSTEM="gambit"
+      SYSTEM=gambit
       ;;
     -b|--bigloo) # system
-      SYSTEM="bigloo"
+      SYSTEM=bigloo
       ;;
     -c|--clean) # clean
-      rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o* tests/*/*~
+      rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o* tests/*/*~ tests/*/*.bbv.dot
       exit
       ;;
+    -v|--view) # view CFG
+      VIEW=yes
+      ;;
     -*) # other options
-      echo "*** unknown option: $1"
+      printf "*** unknown option: $1\n"
       exit 1
       ;;
     *)
-      SOURCES="$SOURCES $1"
+      TESTS="$TESTS $1"
       ;;
   esac
   shift
@@ -50,49 +54,73 @@ run_pdfviewer()
   fi
 }
 
-if test "$SOURCES" = "" ; then
-  SOURCES=tests/*/*.scm
+if test "$TESTS" = "" ; then
+  TESTS="tests"
 fi
 
-for src in $SOURCES ; do
+for test in $(find $TESTS -name "*.scm") ; do
 
-  if test "${src#*.gambit.scm}" = "$src" -a "${src#*.bigloo.scm}" = "$src" ; then
+  if test "${test#*.gambit.scm}" = "$test" -a "${test#*.bigloo.scm}" = "$test" ; then
 
-    base="${src%.scm}"
+    testnoext="${test%.scm}"
 
     case "$SYSTEM" in
 
       gambit)
-        gambitsrc="$base.gambit.scm"
-        gambitgvm="$base.gambit.gvm"
+        base="$testnoext.gambit"
+        gambitsrc="$base.scm"
+        gambitgvm="$base.gvm"
         if test -e "$gambitsrc" ; then
-          printf "========================================= $gambitsrc\n"
+          printf "==================================== $gambitsrc\n"
           $GAMBITDIR/gsi/gsi -:=$GAMBITDIR $GAMBITDIR/gsc/igsc.scm -gvm -cfg $gambitsrc
 
-          # Check if .gvm file contains expected code
-          line=$(grep '; CONTAINS: ' $src | sed 's/^.*CONTAINS: //')
-          if ! grep -q "$line" $gambitgvm
-          then
-            echo "ERROR not found in $gambitgvm: $line"
-          fi
+          run_dot $base.cfg
 
-          run_dot $base.gambit.cfg
-          run_pdfviewer $base.gambit.cfg.pdf
+          CFGPDF=$base.cfg.pdf
+          ANALYSISEXT=.gvm
+
         fi
         ;;
 
       bigloo)
+        base="$testnoext"
         bigloosrc="$base.bgl"
         if test -e "$bigloosrc" ; then
-          printf "========================================= $bigloosrc\n"
+          printf "==================================== $bigloosrc\n"
           bigloo $bigloosrc $base.scm -O3 -saw -fsaw-bbv && \
-	    bglcfg $base-program.bbv.cfg > $base-program.bbv.dot
-	  run_dot $base-program.bbv.dot
-	  run_pdfviewer $base-program.bbv.dot.pdf
+            bglcfg $base-program.bbv.cfg > $base-program.bbv.dot && \
+            run_dot $base-program.bbv.dot
+
+          CFGPDF=$base-program.bbv.dot.pdf
+          ANALYSISEXT=.cfg
+
         fi
         ;;
 
     esac
+
+    if test "$ANALYSISEXT" != "" && fgrep ";; $ANALYSISEXT contains: " $test > /dev/null 2>&1 ; then
+
+      fgrep ";; $ANALYSISEXT contains: " $test | sed -e "s/^;; $ANALYSISEXT contains: //" | while IFS= read -r pattern ; do
+
+        nboccur=$(grep -e "$pattern" $base$ANALYSISEXT | wc -l | sed -e "s/^ *//")
+
+        case "$nboccur" in
+          1) printf "SUCCESS -- $base$ANALYSISEXT contains: $pattern\n"
+             ;;
+          0) printf "FAIL -- pattern not found in $base$ANALYSISEXT: $pattern\n"
+             ;;
+          *) printf "FAIL -- pattern found $nboccur times in $base$ANALYSISEXT: $pattern\n"
+             ;;
+        esac
+
+      done
+
+    fi
+
+    if test "$VIEW" = "yes" ; then
+      run_pdfviewer $CFGPDF
+    fi
 
   fi
 
