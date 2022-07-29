@@ -1,0 +1,5 @@
+(module test
+   (export (clamped-sum X Y Z)))
+
+(define-macro (fx+ . _) (cons '+fx _))
+(define-macro (fx< . _) (cons '<fx _))
