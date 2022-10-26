@@ -1,15 +1,18 @@
-(directives
-   (extern (include "./bbv_saw.h")
-           (macro bbv-saw-statistics::int () "bbv_saw_statistics")))
+(define-macro (for-syntax . exprs)
+  (for-each eval exprs)
+  `(begin))
 
-(define-macro (FLop op . args)   `(,(symbol-append op 'fl) ,@args))
-(define-macro (FXop op . args)   `(,(symbol-append op 'fx) ,@args))
-(define-macro (PRIMop op . args) `(,op ,@args))
+(for-syntax
+ (define (symbol-append . rest)
+   (string->symbol (string-concatenate (map symbol->string rest)))))
 
-(define (unknown x) ((car (list (lambda () x)))))
+(define-macro (FLop op . args)   `(,(symbol-append '|##fl| op) ,@args))
+(define-macro (FXop op . args)   `(,(symbol-append '|##fx| op) ,@args))
+(define-macro (PRIMop op . args) `(,(symbol-append '|##| op) ,@args))
+
+(define-macro (unknown x) `(PRIMop first-argument ,x))
 
 (define-macro (MAPop kind op . args)
-  (define arithmetic 'G) ;; TODO: get this information from the run script
   (cond
    ((eq? kind 'FL)
     `(PRIMop ,(symbol-append 'fl op) ,@args))
@@ -130,8 +133,8 @@
              (,b ,y))
          (cond
           ((and (FIXNUM? ,a) (FIXNUM? ,b))
-           ;; TODO: needs to call <op>fx/ov
-           (,(symbol-append op 'fx) ,a ,b))
+           (or (,(symbol-append '|##fx| op '?) ,a ,b)
+               (PRIMop ,op ,a ,b)))
           ((and (FLONUM? ,a) (FLONUM? ,b))
            (FLop ,op ,a ,b))
           (else
@@ -236,5 +239,3 @@
          (FLatan ,a ,b))
         (else
          (PRIMop atan ,a ,b))))))
-
-(register-exit-function! (lambda (status) (bbv-saw-statistics) status))
