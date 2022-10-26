@@ -1,0 +1,11 @@
+;; bigloo -O3 -saw -fsaw-bbv -fsaw-bbv-fun bbv -t1 bbv.bgl bbv.scm
+;; BIGLOOTRACE="bbv-ins" bigloo.new -O3 -saw -fsaw-bbv -fsaw-bbv-fun bbv -t1 bbv.bgl bbv.scm 
+;; bglcfg 'bbv-bbv.bbv.cfg' > 'bbv-bbv.bbv.dot' && dot 'bbv-bbv.bbv.dot' -Tpdf > bbv-bbv.bbv.pdf
+
+(module bbv
+   (include "./bbv.sch")
+   (main main))
+
+(define (main args)
+   (let ((args (map (lambda (s) (call-with-input-string s read)) (cdr args))))
+      (apply run args)))
