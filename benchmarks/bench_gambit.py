@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
+import csv
 import os
 import re
 import subprocess
 
 DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
-MAX_VLIMIT = 5
 
 def parse_gambit_output(output):
     counter_section = output.split(DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
@@ -31,18 +31,7 @@ def benchmark(gambit_path, filename, vlimits):
 
     return results
 
-def print_results(bench_results):
-    def print_tabule(table):
-        widths = [max(len(l[i]) for l in table) + 1 for i in range(len(table[0]))]
-
-        line = '+' + '+'.join('-' * w for w in widths) + '+'
-
-        for row in table:
-            print(line)
-            print(*['', *(i.ljust(w) for i, w in zip(row, widths)), ''], sep='|')
-        print(line)
-
-
+def results_to_table(bench_results):
     # Get all primitive names across all executions
     all_primitive_names = sorted(set(k for row in bench_results.values() for k in row.keys()))
 
@@ -59,16 +48,31 @@ def print_results(bench_results):
             ratio = '' if not count or not baseline_count or not must_add_percent[n] else f' ({count * 100 // baseline_count}%)'
             row.append(str(count) + ratio)
         table.append(row)
+    return table
 
-    # print
-    print_tabule(table)
+def print_results(bench_results):
+    table = results_to_table(bench_results)
+    widths = [max(len(l[i]) for l in table) + 1 for i in range(len(table[0]))]
 
+    line = '+' + '+'.join('-' * w for w in widths) + '+'
 
-def main(gambit_path, filename):
+    for row in table:
+        print(line)
+        print(*['', *(i.ljust(w) for i, w in zip(row, widths)), ''], sep='|')
+    print(line)
+
+def main(gambit_path, filename, max_vlimit, as_csv):
     gambit_path = os.path.abspath(gambit_path)
     filename = os.path.abspath(filename)
 
-    res = benchmark(gambit_path, filename, range(1, MAX_VLIMIT + 1))
+    res = benchmark(gambit_path, filename, range(1, max_vlimit + 1))
+
+    if as_csv:
+        with open(filename + ".results.csv", 'w') as f:
+            writer = csv.writer(f)
+            writer.writerows(results_to_table(res))
+
+
     print_results(res)
 
 
@@ -77,7 +81,9 @@ if __name__ == "__main__":
 
     parser.add_argument('gambit_path', help='Gambit root path')
     parser.add_argument('file', help='file to benchmark')
+    parser.add_argument('--csv', action='store_true', help='writes the result to a csv file')
+    parser.add_argument('--vlimit', type=int, default=5, help='maximum version limits')
 
     args = parser.parse_args()
 
-    main(args.gambit_path, args.file)
+    main(args.gambit_path, args.file, args.vlimit, args.csv)
