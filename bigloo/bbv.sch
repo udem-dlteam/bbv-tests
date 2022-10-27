@@ -9,7 +9,11 @@
 (define (unknown x) ((car (list (lambda () x)))))
 
 (define-macro (MAPop kind op . args)
-  (define arithmetic 'G) ;; TODO: get this information from the run script
+  (define arithmetic
+     (cond-expand
+	(arithmeticG 'G)
+	(arithmeticS 'S)
+	(else 'G)))
   (cond
    ((eq? kind 'FL)
     `(PRIMop ,(symbol-append 'fl op) ,@args))
@@ -130,8 +134,7 @@
              (,b ,y))
          (cond
           ((and (FIXNUM? ,a) (FIXNUM? ,b))
-           ;; TODO: needs to call <op>fx/ov
-           (,(symbol-append op 'fx) ,a ,b))
+           (,(if (eq? op '/) '/fx (symbol-append op 'fx/ov)) ,a ,b))
           ((and (FLONUM? ,a) (FLONUM? ,b))
            (FLop ,op ,a ,b))
           (else

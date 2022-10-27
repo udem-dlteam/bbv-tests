@@ -129,7 +129,7 @@ for file in $FILES ; do
     bigloo)
       base="$filenoext.bigloo.$ARITHMETIC"
       (cd $SCRIPT_DIR/bigloo && \
-       bigloo bbv.bgl $file -saw -fsaw-bbv -o $base.exe && \
+       bigloo -srfi arithmetic$ARITHMETIC bbv.bgl $file -saw -fsaw-bbv -o $base.exe && \
        bglcfg $base-program.bbv.cfg > $base.dot && \
        run_dot $base-program.bbv.dot)
       CFGPDF=$base-program.bbv.dot.pdf
