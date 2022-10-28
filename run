@@ -41,8 +41,9 @@ else
 fi
 
 # for bigloo
-BIGLOODIR="$SCRIPT_DIR/gambit/inst"
-BIGLOOCOMP="bigloo"
+BIGLOODIR="$SCRIPT_DIR/bigloo/local"
+BIGLOOCOMP="$BIGLOODIR/bin/bigloo"
+BGLCFG="$BIGLOODIR/bin/bglcfg"
 
 while [ "$#" != "0" ]; do
   case "$1" in
@@ -156,7 +157,7 @@ for file in $FILES ; do
       PATH="$BIGLOODIR/bin:$PATH"
       (cd $SCRIPT_DIR/bigloo && \
        $BIGLOOCOMP -srfi arithmetic$ARITHMETIC bbv.bgl $file -saw -fsaw-bbv -o $base.exe && \
-       bglcfg $base-program.bbv.cfg > $base.dot && \
+       $BGLCFG $base-program.bbv.cfg > $base.dot && \
        run_dot $base-program.bbv.dot)
       CFGPDF=$base-program.bbv.dot.pdf
       ANALYSISEXT=-program.bbv.cfg
