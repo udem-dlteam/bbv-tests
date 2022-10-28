@@ -1,0 +1,89 @@
+#! /bin/bash
+
+# File: "update"
+
+# Usage: ./update
+
+
+# find script directory
+SCRIPT_DIR="$0"
+if test "${SCRIPT_DIR#/}" = "$SCRIPT_DIR" ; then
+  SCRIPT_DIR="$(pwd)/$SCRIPT_DIR"
+fi
+SCRIPT_DIR="${SCRIPT_DIR%/*}"
+SCRIPT_DIR="${SCRIPT_DIR%/.}"
+
+
+get_available_parallelism()
+{
+  # This works on linux:
+  AVAILABLE_PARALLELISM="`nproc 2> /dev/null`"
+
+  if [ "$AVAILABLE_PARALLELISM" == "" ] ; then
+
+    # This works on macOS:
+    AVAILABLE_PARALLELISM="`sysctl -n hw.ncpu 2> /dev/null`"
+
+    if [ "$AVAILABLE_PARALLELISM" == "" ] ; then
+      # Just assume we have one processing unit
+      AVAILABLE_PARALLELISM="1"
+    fi
+
+  fi
+}
+
+get_available_parallelism
+
+MAKE_JOBS="-j$AVAILABLE_PARALLELISM"
+
+
+GAMBITREPODIR="$SCRIPT_DIR/gambit"
+GAMBITINSTDIR="$SCRIPT_DIR/inst"
+
+if test ! -d "$GAMBITREPODIR" ; then
+
+  echo "========== cloning Gambit to $GAMBITREPODIR"
+
+  git clone git@github.com:udem-dlteam/gambit "$GAMBITREPODIR"
+
+fi
+
+cd "$GAMBITREPODIR"
+
+if test ! -e makefile ; then
+
+  echo "========== configuring Gambit"
+
+  ./configure --enable-single-host --prefix="$GAMBITINSTDIR"
+
+  git checkout origin bbv
+
+  echo "========== building Gambit"
+
+  make "$MAKE_JOBS" core
+
+  echo "========== installing Gambit"
+
+  make install
+
+fi
+
+git pull > pull.out
+
+cat pull.out
+
+if grep -q -v 'Already up-to-date.' pull.out > /dev/null ; then
+
+  echo "========== building Gambit with recent changes"
+
+  make "$MAKE_JOBS" core
+
+  echo "========== installing Gambit"
+
+  make install > /dev/null 2>&1
+
+fi
+
+rm -f pull.out
+
+echo "========== Gambit is up to date"

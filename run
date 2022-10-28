@@ -10,28 +10,39 @@
 #  For bigloo:
 #
 #    ./run --bigloo --view tests/recursive/fib.scm
-#    time ./tests/recursive/fib.bigloo.G.exe
+#    time ./tests/recursive/fib.bigloo.0G4.exe
 
 
-SYSTEM=gambit
-VIEW=no
-TESTS=""
-
-# use generic arithmetic (G) or fixnum/flonum specialized arithmetic (S)?
-ARITHMETIC=G
-
-# settings for Gambit:
-VERSION_LIMIT=4
-INLINING_LIMIT=0  # 0 for no function inlining
-
-GAMBITDIR="${BBVGAMBITDIR:-../gambit}"
-
+# find script directory
 SCRIPT_DIR="$0"
 if test "${SCRIPT_DIR#/}" = "$SCRIPT_DIR" ; then
   SCRIPT_DIR="$(pwd)/$SCRIPT_DIR"
 fi
 SCRIPT_DIR="${SCRIPT_DIR%/*}"
 SCRIPT_DIR="${SCRIPT_DIR%/.}"
+
+
+# default settings:
+
+SYSTEM=gambit
+VIEW=no
+TESTS=""          # empty to run all tests in tests directory
+
+ARITHMETIC=G      # generic (G) or specialized (S) arithmetic?
+VERSION_LIMIT=4   # version limit (0 to disable BBV)
+INLINING_LIMIT=0  # 0 for no function inlining
+
+# for gambit
+if test "$WIPGAMBITDIR" != "" ; then
+  GAMBITCOMP="$WIPGAMBITDIR/gsi/gsi -:=$WIPGAMBITDIR,drR $WIPGAMBITDIR/gsc/igsc.scm"
+else
+  GAMBITDIR="$SCRIPT_DIR/gambit/inst"
+  GAMBITCOMP="$GAMBITDIR/bin/gsc"
+fi
+
+# for bigloo
+BIGLOODIR="$SCRIPT_DIR/gambit/inst"
+BIGLOOCOMP="bigloo"
 
 while [ "$#" != "0" ]; do
   case "$1" in
@@ -41,8 +52,22 @@ while [ "$#" != "0" ]; do
     -b|--bigloo) # system
       SYSTEM=bigloo
       ;;
+    -G) # generic arithmetic
+      ARITHMETIC=G
+      ;;
+    -S) # specialized arithmetic when fixnum/flonum operations are possible
+      ARITHMETIC=S
+      ;;
+    -V) # version limit
+      shift
+      if [ "$#" = "0" ]; then
+        printf "version limit (-V) option needs an argument"
+        exit 1
+      fi
+      VERSION_LIMIT="$1"
+      ;;
     -c|--clean) # clean
-      rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o* tests/*/*~ tests/*/*.bbv.dot
+      rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o* tests/*/*~ tests/*/*.bbv.dot tests/*/*.exe
       exit
       ;;
     -v|--view) # view CFG
@@ -119,7 +144,7 @@ for file in $FILES ; do
     gambit)
       DECL="(declare (version-limit $VERSION_LIMIT) (inlining-limit $INLINING_LIMIT) (standard-bindings) (extended-bindings) (not safe) (block)) (define-macro (%%%) (eval '(define arithmetic '$ARITHMETIC))) (%%%)"
       base="$filenoext.gambit.$INLINING_LIMIT$ARITHMETIC$VERSION_LIMIT"
-      $GAMBITDIR/gsi/gsi -:=$GAMBITDIR,drR $GAMBITDIR/gsc/igsc.scm -prelude "$DECL (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(load \"$SCRIPT_DIR/gambit/main.scm\")" -keep-temp -gvm -cfg -exe -o $base.exe $file
+      $GAMBITCOMP -prelude "$DECL (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(load \"$SCRIPT_DIR/gambit/main.scm\")" -keep-temp -gvm -cfg -exe -o $base.exe $file
       mv $filenoext.cfg $base.cfg
       run_dot $base.cfg
       CFGPDF=$base.cfg.pdf
@@ -127,9 +152,10 @@ for file in $FILES ; do
       ;;
 
     bigloo)
-      base="$filenoext.bigloo.$ARITHMETIC"
+      base="$filenoext.bigloo.$INLINING_LIMIT$ARITHMETIC$VERSION_LIMIT"
+      PATH="$BIGLOODIR/bin:$PATH"
       (cd $SCRIPT_DIR/bigloo && \
-       bigloo -srfi arithmetic$ARITHMETIC bbv.bgl $file -saw -fsaw-bbv -o $base.exe && \
+       $BIGLOOCOMP -srfi arithmetic$ARITHMETIC bbv.bgl $file -saw -fsaw-bbv -o $base.exe && \
        bglcfg $base-program.bbv.cfg > $base.dot && \
        run_dot $base-program.bbv.dot)
       CFGPDF=$base-program.bbv.dot.pdf
