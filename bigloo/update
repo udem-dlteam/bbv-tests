@@ -56,11 +56,15 @@ if test ! -e config.status ; then
 
   echo "========== building Bigloo"
 
-  make "$MAKE_JOBS" && make -C tools bglcfg
+  make "$MAKE_JOBS"
   
   echo "========== installing Bigloo"
 
   make install
+
+  echo "========== installing bglcfg"
+
+  make -C tools bglcfg
 
 fi
 
