@@ -56,7 +56,7 @@ if test ! -e makefile ; then
 
   ./configure --enable-single-host --prefix="$GAMBITINSTDIR"
 
-  git checkout origin bbv
+  git checkout bbv
 
   echo "========== building Gambit"
 

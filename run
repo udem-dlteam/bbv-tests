@@ -36,8 +36,8 @@ INLINING_LIMIT=0  # 0 for no function inlining
 if test "$WIPGAMBITDIR" != "" ; then
   GAMBITCOMP="$WIPGAMBITDIR/gsi/gsi -:=$WIPGAMBITDIR,drR $WIPGAMBITDIR/gsc/igsc.scm"
 else
-  GAMBITDIR="$SCRIPT_DIR/gambit/inst"
-  GAMBITCOMP="$GAMBITDIR/bin/gsc"
+  GAMBITDIR="$SCRIPT_DIR/gambit/gambit"
+  GAMBITCOMP="$GAMBITDIR/gsi/gsi -:=$GAMBITDIR,drR $GAMBITDIR/gsc/igsc.scm"
 fi
 
 # for bigloo
