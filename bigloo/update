@@ -35,7 +35,7 @@ get_available_parallelism
 MAKE_JOBS="-j$AVAILABLE_PARALLELISM"
 
 BIGLOOREPODIR="$SCRIPT_DIR/bigloo"
-BIGLOOINSTDIR="$SCRIPT_DIR/bigloo/local"
+BIGLOOINSTDIR="$SCRIPT_DIR/local"
 BIGLOOGIT=git@github.com:manuel-serrano/bigloo.git
 
 if test ! -d "$BIGLOOREPODIR" ; then

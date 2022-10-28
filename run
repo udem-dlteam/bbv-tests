@@ -156,7 +156,7 @@ for file in $FILES ; do
       base="$filenoext.bigloo.$INLINING_LIMIT$ARITHMETIC$VERSION_LIMIT"
       PATH="$BIGLOODIR/bin:$PATH"
       (cd $SCRIPT_DIR/bigloo && \
-       $BIGLOOCOMP -srfi arithmetic$ARITHMETIC bbv.bgl $file -saw -fsaw-bbv -o $base.exe && \
+       $BIGLOOCOMP -O3 -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -saw -fsaw-bbv -o $base.exe && \
        $BGLCFG $base-program.bbv.cfg > $base.dot && \
        run_dot $base-program.bbv.dot)
       CFGPDF=$base-program.bbv.dot.pdf
