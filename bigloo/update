@@ -35,7 +35,7 @@ get_available_parallelism
 MAKE_JOBS="-j$AVAILABLE_PARALLELISM"
 
 BIGLOOREPODIR="$SCRIPT_DIR/bigloo"
-BIGLOOINSTDIR="$SCRIPT_DIR/bigloo/local"
+BIGLOOINSTDIR="$SCRIPT_DIR/local"
 BIGLOOGIT=git@github.com:manuel-serrano/bigloo.git
 
 if test ! -d "$BIGLOOREPODIR" ; then
@@ -56,11 +56,15 @@ if test ! -e config.status ; then
 
   echo "========== building Bigloo"
 
-  make "$MAKE_JOBS" && make -C tools bglcfg
+  make "$MAKE_JOBS"
   
   echo "========== installing Bigloo"
 
   make install
+
+  echo "========== installing bglcfg"
+
+  make -C tools bglcfg
 
 fi
 
