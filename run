@@ -69,6 +69,14 @@ while [ "$#" != "0" ]; do
       fi
       VERSION_LIMIT="$1"
       ;;
+    -I) # inlining limit
+      shift
+      if [ "$#" = "0" ]; then
+        printf "inlining limit (-I) option needs an argument"
+        exit 1
+      fi
+      INLINING_LIMIT="$1"
+      ;;
     -P) # primitive counts
       PRIMITIVE_COUNT=1
       ;;
