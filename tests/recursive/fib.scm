@@ -1,9 +1,9 @@
-(define (run #!key (arg (unknown 39)))
+(define (run #!key (n (unknown 39)))
    
-   (define (fib x)
-      (if (GFX< x 2)
-          x
-          (GFX+ (fib (GFX- x 1))
-                (fib (GFX- x 2)))))
+   (define (fib n)
+      (if (GFX< n 2)
+          n
+          (GFX+ (fib (GFX- n 1))
+                (fib (GFX- n 2)))))
    
-   (fib arg))
+   (fib n))
