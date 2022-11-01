@@ -5,6 +5,7 @@ import csv
 import copy
 import os
 import re
+import statistics
 import subprocess
 
 DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
@@ -42,11 +43,16 @@ def extract_primitives_count(content):
 def extract_execution_time(content):
     if DEFAULT_EXECUTION_TIME_MARKER in content:
         time_section = content.split(DEFAULT_EXECUTION_TIME_MARKER)[1]
-        counts = re.search("(\d+):(\d+).(\d+)", time_section)
+        all_times = re.findall(r"real\s+(\d+):(\d+).(\d+)", time_section) \
+                    or re.findall(r"(\d+):(\d+).(\d+)elapsed", time_section) # support both bash and sh time
 
-        minutes, seconds, fraction = map(int, counts.group(1, 2, 3))
+        times = []
 
-        return 60 * minutes  + seconds + fraction / 10 ** len(counts.group(3))
+        for t in all_times:
+            minutes, seconds, fraction = t
+            times.append(60 * int(minutes)  + int(seconds) + int(fraction) / 10 ** len(fraction))
+
+        return times
     else:
         return None
 
@@ -144,9 +150,12 @@ def main(trace_files):
             name = os.path.basename(filename)
             content = f.read()
             primitive_count = extract_primitives_count(content)
-            execution_time = extract_execution_time(content)
+            relevant_execution_times = extract_execution_time(content)[1:]
+            average_time = statistics.mean(relevant_execution_times)
+            variance =  statistics.pvariance(relevant_execution_times)
             results.append({'name': name,
-                            'time': execution_time,
+                            'time': average_time,
+                            'variance': variance,
                             'primitives': primitive_count})
 
     table = results_to_table(results)

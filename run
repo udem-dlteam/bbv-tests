@@ -81,7 +81,12 @@ while [ "$#" != "0" ]; do
       PRIMITIVE_COUNT=1
       ;;
     -T) # timed execution
-      TIMED_EXECUTION=1
+    shift
+      if [ "$#" = "0" ]; then
+        printf "timed exeuction (-T) option needs an argument"
+        exit 1
+      fi
+      TIMED_EXECUTION="$1"
       ;;
     -c|--clean) # clean
       rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o* tests/*/*~ tests/*/*.bbv.dot tests/*/*.exe
@@ -194,9 +199,14 @@ for file in $FILES ; do
 
   esac
 
-  if [ "$TIMED_EXECUTION" -eq "1" ]; then
+  if [ "$TIMED_EXECUTION" != "0" ]; then
     echo "***time" >> $trace
-    time -f "%E" -o $trace -a $exe
+    i=0
+    while [ "$i" -le "$TIMED_EXECUTION" ]; do
+        (time $exe) 2>> $trace
+        i=$(( i + 1 ))
+    done
+    echo "***time" >> $trace
   fi
 
   if test "$ANALYSISEXT" != "" && fgrep ";; $ANALYSISEXT contains: " $file > /dev/null 2>&1 ; then
