@@ -7,5 +7,21 @@
    (main main))
 
 (define (main args)
-   (let ((args (map (lambda (s) (call-with-input-string s read)) (cdr args))))
-      (apply run args)))
+   (let loop ((cmdargs (map (lambda (s) (call-with-input-string s read)) (cdr args)))
+	      (runargs '())
+	      (repeat 1))
+      (cond
+	 ((null? cmdargs)
+	  (let loop ((repeat repeat)
+		     (res #f))
+	     (if (>fx repeat 0)
+		 (loop (-fx repeat 1) (apply run runargs))
+		 (print res))))
+	 ((eq? (car cmdargs) :repeat)
+	  (if (and (pair? (cdr cmdargs)) (integer? (cadr cmdargs)) (>fx (cadr cmdargs) 0))
+	      (loop '() (append runargs (cddr cmdargs)) (cadr cmdargs))
+	      (error "bbv.bgl" "wrong :repeat value" (cdr cmdargs))))
+	 ((null? (cdr cmdargs))
+	  (error "bbv.bgl" "wrong argument" (car cmdargs)))
+	 (else
+	  (loop (cddr cmdargs) (append runargs (list (car cmdargs) (cadr cmdargs))) repeat)))))

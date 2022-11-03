@@ -181,7 +181,7 @@ for file in $FILES ; do
 	SAWBBV=
       fi
       (cd $SCRIPT_DIR/bigloo && \
-	 $BIGLOOCOMP -O3 -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -saw -fsaw-bbv -o $exe)
+	 $BIGLOOCOMP -O3 -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -saw -fsaw-bbv -o $exe)
 
       if [ -f $SCRIPT_DIR/bigloo/$base-program.bbv.cfg ]; then
         (cd $SCRIPT_DIR/bigloo && \
