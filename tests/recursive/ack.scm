@@ -1,8 +1,11 @@
 (define (run #!key (m (unknown 3)) (n (unknown 9)))
    
   (define (ack m n)
-    (cond ((GFX= m 0) (GFX+ n 1))
-          ((GFX= n 0) (ack (GFX- m 1) 1))
-          (else (ack (GFX- m 1) (ack m (GFX- n 1))))))
+    (cond ((SFX= m 0) (SFX+ n 1))
+          ((SFX= n 0) (ack (SFX- m 1) 1))
+          (else (ack (SFX- m 1) (ack m (SFX- n 1))))))
 
   (ack m n))
+
+(define (check result)
+  (equal? result 4093))

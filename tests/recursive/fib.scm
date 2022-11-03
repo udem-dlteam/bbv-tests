@@ -1,9 +1,12 @@
 (define (run #!key (n (unknown 39)))
    
   (define (fib n)
-    (if (GFX< n 2)
+    (if (SFX< n 2)
         n
-        (GFX+ (fib (GFX- n 1))
-              (fib (GFX- n 2)))))
+        (SFX+ (fib (SFX- n 1))
+              (fib (SFX- n 2)))))
    
   (fib n))
+
+(define (check result)
+  (equal? result 63245986))
