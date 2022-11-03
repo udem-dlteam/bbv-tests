@@ -4,11 +4,11 @@ debug=false
 
 #bench=tests/recursive/fib ; args="n: 39" ; repeat=10
 #bench=tests/recursive/ack ; args="m: 3 n: 9" ; repeat=50
-bench=tests/recursive/tak ; args="x: 18 y: 12 z: 6" ; repeat=10000
+#bench=tests/recursive/tak ; args="x: 18 y: 12 z: 6" ; repeat=10000
 #bench=tests/recursive/takl ; args="x: 18 y: 12 z: 6" ; repeat=1000
 #bench=tests/recursive/diviter ; args="" ; repeat=200000
 #bench=tests/recursive/divrec ; args="" ; repeat=200000
-#bench=tests/recursive/array1 ; args="n: 200000" ; repeat=10
+bench=tests/recursive/array1 ; args="n: 200000" ; repeat=10
 
 TIME=time
 TIMEARGS=
