@@ -10,8 +10,8 @@
       (if (pair? args)
           (error "invalid arguments")
           (let ((args (reverse args)))
-            (let loop2 ((repeat repeat))
+            (let loop2 ((repeat repeat) (result #f))
               (if (> repeat 0)
-                  (begin
-                    (apply run args)
-                    (loop2 (- repeat 1)))))))))
+                  (loop2 (- repeat 1) (apply run args))
+                  (if (and (null? args) (not (check result)))
+                      (error "wrong result =" result))))))))

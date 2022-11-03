@@ -1,9 +1,10 @@
 (define (create-n n)
-  (do ((n n (GFX- n 1))
+  (do ((n n (SFX- n 1))
        (a '() (cons '() a)))
-      ((GFX= n 0) a)))
+      ((SFX= n 0) a)))
 
-(define *ll* (create-n 2000))
+(define *ll* (create-n 200))
+(define expect (create-n 100))
 
 (define (run)
 
@@ -13,3 +14,6 @@
         ((null? l) a)))
 
   (iterative-div2 *ll*))
+
+(define (check result)
+  (equal? result expect))
