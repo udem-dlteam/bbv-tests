@@ -74,6 +74,10 @@ cat pull.out
 
 if grep -q -v 'Already up-to-date.' pull.out > /dev/null ; then
 
+  echo "========== reconfiguring Bigloo"
+
+  ./configure --prefix="$BIGLOOINSTDIR"
+
   echo "========== building Bigloo with recent changes"
 
   make "$MAKE_JOBS"
