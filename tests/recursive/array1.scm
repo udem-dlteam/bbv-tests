@@ -1,11 +1,14 @@
+  
+
+
 (define (run #!key (n (unknown 200000)))
-
-  (define (create-x n)
-    (define result (Smake-vector1 n))
-    (do ((i 0 (SFX+ i 1)))
-        ((SFX>= i n) result)
-      (Svector-set! result i i)))
-
+   
+   (define (create-x n)
+      (define result (Smake-vector1 n))
+      (do ((i 0 (SFX+ i 1)))
+	  ((SFX>= i n) result)
+	  (Svector-set! result i i)))
+   
   (define (create-y x)
     (let* ((n (Svector-length x))
            (result (Smake-vector1 n)))

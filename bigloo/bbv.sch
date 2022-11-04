@@ -2,9 +2,18 @@
    (extern (include "./bbv_saw.h")
            (macro bbv-saw-statistics::int () "bbv_saw_statistics")))
 
-(define-macro (FLop op . args)   `(,(symbol-append op 'fl) ,@args))
-(define-macro (FXop op . args)   `(,(symbol-append op 'fx) ,@args))
-(define-macro (PRIMop op . args) `(,op ,@args))
+(define-macro (FLop op . args)
+   (case op
+      ((atan2) `(atan-2fl ,@args))
+      (else `(,(symbol-append op 'fl) ,@args))))
+(define-macro (FXop op . args)
+   `(,(symbol-append op 'fx) ,@args))
+(define-macro (PRIMop op . args)
+   (case op
+      ((vector-set!) `(vector-set-ur! ,@args))
+      ((vector-ref) `(vector-ref-ur ,@args))
+      ((atan2) `(atan-2fl ,@args))
+      (else `(,op ,@args))))
 
 (define (unknown x) ((car (list (lambda () x)))))
 
@@ -236,9 +245,9 @@
            (,b ,y))
        (cond
         ((and (FLONUM? ,a) (FLONUM? ,b))
-         (FLatan ,a ,b))
+         (FLatan2 ,a ,b))
         (else
-         (PRIMop atan ,a ,b))))))
+         (PRIMop atan2 ,a ,b))))))
 
 
 (define-macro (Scar x)
@@ -272,21 +281,27 @@
 		    (PRIMop make-vector ,a)
 		    (DEAD-END "make-vector type error"))))))
 
-(define-macro (Svector-ref v i)
-   (define arithmetic
-      (cond-expand
-	 (arithmeticG 'G)
-	 (arithmeticS 'S)
-	 (else 'G)))
-   (let ((a (gensym))
-	 (b (gensym)))
-      `(let ((,a ,v)
-	     (,b ,i))
-	  ,(if (eq? arithmetic 'S)
-	       `(PRIMop vector-ref ,a ,b)
-	       `(if (and (vector? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop vector-length ,a)))
-		    (PRIMop vector-ref ,a ,b)
-		    (DEAD-END "vector-ref type error"))))))
+(define-expander Svector-ref
+   (lambda (x e)
+      (define arithmetic
+	 (cond-expand
+	    (arithmeticG 'G)
+	    (arithmeticS 'S)
+	    (else 'G)))
+      (let ((v (cadr x))
+	    (i (caddr x))
+	    (a (gensym))
+	    (b (gensym)))
+	 (e `(let ((,a ,v)
+		   (,b ,i))
+		,(if (eq? arithmetic 'S)
+		     `(PRIMop vector-ref ,a ,b)
+		     `(if (and (vector? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop vector-length ,a)))
+			  (PRIMop vector-ref ,a ,b)
+			  (DEAD-END (format "type-error (vector-ref ~a ~a):~a"
+				       (typeof ,a) (typeof ,b)
+				       ',(cer x))))))
+	    e))))
 
 (define-macro (Svector-set! v i x)
    (define arithmetic
@@ -304,7 +319,7 @@
 	       `(PRIMop vector-set! ,a ,b ,c)
 	       `(if (and (vector? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop vector-length ,a)))
 		    (PRIMop vector-set! ,a ,b ,c)
-		    (DEAD-END "vector-set! type error"))))))
+		    (DEAD-END (format "vector-set! type error ~a" ,b)))))))
 
 (define-macro (Svector-length v)
    (define arithmetic
