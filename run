@@ -158,8 +158,8 @@ for file in $FILES ; do
       DECL="(declare (version-limit $VERSION_LIMIT) (inlining-limit $INLINING_LIMIT) (standard-bindings) (extended-bindings) (not safe) (block)) (define-macro (%%%) (eval '(define arithmetic '$ARITHMETIC))) (%%%) (define-macro (npnull? x) (quasiquote (let ((x ,x)) (and (not (##pair? x)) (##null? x)))))"
       base="$filenoext.gambit.$INLINING_LIMIT$ARITHMETIC$VERSION_LIMIT"
       exe=$base.exe
-      $GAMBITCOMP -prelude "$DECL (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(load \"$SCRIPT_DIR/gambit/main\")" -keep-temp -gvm -cfg $PRIMITIVE_COUNT_FLAG -exe -o $exe $file
-      if [ "$PRIMITIVE_COUNT" -eq "1" ]; then
+      $GAMBITCOMP -prelude "$DECL (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(load \"$SCRIPT_DIR/gambit/main\")" -keep-temp -gvm -cfg -exe -o $exe $file
+      if [ "$PRIMITIVE_COUNT" = "1" ]; then
         $GAMBITCOMP -prelude "$DECL (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(run)" -gvm-interpret $file
       fi
       mv $filenoext.cfg $base.cfg
@@ -171,7 +171,7 @@ for file in $FILES ; do
     bigloo)
       base="$filenoext.bigloo.$INLINING_LIMIT$ARITHMETIC$VERSION_LIMIT"
       exe=$base.exe
-      if [ "$PRIMITIVE_COUNT" -eq "1" ]; then
+      if [ "$PRIMITIVE_COUNT" = "1" ]; then
         echo "ERROR: primitive count not supported for bigloo"
         exit 1
       fi
