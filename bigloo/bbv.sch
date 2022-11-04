@@ -249,23 +249,75 @@
         (else
          (PRIMop atan2 ,a ,b))))))
 
-
 (define-macro (Scar x)
+  (define arithmetic
+    (cond-expand
+      (arithmeticG 'G)
+      (arithmeticS 'S)
+      (else 'G)))
   (let ((a (gensym)))
     `(let ((,a ,x))
-       (if (pair? ,a)
-           (PRIMop car ,a)
-           (DEAD-END "car type error")))))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop car ,a)
+            `(if (pair? ,a)
+                 (PRIMop car ,a)
+                 (DEAD-END "car type error"))))))
 
 (define-macro (Scdr x)
+  (define arithmetic
+    (cond-expand
+      (arithmeticG 'G)
+      (arithmeticS 'S)
+      (else 'G)))
   (let ((a (gensym)))
     `(let ((,a ,x))
-       (if (pair? ,a)
-           (PRIMop cdr ,a)
-           (DEAD-END "cdr type error")))))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop cdr ,a)
+            `(if (pair? ,a)
+                 (PRIMop cdr ,a)
+                 (DEAD-END "cdr type error"))))))
 
-(define-macro (Scddr x)
-  `(Scdr (Scdr ,x)))
+(define-macro (Sset-car! x y)
+  (define arithmetic
+    (cond-expand
+      (arithmeticG 'G)
+      (arithmeticS 'S)
+      (else 'G)))
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop set-car! ,a ,b)
+            `(if (pair? ,a)
+                 (PRIMop set-car! ,a ,b)
+                 (DEAD-END "set-car! type error"))))))
+
+(define-macro (Sset-cdr! x y)
+  (define arithmetic
+    (cond-expand
+      (arithmeticG 'G)
+      (arithmeticS 'S)
+      (else 'G)))
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop set-cdr! ,a ,b)
+            `(if (pair? ,a)
+                 (PRIMop set-cdr! ,a ,b)
+                 (DEAD-END "set-cdr! type error"))))))
+
+(define-macro (Scadr x) `(Scar (Scdr ,x)))
+(define-macro (Scddr x) `(Scdr (Scdr ,x)))
+
+(define-macro (Sstring->symbol x) `(string->symbol ,x))
+(define-macro (Ssymbol->string x) `(symbol->string ,x))
+(define-macro (SFXnumber->string x) `(number->string ,x))
+(define-macro (Slength x) `(length ,x))
+(define-macro (Sappend x y) `(append ,x ,y))
+(define-macro (Sassq x y) `(assq ,x ,y))
 
 (define-macro (Smake-vector1 n)
    (define arithmetic
@@ -334,6 +386,54 @@
 	       `(if (vector? ,a)
 		    (PRIMop vector-length ,a)
 		    (DEAD-END "vector-length type error"))))))
+
+(define-macro (Sstring-ref s i)
+   (define arithmetic
+      (cond-expand
+	 (arithmeticG 'G)
+	 (arithmeticS 'S)
+	 (else 'G)))
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,s)
+           (,b ,i))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop string-ref ,a ,b)
+            `(if (and (string? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop string-length ,a)))
+                 (PRIMop string-ref ,a ,b)
+                 (DEAD-END "string-ref type error"))))))
+
+(define-macro (Sstring-set! s i x)
+   (define arithmetic
+      (cond-expand
+	 (arithmeticG 'G)
+	 (arithmeticS 'S)
+	 (else 'G)))
+  (let ((a (gensym))
+        (b (gensym))
+        (c (gensym)))
+    `(let ((,a ,s)
+           (,b ,i)
+           (,c ,x))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop string-set! ,a ,b ,c)
+            `(if (and (string? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop string-length ,a)))
+                 (PRIMop string-set! ,a ,b ,c)
+                 (DEAD-END "string-set! type error"))))))
+
+(define-macro (Sstring-length s)
+   (define arithmetic
+      (cond-expand
+	 (arithmeticG 'G)
+	 (arithmeticS 'S)
+	 (else 'G)))
+  (let ((a (gensym)))
+    `(let ((,a ,s))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop string-length ,a)
+            `(if (string? ,a)
+                 (PRIMop string-length ,a)
+                 (DEAD-END "string-length type error"))))))
 
 (define-macro (DEAD-END msg)
   `(error "bbv" "error" ,msg))
