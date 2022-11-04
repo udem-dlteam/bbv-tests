@@ -9,7 +9,7 @@
             (loop1 (cddr args) (cons (cadr args) (cons (car args) rev-args)) repeat)))
       (if (pair? args)
           (error "invalid arguments")
-          (let ((args (reverse args)))
+          (let ((args (reverse rev-args)))
             (let loop2 ((repeat repeat) (result #f))
               (if (> repeat 0)
                   (loop2 (- repeat 1) (apply run args))
