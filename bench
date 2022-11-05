@@ -5,6 +5,7 @@
 #  For gambit:
 #
 #    ./bench -g fib
+#    ./bench -g -P fib   # add branch counts to CFG
 #    ./bench -g -G -S -V 0 -V 5 -I 0 -I 350 fib fibfp tak takl
 #    ./bench -g
 #
@@ -42,6 +43,7 @@ SG=""
 PROGRAMS=""
 V=""
 I=""
+PRIMITIVE_COUNT=""
 
 while [ "$#" != "0" ]; do
   case "$1" in
@@ -52,10 +54,10 @@ while [ "$#" != "0" ]; do
       SC="$SC bigloo"
       ;;
     -G) # generic arithmetic
-      SG="$SC G"
+      SG="$SG G"
       ;;
     -S) # specialized arithmetic when fixnum/flonum operations are possible
-      SG="$SC S"
+      SG="$SG S"
       ;;
     -V) # version limit
       shift
@@ -72,6 +74,9 @@ while [ "$#" != "0" ]; do
         exit 1
       fi
       I="$I $1"
+      ;;
+    -P) # primitive counts
+      PRIMITIVE_COUNT="-P"
       ;;
     -*) # other options
       printf "*** unknown option: $1\n"
@@ -164,7 +169,7 @@ for program in $PROGRAMS ; do
         for SG in $SG_range ; do
           for V in $V_range ; do
             for I in $I_range ; do
-              $SCRIPT_DIR/compile --$SC -I $I -$SG -V $V $bench.scm
+              $SCRIPT_DIR/compile --$SC -I $I -$SG -V $V $PRIMITIVE_COUNT $bench.scm
             done
           done
         done

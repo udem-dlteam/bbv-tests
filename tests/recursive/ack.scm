@@ -1,4 +1,4 @@
-(define (run #!key (m (unknown 3)) (n (unknown 9)))
+(define (run #!key (m (unknown 3 3)) (n (unknown 9 6)))
    
   (define (ack m n)
     (cond ((SFX= m 0) (SFX+ n 1))
