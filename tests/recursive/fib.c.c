@@ -2,11 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-int fib(int x) {
-  if (x<2)
-    return x;
+int fib(int n) {
+  if (n<2)
+    return n;
   else
-    return fib(x-1) + fib(x-2);
+    return fib(n-1) + fib(n-2);
 }
 
 int run(int n) {
