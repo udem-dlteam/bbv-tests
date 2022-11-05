@@ -4,12 +4,12 @@
 #
 #  For gambit:
 #
-#    ./run --gambit --view tests/recursive/fib.scm
+#    ./compile --gambit --view tests/recursive/fib.scm
 #    time ./tests/recursive/fib.gambit.0G4.exe
 #
 #  For bigloo:
 #
-#    ./run --bigloo --view tests/recursive/fib.scm
+#    ./compile --bigloo --view tests/recursive/fib.scm
 #    time ./tests/recursive/fib.bigloo.0G4.exe
 
 
@@ -26,7 +26,7 @@ SCRIPT_DIR="${SCRIPT_DIR%/.}"
 
 SYSTEM=gambit
 VIEW=no
-TESTS=""          # empty to run all tests in tests directory
+TESTS=""          # empty to compile all tests in tests directory
 
 ARITHMETIC=G      # generic (G) or specialized (S) arithmetic?
 VERSION_LIMIT=4   # version limit (0 to disable BBV)

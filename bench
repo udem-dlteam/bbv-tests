@@ -1,0 +1,219 @@
+#!/bin/sh
+
+# usage:
+#
+#  For gambit:
+#
+#    ./bench -g fib
+#    ./bench -g -G -S -V 0 -V 5 -I 0 -I 350 fib fibfp tak takl
+#    ./bench -g
+#
+#  For bigloo:
+#
+#    ./bench -b fib
+#    ./bench -b -G -S -V 0 -V 5 fib fibfp tak takl
+#    ./bench -b
+
+DEFAULT_SC="gambit bigloo"
+DEFAULT_SG="S G"
+DEFAULT_V="0 5"
+DEFAULT_I="0"
+DEFAULT_PROGRAMS="ack fib fibfp tak takl diviter divrec array1 browse"
+
+#debug=true
+debug=false
+
+compile=true
+#compile=false
+
+execute=true
+#execute=false
+
+# find script directory
+SCRIPT_DIR="$0"
+if test "${SCRIPT_DIR#/}" = "$SCRIPT_DIR" ; then
+  SCRIPT_DIR="$(pwd)/$SCRIPT_DIR"
+fi
+SCRIPT_DIR="${SCRIPT_DIR%/*}"
+SCRIPT_DIR="${SCRIPT_DIR%/.}"
+
+SC=""
+SG=""
+PROGRAMS=""
+V=""
+I=""
+
+while [ "$#" != "0" ]; do
+  case "$1" in
+    -g|--gambit) # system
+      SC="$SC gambit"
+      ;;
+    -b|--bigloo) # system
+      SC="$SC bigloo"
+      ;;
+    -G) # generic arithmetic
+      SG="$SC G"
+      ;;
+    -S) # specialized arithmetic when fixnum/flonum operations are possible
+      SG="$SC S"
+      ;;
+    -V) # version limit
+      shift
+      if [ "$#" = "0" ]; then
+        printf "version limit (-V) option needs an argument"
+        exit 1
+      fi
+      V="$V $1"
+      ;;
+    -I) # inlining limit
+      shift
+      if [ "$#" = "0" ]; then
+        printf "inlining limit (-I) option needs an argument"
+        exit 1
+      fi
+      I="$I $1"
+      ;;
+    -*) # other options
+      printf "*** unknown option: $1\n"
+      exit 1
+      ;;
+    *)
+      PROGRAMS="$PROGRAMS $1"
+      ;;
+  esac
+  shift
+done
+
+if [ "$SC" = "" ] ; then
+  SC="$DEFAULT_SC"
+fi
+
+if [ "$SG" = "" ] ; then
+  SG="$DEFAULT_SG"
+fi
+
+if [ "$V" = "" ] ; then
+  V="$DEFAULT_V"
+fi
+
+if [ "$I" = "" ] ; then
+  I="$DEFAULT_I"
+fi
+
+if [ "$PROGRAMS" = "" ] ; then
+  PROGRAMS="$DEFAULT_PROGRAMS"
+fi
+
+SC_range="$SC"
+SG_range="$SG"
+V_range="$V"
+I_range="$I"
+
+CC_range="gcc clang"
+O_range="0 1 2 3"
+
+if $debug ; then
+
+  # for quick testing
+
+  gambit_V_range="5"
+  gambit_I_range="0"
+
+  bigloo_V_range="5"
+  bigloo_I_range="0"
+
+  CC_range=""
+  O_range="1"
+
+fi
+
+#if [ "$WIPGAMBITDIR" = "" ] ; then
+#  export WIPGAMBITDIR=`pwd`/../gambit
+#fi
+
+if [ `uname -s` = "Darwin" ] ; then
+  TIME=time
+  TIMEARGS=
+  GCC=gcc-12
+else
+  TIME=/usr/bin/time
+  TIMEARGS="-f real:%e"
+  GCC=gcc
+fi
+
+for program in $PROGRAMS ; do
+
+  case "$program" in
+
+     ack) bench=tests/recursive/ack ; args="m: 3 n: 9" ; repeat=50 ;;
+     fib) bench=tests/recursive/fib ; args="n: 39" ; repeat=5 ;;
+   fibfp) bench=tests/recursive/fibfp ; args="n: 39.0" ; repeat=2 ;;
+     tak) bench=tests/recursive/tak ; args="x: 18 y: 12 z: 6" ; repeat=10000 ;;
+    takl) bench=tests/recursive/takl ; args="x: 18 y: 12 z: 6" ; repeat=2000 ;;
+ diviter) bench=tests/recursive/diviter ; args="" ; repeat=2000000 ;;
+  divrec) bench=tests/recursive/divrec ; args="" ; repeat=2000000 ;;
+  array1) bench=tests/recursive/array1 ; args="n: 200000" ; repeat=5 ;;
+  browse) bench=tests/gabriel/browse ; args="" ; repeat=2000 ;;
+
+  esac
+
+  if $compile ; then
+
+    if test -e $bench.scm ; then
+      for SC in $SC_range ; do
+        for SG in $SG_range ; do
+          for V in $V_range ; do
+            for I in $I_range ; do
+              $SCRIPT_DIR/compile --$SC -I $I -$SG -V $V $bench.scm
+            done
+          done
+        done
+      done
+    fi
+
+    if test -e $bench.c.c ; then
+      for CC in $CC_range ; do
+        if [ "$CC" = "gcc" ] ; then
+          ACTUAL_CC="$GCC"
+        else
+          ACTUAL_CC="$CC"
+        fi
+        for O in $O_range ; do
+          $ACTUAL_CC -fomit-frame-pointer -O$O $bench.c.c -o $bench.$CC.O$O.exe
+        done
+      done
+    fi
+
+  fi
+
+  if $execute ; then
+
+    rm -f $bench.results
+
+    if test -e $bench.scm ; then
+      for SC in $SC_range ; do
+        for SG in $SG_range ; do
+          for V in $V_range ; do
+            for I in $I_range ; do
+              printf "(%s $SC %s V=%s I=%s)\n" `(eval $TIME $TIMEARGS $bench.$SC.$I$SG$V.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/.*0m//' -e 's/ *//' -e 's/[s ].*//'` $SG $V $I >> $bench.results
+            done
+          done
+        done
+      done
+    fi
+
+    if test -e $bench.c.c ; then
+      for CC in $CC_range ; do
+        for O in $O_range ; do
+          printf "(%s $CC -O%s)\n" `(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/.*0m//' -e 's/ *//' -e 's/[s ].*//'` $O >> $bench.results
+        done
+      done
+    fi
+
+    printf "########### EXECUTION TIMES FOR $program\n"
+
+    sort -n $bench.results
+
+  fi
+
+done
