@@ -76,6 +76,8 @@
 (define-macro (SFX<= x y)        `(MAPop SFX <=,x ,y))
 (define-macro (SFX>= x y)        `(MAPop SFX >= ,x ,y))
 (define-macro (SFXzero? x)       `(MAPop SFX zero? ,x))
+(define-macro (SFXodd? x)        `(MAPop SFX odd? ,x))
+(define-macro (SFXeven? x)       `(MAPop SFX even? ,x))
 
 (define-macro (FL+ x y)         `(FLop + ,x ,y))
 (define-macro (FL- x y)         `(FLop - ,x ,y))
@@ -107,6 +109,8 @@
 (define-macro (FX<= x y)        `(FXop <=,x ,y))
 (define-macro (FX>= x y)        `(FXop >= ,x ,y))
 (define-macro (FXzero? x)       `(FXop zero? ,x))
+(define-macro (FXodd? x)        `(FXop odd? ,x))
+(define-macro (FXeven? x)       `(FXop even? ,x))
 
 (define-macro (FLONUM? x) `(PRIMop flonum? ,x))
 (define-macro (FIXNUM? x) `(PRIMop fixnum? ,x))
@@ -211,6 +215,20 @@
         ((FLONUM? ,a) (FLzero? ,a))
         (else (PRIMop zero? ,a))))))
 
+(define-macro (BBVodd? x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (cond
+        ((FIXNUM? ,a) (FXodd? ,a))
+        (else (PRIMop odd? ,a))))))
+
+(define-macro (BBVeven? x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (cond
+        ((FIXNUM? ,a) (FXeven? ,a))
+        (else (PRIMop even? ,a))))))
+
 (define-macro (BBVsqrt x)
   (let ((a (gensym)))
     `(let ((,a ,x))
@@ -289,9 +307,19 @@
 (define-macro (Sstring->symbol x) `(string->symbol ,x))
 (define-macro (Ssymbol->string x) `(symbol->string ,x))
 (define-macro (SFXnumber->string x) `(number->string ,x))
-(define-macro (Slength x) `(length ,x))
-(define-macro (Sappend x y) `(append ,x ,y))
-(define-macro (Sassq x y) `(assq ,x ,y))
+(define-macro (Slength lst) `(length ,lst))
+(define-macro (Sappend lst1 lst2) `(append ,lst1 ,lst2))
+(define-macro (Sassq x lst) `(assq ,x ,lst))
+(define-macro (Smember x lst) `(member ,x ,lst))
+(define-macro (Smap2 f lst) `(map ,f ,lst))
+
+(define-macro (SFLexact x) `(exact ,x))
+(define-macro (SFXinexact x) `(inexact ,x))
+(define-macro (SFLtruncate x) `(truncate ,x))
+(define-macro (Svector-map2 f vect) `(vector-map ,f ,vect))
+(define-macro (Scall-with-current-continuation f) `(call-with-current-continuation ,f))
+(define-macro (Slist->vector lst) `(list->vector ,lst))
+(define-macro (Svector->list vect) `(vector->list ,vect))
 
 (define-macro (Smake-vector1 n)
   (let ((a (gensym)))
@@ -300,6 +328,17 @@
             `(PRIMop make-vector ,a)
             `(if (and (FIXNUM? ,a) (FX>= ,a 0))
                  (PRIMop make-vector ,a)
+                 (DEAD-END "make-vector type error"))))))
+
+(define-macro (Smake-vector2 n init)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,n)
+           (,b ,init))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop make-vector ,a ,b)
+            `(if (and (FIXNUM? ,a) (FX>= ,a 0))
+                 (PRIMop make-vector ,a ,b)
                  (DEAD-END "make-vector type error"))))))
 
 (define-macro (Svector-ref v i)

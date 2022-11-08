@@ -19,7 +19,7 @@ DEFAULT_SC="gambit bigloo"
 DEFAULT_SG="S G"
 DEFAULT_V="0 5"
 DEFAULT_I="0"
-DEFAULT_PROGRAMS="ack fib fibfp tak takl diviter divrec array1 browse"
+DEFAULT_PROGRAMS="ack fib fibfp tak takl diviter divrec array1 browse mazefun nqueens puzzle quicksort sum sumfp triangl"
 
 #debug=true
 debug=false
@@ -150,17 +150,26 @@ for program in $PROGRAMS ; do
 
   case "$program" in
 
-     ack) bench=tests/recursive/ack ; args="m: 3 n: 9" ; repeat=50 ;;
-     fib) bench=tests/recursive/fib ; args="n: 39" ; repeat=5 ;;
-   fibfp) bench=tests/recursive/fibfp ; args="n: 39.0" ; repeat=2 ;;
-     tak) bench=tests/recursive/tak ; args="x: 18 y: 12 z: 6" ; repeat=10000 ;;
-    takl) bench=tests/recursive/takl ; args="x: 18 y: 12 z: 6" ; repeat=2000 ;;
- diviter) bench=tests/recursive/diviter ; args="" ; repeat=2000000 ;;
-  divrec) bench=tests/recursive/divrec ; args="" ; repeat=2000000 ;;
-  array1) bench=tests/recursive/array1 ; args="n: 200000" ; repeat=5 ;;
-  browse) bench=tests/gabriel/browse ; args="" ; repeat=2000 ;;
+       ack) bench=recursive/ack ; args="m: 3 n: 9" ; repeat=50 ;;
+       fib) bench=recursive/fib ; args="n: 39" ; repeat=5 ;;
+     fibfp) bench=recursive/fibfp ; args="n: 39.0" ; repeat=2 ;;
+       tak) bench=recursive/tak ; args="x: 18 y: 12 z: 6" ; repeat=10000 ;;
+      takl) bench=recursive/takl ; args="x: 18 y: 12 z: 6" ; repeat=2000 ;;
+   diviter) bench=recursive/diviter ; args="" ; repeat=2000000 ;;
+    divrec) bench=recursive/divrec ; args="" ; repeat=2000000 ;;
+    array1) bench=recursive/array1 ; args="n: 200000" ; repeat=5 ;;
+    browse) bench=gabriel/browse ; args="" ; repeat=2000 ;;
+   mazefun) bench=gabriel/mazefun ; args="n: 11 m: 11" ; repeat=5000 ;;
+   nqueens) bench=gabriel/nqueens ; args="n: 13" ; repeat=2 ;;
+    puzzle) bench=gabriel/puzzle ; args="n: 511" ; repeat=500 ;;
+ quicksort) bench=gabriel/quicksort ; args="" ; repeat=1000 ;;
+       sum) bench=gabriel/sum ; args="n: 10000" ; repeat=200000 ;;
+     sumfp) bench=gabriel/sumfp ; args="n: 1e6" ; repeat=500 ;;
+   triangl) bench=gabriel/triangl ; args="i: 22 depth: 1" ; repeat=50 ;;
 
   esac
+
+  bench="tests/$bench"
 
   if $compile ; then
 
