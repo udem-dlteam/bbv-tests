@@ -34,17 +34,22 @@ def verbose(*args, **kwargs):
 
 def group_similar_primitives(primitives):
     grouped_primitives = {}
+    seen = {}
 
     for k, v in primitives.items():
         group = SIMILAR_PRIMITIVES_TABLE.get(k)
         if group:
-            group_name = '/'.join(group)
-            grouped_primitives.setdefault(group_name, 0)
-            grouped_primitives[group_name] += v
-        else:
-            grouped_primitives[k] = v
+            group_name = ' & '.join(group)
 
-    return grouped_primitives
+            grouped_primitives.setdefault(group_name, 0)
+            seen.setdefault(group_name, 0)
+
+            grouped_primitives[group_name] += v
+            seen[group_name] += 1
+
+    relevant_grouped_primitives = {k: v for k, v in grouped_primitives.items() if seen[k] > 1}
+
+    return {**primitives, **relevant_grouped_primitives}
 
 def extract_primitives_count(content):
     if DEFAULT_PRIMITIVE_COUNTER_MARKER in content:
