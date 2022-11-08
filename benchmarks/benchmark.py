@@ -3,14 +3,25 @@
 import argparse
 import csv
 import copy
+import locale
 import os
 import re
 import statistics
 import subprocess
 
+locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+
+def aton(n):
+    try:
+        return locale.atoi(n)
+    except ValueError:
+        return locale.atof(n)
+
 VERBOSE = False
-RUN_SCRIPT = "../run"
+RUN_SCRIPT = "../compile"
 DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
+
+TITLES_ORDER = ['version', 'time', 'branch']
 
 SIMILAR_PRIMITIVES = [['##fx+', '##fx+?'],
                       ['##fx-', '##fx-?'],
@@ -23,17 +34,22 @@ def verbose(*args, **kwargs):
 
 def group_similar_primitives(primitives):
     grouped_primitives = {}
+    seen = {}
 
     for k, v in primitives.items():
         group = SIMILAR_PRIMITIVES_TABLE.get(k)
         if group:
-            group_name = '/'.join(group)
-            grouped_primitives.setdefault(group_name, 0)
-            grouped_primitives[group_name] += v
-        else:
-            grouped_primitives[k] = v
+            group_name = ' & '.join(group)
 
-    return grouped_primitives
+            grouped_primitives.setdefault(group_name, 0)
+            seen.setdefault(group_name, 0)
+
+            grouped_primitives[group_name] += v
+            seen[group_name] += 1
+
+    relevant_grouped_primitives = {k: v for k, v in grouped_primitives.items() if seen[k] > 1}
+
+    return {**primitives, **relevant_grouped_primitives}
 
 def extract_primitives_count(content):
     if DEFAULT_PRIMITIVE_COUNTER_MARKER in content:
@@ -64,39 +80,59 @@ def compile(file, system, vlimit, params):
 
     return executable, primitive_count
 
-def bench_one(executable, params):
-    command = f"time {executable}"
-    if params.get("force_bash"): command = f'bash -c "{command}"'
+def bench(executable, n, params):
+    def get_numbers_on_line_with(text, marker):
+        for line in text.splitlines():
+            if marker in line:
+                numbers = re.findall(r"[\d\.,]+", line)
+                return [aton(n) for n in numbers]
 
+        raise OSError(f"no line with '{marker}' in 'perf stat' output (is perf installed?)")
+
+
+    command = f"perf stat -r {n} {executable}"
     verbose(command)
     output = subprocess.run(command, shell=True, capture_output=True).stderr.decode()
+    verbose(output)
 
-    t = re.search(r"real\s+(\d+)m(\d+).(\d+)", output)
+    elapsed, delta, pdelta = get_numbers_on_line_with(output, "seconds time elapsed")
+    branch_misses, pbranch_misses, pbranch_misses_delta = get_numbers_on_line_with(output, "branch-misses:u")
 
-    if t:
-        minutes, seconds, fraction = t.group(1, 2, 3)
-        time = 60 * int(minutes)  + int(seconds) + int(fraction) / 10 ** len(fraction)
-
-        return time
-    else:
-        raise OSError("unknown format for shell 'time' command (try using --force-bash?)")
-
-def bench(executable, n, params):
-    bench_one(executable, params) # warmup
-    return [bench_one(executable, params) for _ in range(n)]
+    return {
+        "time": f"{elapsed}s (± {pdelta}%)",
+        "branch_misses": f"{branch_misses} (± {pbranch_misses_delta}%)"
+        }
 
 def add_percentages_to_results(bench_results, all_primitive_names):
     def make_getter(*path):
         def get(o, default):
             for k in path[:-1]: o = o[k]
-            return o.get(path[-1], default)
+            return read_number(o.get(path[-1], default))
         return get
 
-    def make_setter(*path):
-        def set(o, v):
+    def make_setter(*path, ratio_only=False):
+        def set(o, v, base):
+            if ratio_only:
+                result = f'{v / base:.3f}x'
+            elif v == base:
+                result = f'{format_number(v)}'
+            else:
+                result = f'{format_number(v)} ({v * 100 / base:.1f}%)'
+
             for k in path[:-1]: o = o[k]
-            o[path[-1]] = v
+            o[path[-1]] = result
         return set
+
+    def make_getter_setter(*path):
+        return make_getter(*path), make_setter(*path)
+
+    def read_number(x):
+        if isinstance(x, (int, float)):
+            return x
+        elif isinstance(x, str):
+            return aton(re.search(r"[\d\.,]+", x).group())
+        else:
+            raise TypeError("cannot read {x} as number")
 
     def format_number(x):
         if isinstance(x, int):
@@ -104,25 +140,20 @@ def add_percentages_to_results(bench_results, all_primitive_names):
         else:
             return f'{x:.3f}'
 
-    def add_percentage(values, getter, setter):
-        raw_counts = [getter(b, 0) for b in values]
-        if len(set(raw_counts)) == 1 or not raw_counts[0]:
-            counts = [format_number(c) for c in raw_counts]
-        else:
-            base = raw_counts[0]
-            counts = [format_number(base)]
-            counts.extend(f'{format_number(c)} ({c * 100 / base:.1f}%)' for c in raw_counts[1:])
+    def add_percentage(bench_results, getter, setter):
+        counts = [getter(b, 0) for b in bench_results]
+        base = counts[0]
 
-        for i, b in enumerate(bench_results):
-            setter(b, counts[i])
+        for b, c in zip(bench_results, counts):
+            setter(b, c, base)
 
     bench_results = copy.deepcopy(bench_results)
-    add_percentage(bench_results, make_getter('time'), make_setter('time'))
+
+    add_percentage(bench_results, make_getter('time'), make_setter('time_ratio', ratio_only=True))
+    add_percentage(bench_results, make_getter('branch_misses'), make_setter('branch_misses_ratio', ratio_only=True))
 
     for name in all_primitive_names:
-        add_percentage(bench_results,
-                       make_getter('primitives', name),
-                       make_setter('primitives', name))
+        add_percentage(bench_results, *make_getter_setter('primitives', name))
 
     return bench_results
 
@@ -137,14 +168,18 @@ def results_to_table(bench_results):
     bench_results = add_percentages_to_results(bench_results, all_primitive_names)
 
     # Convert dict to table
-    table = [['VERSIONS', 'TIME', *all_primitive_names]]
-    baseline = bench_results[0]
-    basetime = baseline['time']
-    basecount = baseline['primitives']
+    def priority(name):
+        for i, k in enumerate(TITLES_ORDER):
+            if k.lower() in name.lower():
+                return (i, name)
+        return (len(TITLES_ORDER), name)
+
+    names = [n for n in bench_results[0].keys() if n != 'primitives']
+    names.sort(key=priority)
+    table = [[*(n.upper().replace('_', ' ') for n in names), *all_primitive_names]]
 
     for results in bench_results:
-        name = results['versions']
-        row = [name, results['time']]
+        row = [results[n] for n in names]
         primitive_count = results['primitives']
         if primitive_count is None:
             row.extend([None] * len(all_primitive_names))
@@ -182,13 +217,8 @@ def main(*, file, system, vlimits, executions, **params):
 
     for v in vlimits:
         executable, primitive_count = compile(file, system, v, params)
-        exec_times = bench(executable, executions, params)
-
-        verbose("execution times:", *exec_times)
-
         results.append({'versions': v,
-                        'time': statistics.mean(exec_times),
-                        'variance': statistics.pvariance(exec_times),
+                        **bench(executable, executions, params),
                         'primitives': primitive_count})
 
     table = results_to_table(results)
@@ -211,7 +241,7 @@ if __name__ == "__main__":
                         help='verbose')
     parser.add_argument('-l',
                         dest="vlimits",
-                        nargs="*",
+                        nargs="+",
                         default=(0, 1, 2, 3, 4, 5),
                         type=int,
                         help="BBV versions limits")
@@ -220,10 +250,6 @@ if __name__ == "__main__":
                         default=10,
                         type=int,
                         help="number of executions")
-    parser.add_argument("--force-bash",
-                        dest="force_bash",
-                        action="store_true",
-                        help="force the use of the bash time command for benchamrks")
     parser.add_argument('-s',
                         dest='system',
                         default='gambit',
