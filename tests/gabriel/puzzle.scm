@@ -1,0 +1,145 @@
+;;; PUZZLE -- Forest Baskett's Puzzle benchmark, originally written in Pascal.
+
+;;(import (scheme base) (scheme read) (scheme write) (scheme time))
+
+(define (my-iota n)
+  (do ((n n (SFX- n 1))
+       (list '() (cons (SFX- n 1) list)))
+      ((SFXzero? n) list)))
+
+(define *size* 511)
+(define classmax 3)
+(define typemax 12)
+
+(define *iii* 0)
+(define *kount* 0)
+(define *d* 8)
+
+(define *piececount* (Smake-vector2 (SFX+ classmax 1) 0))
+(define *class* (Smake-vector2 (SFX+ typemax 1) 0))
+(define *piecemax* (Smake-vector2 (SFX+ typemax 1) 0))
+(define *puzzle* (Smake-vector1 (SFX+ *size* 1)))
+(define *p* (Smake-vector1 (SFX+ typemax 1)))
+
+(define (fit i j)
+  (let ((end (Svector-ref *piecemax* i)))
+    (do ((k 0 (SFX+ k 1)))
+        ((or (SFX> k end)
+             (and (Svector-ref (Svector-ref *p* i) k)
+                  (Svector-ref *puzzle* (SFX+ j k))))
+         (if (SFX> k end) #t #f)))))
+
+(define (place i j)
+  (let ((end (Svector-ref *piecemax* i)))
+    (do ((k 0 (SFX+ k 1)))
+        ((SFX> k end))
+      (cond ((Svector-ref (Svector-ref *p* i) k)
+             (Svector-set! *puzzle* (SFX+ j k) #t)
+             #t)))
+    (Svector-set! *piececount*
+                  (Svector-ref *class* i)
+                  (SFX- (Svector-ref *piececount* (Svector-ref *class* i)) 1))
+    (do ((k j (SFX+ k 1)))
+        ((or (SFX> k *size*) (not (Svector-ref *puzzle* k)))
+         (if (SFX> k *size*) 0 k)))))
+
+(define (puzzle-remove i j)
+  (let ((end (Svector-ref *piecemax* i)))
+    (do ((k 0 (SFX+ k 1)))
+        ((SFX> k end))
+      (cond ((Svector-ref (Svector-ref *p* i) k)
+             (Svector-set! *puzzle* (SFX+ j k) #f)
+             #f)))
+    (Svector-set! *piececount*
+                  (Svector-ref *class* i)
+                  (SFX+ (Svector-ref *piececount* (Svector-ref *class* i)) 1))))
+
+(define (trial j)
+  (let ((k 0))
+    (call-with-current-continuation
+     (lambda (return)
+       (do ((i 0 (SFX+ i 1)))
+           ((SFX> i typemax) (set! *kount* (SFX+ *kount* 1)) #f)
+         (cond
+          ((not
+            (SFXzero?
+             (Svector-ref *piececount* (Svector-ref *class* i))))
+           (cond
+            ((fit i j)
+             (set! k (place i j))
+             (cond
+              ((or (trial k) (SFXzero? k))
+               (set! *kount* (SFX+ *kount* 1))
+               (return #t))
+              (else (puzzle-remove i j))))))))))))
+
+(define (definePiece iclass ii jj kk)
+  (let ((index 0))
+    (do ((i 0 (SFX+ i 1)))
+        ((SFX> i ii))
+      (do ((j 0 (SFX+ j 1)))
+          ((SFX> j jj))
+        (do ((k 0 (SFX+ k 1)))
+            ((SFX> k kk))
+          (set! index (SFX+ i (SFX* *d* (SFX+ j (SFX* *d* k)))))
+          (Svector-set! (Svector-ref *p* *iii*) index  #t))))
+    (Svector-set! *class* *iii* iclass)
+    (Svector-set! *piecemax* *iii* index)
+    (cond ((not (SFX= *iii* typemax))
+           (set! *iii* (SFX+ *iii* 1))))))
+
+(define (start size)
+  (set! *kount* 0)
+  (do ((m 0 (SFX+ m 1)))
+      ((SFX> m size))
+    (Svector-set! *puzzle* m #t))
+  (do ((i 1 (SFX+ i 1)))
+      ((SFX> i 5))
+    (do ((j 1 (SFX+ j 1)))
+        ((SFX> j 5))
+      (do ((k 1 (SFX+ k 1)))
+          ((SFX> k 5))
+        (Svector-set! *puzzle* (SFX+ i (SFX* *d* (SFX+ j (SFX* *d* k)))) #f))))
+  (do ((i 0 (SFX+ i 1)))
+      ((SFX> i typemax))
+    (do ((m 0 (SFX+ m 1)))
+        ((SFX> m size))
+      (Svector-set! (Svector-ref *p* i) m #f)))
+  (set! *iii* 0)
+  (definePiece 0 3 1 0)
+  (definePiece 0 1 0 3)
+  (definePiece 0 0 3 1)
+  (definePiece 0 1 3 0)
+  (definePiece 0 3 0 1)
+  (definePiece 0 0 1 3)
+
+  (definePiece 1 2 0 0)
+  (definePiece 1 0 2 0)
+  (definePiece 1 0 0 2)
+
+  (definePiece 2 1 1 0)
+  (definePiece 2 1 0 1)
+  (definePiece 2 0 1 1)
+
+  (definePiece 3 1 1 1)
+
+  (Svector-set! *piececount* 0 13)
+  (Svector-set! *piececount* 1 3)
+  (Svector-set! *piececount* 2 1)
+  (Svector-set! *piececount* 3 1)
+  (let ((m (SFX+ (SFX* *d* (SFX+ *d* 1)) 1))
+        (n 0))
+    (cond ((fit 0 m) (set! n (place 0 m)))
+          (else (begin (newline) (display "Error."))))
+    (if (trial n)
+        *kount*
+        #f)))
+
+(for-each (lambda (i) (Svector-set! *p* i (Smake-vector1 (SFX+ *size* 1))))
+          (my-iota (SFX+ typemax 1)))
+
+(define (run #!key (n (unknown 511)))
+  (start n))
+
+(define (check result)
+  (equal? result 2005))
