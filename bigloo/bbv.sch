@@ -15,7 +15,7 @@
       ((atan2) `(atan-2fl ,@args))
       (else `(,op ,@args))))
 
-(define (unknown x) ((car (list (lambda () x)))))
+(define (unknown x . rest) ((car (list (lambda () x)))))
 
 (define-macro (MAPop kind op . args)
   (define arithmetic

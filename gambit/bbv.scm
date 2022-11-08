@@ -10,7 +10,10 @@
 (define-macro (FXop op . args)   `(,(symbol-append '|##fx| op) ,@args))
 (define-macro (PRIMop op . args) `(,(symbol-append '|##| op) ,@args))
 
-(define-macro (unknown x) `(PRIMop first-argument ,x))
+(define-macro (unknown x . rest)
+  (if (eq? compilation-mode 'gvm-interpret)
+      `(PRIMop first-argument ,(if (null? rest) x (car rest)))
+      `(PRIMop first-argument ,x)))
 
 (define-macro (MAPop kind op . args)
   (cond

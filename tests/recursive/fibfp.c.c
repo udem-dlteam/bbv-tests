@@ -1,31 +1,49 @@
-/* FIBFP -- Computes fib(35) using floating point */
+#include <stdio.h>
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define FLOAT double
 
-static FLOAT fib (FLOAT n)
-{
-  if (n < 2.)
+FLOAT fibfp(FLOAT n) {
+  if (n<2)
     return n;
   else
-    return fib (n-1.) + fib (n-2.);
+    return fibfp(n-1.0) + fibfp(n-2.0);
 }
 
-int main (int argc, char *argv[])
-{
-  int i;
-  FLOAT result;
-  int n = 35;
+FLOAT run(FLOAT n) {
+  if (n < 0.0) n = 39.0;
+  return fibfp(n);
+}
 
-  if (argc > 1)
-    n = atoi (argv[1]);
+int main(int argc, const char *argv[]) {
 
-  for (i=0; i<2; i++)
-    result = fib (n);
+  FLOAT n = -1.0;
+  int repeat = 1;
+  int i = 1;
 
-  if (result != 9227465.)
-    printf ("*** wrong result ***\n");
+  while (argv[i] && argv[i+1]) {
+    if (!strcmp(argv[i], "repeat:")) {
+      repeat = atoi(argv[i+1]);
+      i += 2;
+    } else if (!strcmp(argv[i], "n:")) {
+      n = atof(argv[i+1]);
+      i += 2;
+    } else {
+      break;
+    }
+  }
 
-  return 0;
+  if (argv[i]) {
+    printf("usage: %s [repeat: N] [n: N]\n", argv[0]);
+    exit(1);
+  } else {
+    FLOAT accum = 0.0;
+    while (repeat-- > 0) {
+      accum = (accum+1.0) + run(n + (accum == 1.5));
+    }
+    exit(accum == 1.5); /* trick the compiler... should always return 0 */
+  }
 }
