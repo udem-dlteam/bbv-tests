@@ -18,8 +18,10 @@ def aton(n):
         return locale.atof(n)
 
 VERBOSE = False
-RUN_SCRIPT = "../run"
+RUN_SCRIPT = "../compile"
 DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
+
+TITLES_ORDER = ['version', 'time', 'branch']
 
 SIMILAR_PRIMITIVES = [['##fx+', '##fx+?'],
                       ['##fx-', '##fx-?'],
@@ -162,11 +164,10 @@ def results_to_table(bench_results):
 
     # Convert dict to table
     def priority(name):
-        order = ['version', 'time', 'branch']
-        for i, k in enumerate(order):
-            if k in name:
+        for i, k in enumerate(TITLES_ORDER):
+            if k.lower() in name.lower():
                 return (i, name)
-        return (len(order), name)
+        return (len(TITLES_ORDER), name)
 
     names = [n for n in bench_results[0].keys() if n != 'primitives']
     names.sort(key=priority)
