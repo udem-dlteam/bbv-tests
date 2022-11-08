@@ -229,6 +229,9 @@ def main(*, file, system, vlimits, executions, **params):
     csvfile = params.get('csvfile')
 
     if csvfile:
+        dirpath = os.path.dirname(csvfile)
+        if dirpath: os.makedirs(os.path.dirname(csvfile), exist_ok=True)
+        
         with open(csvfile, 'w') as f:
             writer = csv.writer(f)
             writer.writerows(table)
