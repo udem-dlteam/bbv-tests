@@ -21,7 +21,7 @@ VERBOSE = False
 RUN_SCRIPT = "../compile"
 DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
 
-TITLES_ORDER = ['version', 'time', 'branch']
+TITLES_ORDER = ['version', 'time', 'branches', 'branch_miss']
 
 SIMILAR_PRIMITIVES = [['##fx+', '##fx+?'],
                       ['##fx-', '##fx-?'],
@@ -97,9 +97,11 @@ def bench(executable, n, params):
 
     elapsed, delta, pdelta = get_numbers_on_line_with(output, "seconds time elapsed")
     branch_misses, pbranch_misses, pbranch_misses_delta = get_numbers_on_line_with(output, "branch-misses:u")
+    branches, _, _ = get_numbers_on_line_with(output, "branches:u")
 
     return {
         "time": f"{elapsed}s (± {pdelta}%)",
+        "branches": branches,
         "branch_misses": f"{branch_misses} (± {pbranch_misses_delta}%)"
         }
 
@@ -151,6 +153,7 @@ def add_percentages_to_results(bench_results, all_primitive_names):
 
     add_percentage(bench_results, make_getter('time'), make_setter('time_ratio', ratio_only=True))
     add_percentage(bench_results, make_getter('branch_misses'), make_setter('branch_misses_ratio', ratio_only=True))
+    add_percentage(bench_results, make_getter('branches'), make_setter('branches'))
 
     for name in all_primitive_names:
         add_percentage(bench_results, *make_getter_setter('primitives', name))
