@@ -18,10 +18,10 @@ def aton(n):
         return locale.atof(n)
 
 VERBOSE = False
-RUN_SCRIPT = "../compile"
+COMPILE_SCRIPT = "../compile"
 DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
 
-TITLES_ORDER = ['version', 'time', 'branches', 'branch_miss']
+TITLES_ORDER = ['version', 'time', 'instr', 'branches', 'branch_miss']
 
 SIMILAR_PRIMITIVES = [['##fx+', '##fx+?'],
                       ['##fx-', '##fx-?'],
@@ -67,7 +67,7 @@ def compile(file, system, vlimit, params):
     system_flag = {"bigloo": "-b",
                    "gambit": "-g"}[system]
 
-    run_command = f"{RUN_SCRIPT} {system_flag} -V {vlimit} -P {file}"
+    run_command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} -P {file}"
 
     env = os.environ.copy()
     if 'wipgambitdir' in params: env["WIPGAMBITDIR"] = params["wipgambitdir"]
@@ -98,11 +98,14 @@ def bench(executable, n, params):
     elapsed, delta, pdelta = get_numbers_on_line_with(output, "seconds time elapsed")
     branch_misses, pbranch_misses, pbranch_misses_delta = get_numbers_on_line_with(output, "branch-misses:u")
     branches, _, _ = get_numbers_on_line_with(output, "branches:u")
+    instructions, ipc, _ = get_numbers_on_line_with(output, "instructions:u")
 
     return {
         "time": f"{elapsed}s (± {pdelta}%)",
         "branches": branches,
-        "branch_misses": f"{branch_misses} (± {pbranch_misses_delta}%)"
+        "branch_misses": f"{branch_misses} (± {pbranch_misses_delta}%)",
+        "instructions": instructions,
+        "instr/cycle": ipc,
         }
 
 def add_percentages_to_results(bench_results, all_primitive_names):
@@ -153,6 +156,7 @@ def add_percentages_to_results(bench_results, all_primitive_names):
 
     add_percentage(bench_results, make_getter('time'), make_setter('time_ratio', ratio_only=True))
     add_percentage(bench_results, make_getter('branch_misses'), make_setter('branch_misses_ratio', ratio_only=True))
+    add_percentage(bench_results, make_getter('instructions'), make_setter('instructions'))
     add_percentage(bench_results, make_getter('branches'), make_setter('branches'))
 
     for name in all_primitive_names:
@@ -231,7 +235,7 @@ def main(*, file, system, vlimits, executions, **params):
     if csvfile:
         dirpath = os.path.dirname(csvfile)
         if dirpath: os.makedirs(os.path.dirname(csvfile), exist_ok=True)
-        
+
         with open(csvfile, 'w') as f:
             writer = csv.writer(f)
             writer.writerows(table)
