@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-int ack(int m, int n) {
+#define INT long
+
+INT ack(INT m, INT n) {
   if (m == 0)
     return n+1;
   else if (n == 0)
@@ -11,7 +13,7 @@ int ack(int m, int n) {
     return ack(m-1, ack(m, n-1));
 }
 
-int run(int m, int n) {
+INT run(INT m, INT n) {
   if (m < 0) m = 3;
   if (n < 0) n = 9;
   return ack(m, n);
@@ -19,8 +21,8 @@ int run(int m, int n) {
 
 int main(int argc, const char *argv[]) {
 
-  int m = -1;
-  int n = -1;
+  INT m = -1;
+  INT n = -1;
   int repeat = 1;
   int i = 1;
 
@@ -43,7 +45,7 @@ int main(int argc, const char *argv[]) {
     printf("usage: %s [repeat: N] [m: N] [n: N]\n", argv[0]);
     exit(1);
   } else {
-    int accum = 0;
+    INT accum = 0;
     while (repeat-- > 0) {
       accum = (accum+1) | run(m | (accum == 999999999), n | (accum == 999999999));
     }
