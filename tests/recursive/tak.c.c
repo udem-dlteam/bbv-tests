@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-int tak (int x, int y, int z) {
+#define INT long
+
+INT tak (INT x, INT y, INT z) {
   if (y >= x)
     return z;
   else
@@ -11,7 +13,7 @@ int tak (int x, int y, int z) {
                tak(z-1, x, y));
 }
 
-int run(int x, int y, int z) {
+INT run(INT x, INT y, INT z) {
   if (x < 0) x = 18;
   if (y < 0) y = 12;
   if (z < 0) z = 6;
@@ -20,9 +22,9 @@ int run(int x, int y, int z) {
 
 int main(int argc, const char *argv[]) {
 
-  int x = -1;
-  int y = -1;
-  int z = -1;
+  INT x = -1;
+  INT y = -1;
+  INT z = -1;
   int repeat = 1;
   int i = 1;
 
@@ -48,7 +50,7 @@ int main(int argc, const char *argv[]) {
     printf("usage: %s [repeat: N] [x: N] [y: N] [z: N]\n", argv[0]);
     exit(1);
   } else {
-    int accum = 0;
+    INT accum = 0;
     while (repeat-- > 0) {
       accum = (accum+1) | run(x | (accum == 999999999), y | (accum == 999999999), z | (accum == 999999999));
     }
