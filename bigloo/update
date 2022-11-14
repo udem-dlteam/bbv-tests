@@ -36,7 +36,7 @@ MAKE_JOBS="-j$AVAILABLE_PARALLELISM"
 
 BIGLOOREPODIR="$SCRIPT_DIR/bigloo"
 BIGLOOINSTDIR="$SCRIPT_DIR/local"
-BIGLOOGIT=git@github.com:manuel-serrano/bigloo.git
+BIGLOOGIT=https://github.com/manuel-serrano/bigloo.git
 
 if test ! -d "$BIGLOOREPODIR" ; then
 
@@ -44,11 +44,7 @@ if test ! -d "$BIGLOOREPODIR" ; then
 
   git clone $BIGLOOGIT "$BIGLOOREPODIR"
 
-fi
-
-cd "$BIGLOOREPODIR"
-
-if test ! -e config.status ; then
+  cd "$BIGLOOREPODIR"
 
   echo "========== configuring Bigloo"
 
@@ -56,38 +52,40 @@ if test ! -e config.status ; then
 
   echo "========== building Bigloo"
 
-  make "$MAKE_JOBS"
+  make "$MAKE_JOBS" || exit 1
   
   echo "========== installing Bigloo"
 
-  make install
+  make install || exit 1
 
   echo "========== installing bglcfg"
 
   make -C tools bglcfg
 
-fi
+else
+  cd "$BIGLOOREPODIR"
 
-git pull > pull.out
+  git pull > pull.out
 
-cat pull.out
+  cat pull.out
 
-if grep -q -v 'Already up-to-date.' pull.out > /dev/null ; then
+  if grep -q -v 'Already up-to-date.' pull.out > /dev/null ; then
 
-  echo "========== reconfiguring Bigloo"
+    echo "========== reconfiguring Bigloo"
 
-  ./configure --prefix="$BIGLOOINSTDIR"
+    ./configure --prefix="$BIGLOOINSTDIR"
 
-  echo "========== building Bigloo with recent changes"
+    echo "========== building Bigloo with recent changes"
 
-  make "$MAKE_JOBS"
+    make "$MAKE_JOBS" || exit 2
 
-  echo "========== installing Bigloo"
+    echo "========== installing Bigloo"
 
-  make install > /dev/null 2>&1
+    make install || exit 2
 
-fi
+  fi
 
-rm -f pull.out
+  rm -f pull.out
+fi  
 
 echo "========== Bigloo is up to date"

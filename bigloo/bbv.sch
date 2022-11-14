@@ -5,9 +5,13 @@
 (define-macro (FLop op . args)
    (case op
       ((atan2) `(atan-2fl ,@args))
+      ((zero?) `(zerofl? ,@args))
       (else `(,(symbol-append op 'fl) ,@args))))
 (define-macro (FXop op . args)
-   `(,(symbol-append op 'fx) ,@args))
+   (case op
+      ((zero?) `(zerofx? ,@args))
+      (else `(,(symbol-append op 'fx) ,@args))))
+
 (define-macro (PRIMop op . args)
    (case op
       ((vector-set!) `(vector-set-ur! ,@args))
@@ -29,7 +33,7 @@
    ((eq? kind 'FX)
     `(PRIMop ,(symbol-append 'fx op) ,@args))
    ((or (eq? kind 'GEN) (eq? arithmetic 'G)) ;; force generic?
-    `(,(symbol-append 'BBV op) ,@args))
+    `(,op ,@args))
    ((eq? kind 'SFL)
     `(,(symbol-append 'FL op) ,@args))
    ((eq? kind 'SFX)
@@ -63,7 +67,7 @@
 (define-macro (SFL= x y)         `(MAPop SFL = ,x ,y))
 (define-macro (SFL< x y)         `(MAPop SFL < ,x ,y))
 (define-macro (SFL> x y)         `(MAPop SFL > ,x ,y))
-(define-macro (SFL<= x y)        `(MAPop SFL <=,x ,y))
+(define-macro (SFL<= x y)        `(MAPop SFL <= ,x ,y))
 (define-macro (SFL>= x y)        `(MAPop SFL >= ,x ,y))
 (define-macro (SFLzero? x)       `(MAPop SFL zero? ,x))
 (define-macro (SFLsqrt x)        `(MAPop SFL sqrt ,x))
@@ -80,7 +84,7 @@
 (define-macro (SFX= x y)         `(MAPop SFX = ,x ,y))
 (define-macro (SFX< x y)         `(MAPop SFX < ,x ,y))
 (define-macro (SFX> x y)         `(MAPop SFX > ,x ,y))
-(define-macro (SFX<= x y)        `(MAPop SFX <=,x ,y))
+(define-macro (SFX<= x y)        `(MAPop SFX <= ,x ,y))
 (define-macro (SFX>= x y)        `(MAPop SFX >= ,x ,y))
 (define-macro (SFXzero? x)       `(MAPop SFX zero? ,x))
 (define-macro (SFXodd? x)        `(MAPop SFX odd? ,x))
@@ -96,7 +100,7 @@
 (define-macro (FL= x y)         `(FLop = ,x ,y))
 (define-macro (FL< x y)         `(FLop < ,x ,y))
 (define-macro (FL> x y)         `(FLop > ,x ,y))
-(define-macro (FL<= x y)        `(FLop <=,x ,y))
+(define-macro (FL<= x y)        `(FLop <= ,x ,y))
 (define-macro (FL>= x y)        `(FLop >= ,x ,y))
 (define-macro (FLzero? x)       `(FLop zero? ,x))
 (define-macro (FLsqrt x)        `(FLop sqrt ,x))
@@ -343,9 +347,22 @@
 (define-macro (SFXinexact x) `(inexact ,x))
 (define-macro (SFLtruncate x) `(truncate ,x))
 (define-macro (Svector-map2 f vect) `(vector-map ,f ,vect))
-(define-macro (Scall-with-current-continuation f) `(call-with-current-continuation ,f))
 (define-macro (Slist->vector lst) `(list->vector ,lst))
 (define-macro (Svector->list vect) `(vector->list ,vect))
+
+(define-macro (Scall-with-current-continuation f)
+   (match-case f
+      ((lambda (?esc) ?body)
+       `(bind-exit (,esc) ,body))
+      (else
+       (error "$call-with-current-continuation" "bad form" ',f))))
+
+(define-macro (call-with-current-continuation f)
+   (match-case f
+      ((lambda (?esc) ?body)
+       `(bind-exit (,esc) ,body))
+      (else
+       (error "call-with-current-continuation" "bad form" ',f))))
 
 (define-macro (Smake-vector1 n)
    (define arithmetic
