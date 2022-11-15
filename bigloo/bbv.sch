@@ -56,6 +56,7 @@
 (define-macro (GENsin x)         `(MAPop GEN sin ,x))
 (define-macro (GENcos x)         `(MAPop GEN cos ,x))
 (define-macro (GENatan2 x y)     `(MAPop GEN atan2 ,x ,y))
+(define-macro (GENatan x)        `(MAPop GEN atan ,x))
 
 (define-macro (SFL+ x y)         `(MAPop SFL + ,x ,y))
 (define-macro (SFL- x y)         `(MAPop SFL - ,x ,y))
@@ -74,6 +75,7 @@
 (define-macro (SFLsin x)         `(MAPop SFL sin ,x))
 (define-macro (SFLcos x)         `(MAPop SFL cos ,x))
 (define-macro (SFLatan2 x y)     `(MAPop SFL atan2 ,x ,y))
+(define-macro (SFLatan x)        `(MAPop SFL atan ,x))
 
 (define-macro (SFX+ x y)         `(MAPop SFX + ,x ,y))
 (define-macro (SFX- x y)         `(MAPop SFX - ,x ,y))
@@ -107,6 +109,7 @@
 (define-macro (FLsin x)         `(FLop sin ,x))
 (define-macro (FLcos x)         `(FLop cos ,x))
 (define-macro (FLatan2 x y)     `(FLop atan2 ,x ,y))
+(define-macro (FLatan x)        `(FLop atan ,x))
 
 (define-macro (FX+ x y)         `(FXop + ,x ,y))
 (define-macro (FX- x y)         `(FXop - ,x ,y))
@@ -270,6 +273,15 @@
          (FLatan2 ,a ,b))
         (else
          (PRIMop atan2 ,a ,b))))))
+
+(define-macro (BBVatan x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (cond
+        ((FLONUM? ,a)
+         (FLatan ,a))
+        (else
+         (PRIMop atan ,a))))))
 
 (define-macro (Scar x)
   (define arithmetic
