@@ -1,7 +1,13 @@
 #!/bin/bash
-set -euxo pipefail
+#set -euxo pipefail
 
-files=("recursive/ack"
+files=("bglstone/almabench.scm"
+       "bglstone/bague.scm"
+       "bglstone/beval.scm"
+       "bglstone/maze.scm"
+       "bglstone/mbrot.scm"
+       "bglstone/peval.scm"
+       "recursive/ack"
        "recursive/fib"
        "recursive/fibfp"
        "recursive/tak"

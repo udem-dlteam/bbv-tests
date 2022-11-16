@@ -35,10 +35,10 @@ PRIMITIVE_COUNT=0 # enables primitive (0 to disable)
 
 # for gambit
 if test "$WIPGAMBITDIR" != "" ; then
-  GAMBITCOMP="$WIPGAMBITDIR/gsi/gsi -:=$WIPGAMBITDIR $WIPGAMBITDIR/gsc/igsc.scm"
+  GAMBITCOMP="$WIPGAMBITDIR/gsc/gsc -:=$WIPGAMBITDIR"
 else
   GAMBITDIR="$SCRIPT_DIR/gambit/gambit"
-  GAMBITCOMP="$GAMBITDIR/gsi/gsi -:=$GAMBITDIR $GAMBITDIR/gsc/igsc.scm"
+  GAMBITCOMP="$GAMBITDIR/gsc/gsc -:=$GAMBITDIR"
 fi
 
 # for bigloo
