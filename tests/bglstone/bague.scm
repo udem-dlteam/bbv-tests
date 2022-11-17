@@ -90,7 +90,7 @@
        (pose-pierre n)
        (repose (SFX- n 2)))))
 
-(define (run #!key (nombre-de-pierres 28))
+(define (run #!key (nombre-de-pierres (unknown 28 5)))
    (init-jeu)
    (bague nombre-de-pierres)
    (cons nombre-de-pierres nombre-de-coups))
@@ -109,7 +109,3 @@
 	 ((27) 89478485)
 	 ((28) 178956970)
 	 (else #f))))
-
-		    
-       
-
