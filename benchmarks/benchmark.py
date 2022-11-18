@@ -6,6 +6,7 @@ import copy
 import locale
 import os
 import re
+import shlex
 import statistics
 import subprocess
 
@@ -70,10 +71,26 @@ def compile(file, system, vlimit, params):
     run_command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} -P {file}"
 
     env = os.environ.copy()
+    timeout = params['compilation_timeout']
     if 'wipgambitdir' in params: env["WIPGAMBITDIR"] = params["wipgambitdir"]
 
-    verbose(run_command)
-    output = subprocess.run(run_command, env=env, shell=True, capture_output=True).stdout.decode()
+    if timeout:
+        verbose(run_command, f"(with timeout: {timeout}s)")
+    else:
+        verbose(run_command)
+
+    try:
+        process = subprocess.Popen(shlex.split(run_command),
+                                   env=env,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT)
+        output, _ = process.communicate(timeout=timeout)
+        output = output.decode()
+    finally:
+        if process.poll() is None:
+            verbose(f"killing process")
+            process.kill()
+
 
     primitive_count = extract_primitives_count(output)
     executable = extract_executable_name(output)
@@ -251,6 +268,7 @@ if __name__ == "__main__":
                         help='verbose')
     parser.add_argument('-l',
                         dest="vlimits",
+                        metavar="LIMIT",
                         nargs="+",
                         default=(0, 1, 2, 3, 4, 5),
                         type=int,
@@ -260,6 +278,11 @@ if __name__ == "__main__":
                         default=10,
                         type=int,
                         help="number of executions")
+    parser.add_argument('-t',
+                        dest="compilation_timeout",
+                        metavar='TIMEOUT',
+                        type=float,
+                        help="compilation timeout (in secondes)")
     parser.add_argument('-s',
                         dest='system',
                         default='gambit',

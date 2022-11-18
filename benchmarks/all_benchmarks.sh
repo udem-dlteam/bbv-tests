@@ -27,5 +27,5 @@ files=("bglstone/almabench"
        "gabriel/triangl")
 
 for file in ${files[@]}; do
-  timeout 600 ./benchmark.py ../tests/${file}.scm -g ../../gambit -v -l 0 1 2 3 4 5 6 7 8 -csv results/${file}.csv
+  timeout 600 ./benchmark.py ../tests/${file}.scm -g ../../gambit -v -l 0 1 2 3 4 5 6 7 8 -t 60 -csv results/${file}.csv
 done
