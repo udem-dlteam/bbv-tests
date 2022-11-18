@@ -27,7 +27,7 @@
 ;;; the the record maker procedure. A defaulted field takes its value from
 ;;; the the DEFAULT expression. If a DEFAULT expression is not given, then
 ;;; the defaulted field's initial value is undefined.
-;;; 
+;;;
 ;;; Example:
 ;;; (define-record employee
 ;;;     name
@@ -36,12 +36,12 @@
 ;;;     (department)	; Initial value undefined.
 ;;;     sex
 ;;;     married?)
-;;; 
+;;;
 ;;; Defines the following:
 ;;; - A maker procedure:
 ;;;   (make-employee "John Smith" 742931 'male #f)
 ;;;   MAKE-EMPLOYEE takes one argument for each initialised field.
-;;; 
+;;;
 ;;; - Accessor procedures:
 ;;;   (employee:name emp)
 ;;;   (employee:id-number emp)
@@ -49,7 +49,7 @@
 ;;;   (employee:department emp)
 ;;;   (employee:sex emp)
 ;;;   (employee:married? emp)
-;;; 
+;;;
 ;;; - Setter procedures:
 ;;;   (set-employee:name emp)
 ;;;   (set-employee:id-number emp)
@@ -57,10 +57,10 @@
 ;;;   (set-employee:department emp "Vaporware")
 ;;;   (set-employee:sex emp 'female)
 ;;;   (set-employee:married? emp #t)
-;;; 
+;;;
 ;;; - A type predicate:
 ;;;   (employee? x)
-;;; 
+;;;
 ;;; - The record type descriptor:
 ;;;     type/employee
 
@@ -153,7 +153,7 @@
 				     (+ off 1)
 				     (cons a-set (cons a-ref set))))))))
       `(begin ,alloc ,pred ,make ,@set-get)))
-   
+
 (define-record harr
   nrows
   ncols
@@ -295,7 +295,7 @@
 	 (walls '())
 	 (add-wall (lambda (o n b) ; owner neighbor bit
 		     (set! walls (cons (make-wall o n b) walls)))))
-	
+
     ;; Do everything but the bottom row.
     (do ((x (SFX* (SFX- ncols 1) 3) (SFX- x 3)))
 	((SFX< x 0))
@@ -330,7 +330,7 @@
 
 
 ;;; Find the box ctop from the top row, and the box cbot from the bottom
-;;; row such that cbot is furthest from ctop. 
+;;; row such that cbot is furthest from ctop.
 ;;; Return [ctop-x, ctop-y, cbot-x, cbot-y].
 
 (define (pick-entrances harr)
@@ -355,7 +355,7 @@
 			    (bt-lp this-len tcol bcol (SFX- bcol 1))
 			    (bt-lp max-len  entrance exit (SFX- bcol 1))))))
 	      (tp-lp max-len entrance exit (SFX- tcol 1))))))))
-		
+
 
 
 ;;; Apply PROC to each node reachable from BOX.
@@ -431,12 +431,12 @@
 ;;; / \_/ \_/
 ;;; \_/ \_/ \
 ;;; / \_/ \_/
-;;; \_/ \_/ 
+;;; \_/ \_/
 
 ;;; Top part of top row looks like this:
 ;;;    _   _  _   _
 ;;;  _/ \_/ \/ \_/ \
-;;; /        
+;;; /
 
 (define (print-hexmaze harr entrance)
   (let* ((nrows  (harr~nrows harr))
@@ -472,7 +472,7 @@
 	  ((SFX>= c ncols2))
 	;; The dot/space for the even col just behind c.
 	(write-char (dot/space harr r (SFX- c 1)))
-	(display-hexbottom (box~walls (href/rc harr r c))))	
+	(display-hexbottom (box~walls (href/rc harr r c))))
 
       (cond ((odd? ncols)
 	     (write-char (dot/space harr r (SFX- ncols 1)))
@@ -485,7 +485,7 @@
 	(display-hexbottom (box~walls (href/rc harr r c)))
 	;; The dot/space is for the odd col just after c, on row below.
 	(write-char (dot/space harr (SFX- r 1) (SFX+ c 1))))
-      
+
       (cond ((odd? ncols)
 	     (display-hexbottom (box~walls (href/rc harr r (SFX- ncols 1)))))
 	    ((not (SFXzero? r)) (write-char #\\)))
@@ -575,7 +575,7 @@
 	   ;; If the new set of reachable boxs is the whole set
 	   ;; of boxs, quit.
 	   (if (not (set-equal? set1 set2))
-	       (let ((walls (box~walls c1))	
+	       (let ((walls (box~walls c1))
 		     (wall-mask (bitnot (wall~bit wall))))
 		 (union! set1 set2)
 		 (set-box~walls c1 (bitand walls wall-mask))
@@ -583,10 +583,10 @@
        walls))))
 
 
-;;; Some simple DFS routines useful for determining path length 
+;;; Some simple DFS routines useful for determining path length
 ;;; through the maze.
 
-;;; Build a DFS tree from ROOT. 
+;;; Build a DFS tree from ROOT.
 ;;; (DO-CHILDREN proc maze node) applies PROC to each of NODE's children.
 ;;; We assume there are no loops in the maze; if this is incorrect, the
 ;;; algorithm will diverge.
@@ -681,9 +681,9 @@
 ; 	 (slop (modulo M n)))
 ;     (let loop ((r (rand)))
 ;       (if (SFX> r slop)
-; 	  (modulo r n)	
+; 	  (modulo r n)
 ; 	  (loop (rand))))))
-; 
+;
 ; (define (rngtest)
 ;   (display "implementation ")
 ;   (srand 1)
@@ -732,7 +732,7 @@
 ;;; cdr = (). Set equality is determined by comparing representatives using
 ;;; EQ?. A representative's car contains the number of elements in the set.
 
-;;; The speed of the algorithm comes because when we chase links to find 
+;;; The speed of the algorithm comes because when we chase links to find
 ;;; representatives, we collapse links by changing all the boxs in the path
 ;;; we followed to point directly to the representative, so that next time
 ;;; we walk the cdr-chain, we'll go directly to the representative in one hop.
@@ -751,7 +751,7 @@
 	    (else
 	     (if (not (eq? r s))	; Now zip down the list again,
 		 (let lp ((x s))	; changing everyone's cdr to r.
-		   (let ((next (cdr x)))	
+		   (let ((next (cdr x)))
 		     (cond ((not (eq? r next))
 			    (set-cdr! x r)
 			    (lp next))))))
@@ -775,7 +775,7 @@
 	   (set-cdr! r1 r2)
 	   (set-car! r2 n)))))
 
-(define (run #!key (rows 1500) (cols 35))
+(define (run #!key (rows (unknown 1500 150)) (cols (unknown 35 10)))
    (with-output-to-file "/dev/null"
       (lambda () (pmaze rows cols))))
 
@@ -783,4 +783,3 @@
    (let ((s (with-output-to-string
 	       (lambda () (pmaze 5 15)))))
       (= (string-length s) 380)))
-

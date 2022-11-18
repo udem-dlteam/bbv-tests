@@ -31,7 +31,7 @@
 
 ;;number of days to include in test
 (define TEST_LOOPS  4)
-(define TEST_LENGTH 36525)
+(define TEST_LENGTH (unknown 36525 365))
 
 ;;sin and cos of j2000 mean obliquity (iau 1976)
 (define sineps 0.3977771559319137)
@@ -266,7 +266,7 @@ w))
 			  A2R)))
 	  (dmu (SFL* 0.35953620 t)))
       ;;time: julian millennia since j2000.
-      
+
       ;;compute the mean elements.
       ;;apply the trigonometric terms.
       (do ((k 0 (SFX+ k 1)))
@@ -290,7 +290,7 @@ w))
 				      (cos arga))
 				 (SFL* (Svector-ref (Svector-ref sa np) 8)
 				      (sin arga)))))))
-      
+
       (do ((k 8 (SFX+ k 1)))
 	  ((SFX= k 10))
 	  (let ((argl (SFL* dmu (Svector-ref (Svector-ref kq np) k))))
