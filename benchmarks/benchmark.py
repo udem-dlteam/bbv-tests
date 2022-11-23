@@ -64,33 +64,35 @@ def extract_primitives_count(content):
 def extract_executable_name(content):
     return re.search(r"\*\*\*executable: (.+)", content).group(1)
 
-def compile(file, system, vlimit, params):
-    system_flag = {"bigloo": "-b",
-                   "gambit": "-g"}[system]
-
-    run_command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} -P {file}"
-
-    env = os.environ.copy()
-    timeout = params['compilation_timeout']
-    if 'wipgambitdir' in params: env["WIPGAMBITDIR"] = params["wipgambitdir"]
-
+def run_command(command, timeout, env):
     if timeout:
-        verbose(run_command, f"(with timeout: {timeout}s)")
+        verbose(command, f"(with timeout: {timeout}s)")
     else:
-        verbose(run_command)
+        verbose(command)
 
     try:
-        process = subprocess.Popen(shlex.split(run_command),
+        process = subprocess.Popen(shlex.split(command),
                                    env=env,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT)
         output, _ = process.communicate(timeout=timeout)
-        output = output.decode()
+        return output.decode()
     finally:
         if process.poll() is None:
             verbose(f"killing process")
             process.kill()
 
+def compile(file, system, vlimit, params):
+    system_flag = {"bigloo": "-b",
+                   "gambit": "-g"}[system]
+
+    command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} -P {file}"
+
+    env = os.environ.copy()
+    timeout = params['compilation_timeout']
+    if 'wipgambitdir' in params: env["WIPGAMBITDIR"] = params["wipgambitdir"]
+
+    output = run_command(command, timeout, env)
 
     primitive_count = extract_primitives_count(output)
     executable = extract_executable_name(output)

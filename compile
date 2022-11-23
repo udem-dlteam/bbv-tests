@@ -160,7 +160,7 @@ for file in $FILES ; do
       exe=$base.exe
       $GAMBITCOMP -prelude "$DECL (define-macro (%%%2) (eval '(define compilation-mode 'normal))) (%%%2) (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(load \"$SCRIPT_DIR/gambit/main\")" -keep-temp -gvm -cfg -exe -o $exe $file
       if [ "$PRIMITIVE_COUNT" = "1" ]; then
-        $GAMBITCOMP -prelude "$DECL (define-macro (%%%2) (eval '(define compilation-mode 'gvm-interpret))) (%%%2) (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(run)" -gvm-interpret -cfg -c $file
+        $GAMBITCOMP -prelude "$DECL (define-macro (%%%2) (eval '(define compilation-mode 'gvm-interpret))) (%%%2) (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(run)" -gvm-interpret $file
       fi
       mv $filenoext.cfg $base.cfg
       run_dot $base.cfg

@@ -17,6 +17,12 @@
 	     (Svector-set! mx i row)))
       mx))
 
+(define (flremainder x y)
+  (let* ((sign (if (SFL> x 0.) 1. -1.))
+         (absX (abs x))
+         (absY (abs y)))
+    (SFL* sign (SFL- absX (SFL* absY (floor (SFL/ absX absY)))))))
+
 ;;;;;;;;;;;;;END HELPER;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define *PI*      3.14159265358979323846)
@@ -31,7 +37,7 @@
 
 ;;number of days to include in test
 (define TEST_LOOPS  4)
-(define TEST_LENGTH (unknown 36525 365))
+(define TEST_LENGTH (unknown 36525 30))
 
 ;;sin and cos of j2000 mean obliquity (iau 1976)
 (define sineps 0.3977771559319137)
@@ -224,7 +230,7 @@
 ;;---------------------------------------------------------------------------
 ;;Normalize angle into the range -pi <= A < +pi.
 (define (anpm a)
-  (let ((w (SFLremainder a TWOPI)))
+  (let ((w (flremainder a TWOPI)))
     (if (SFL>= (abs w) *PI*)
     (set! w (SFL- w (if (SFL< a 0.0)
              (SFL- 0.0 TWOPI)
@@ -300,7 +306,7 @@ w))
 					  (cos argl))
 				     (SFL* (Svector-ref (Svector-ref sl np) k)
 					  (sin argl))))))))
-      (set! dl (SFLremainder dl TWOPI))
+      (set! dl (flremainder dl TWOPI))
       ;;iterative solution of kepler's equation to get eccentric anomaly.
       (let* ((am (SFL- dl dp))
 	     (ae (SFL+ am (SFL* de  (sin am)))))

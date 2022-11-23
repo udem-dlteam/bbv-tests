@@ -7,7 +7,7 @@
    c)
 
 (define (_newline)
-   #\Newline)
+   #\n)
 
 (define (count cr ci)
    (let ((max-count 64)
@@ -34,11 +34,11 @@
              (if p? (_write-char (integer->char (SFX+ c 32))))
             (loop2 (SFX- x 1) (SFL+ cr step)))
           (begin
-             (if p? 
+             (if p?
                  (_newline))
             (loop1 (SFX- y 1) (SFL+ ci step))))))))
 
-(define (run #!key (num 10))
+(define (run #!key (num (unknown 10 2)))
    (let loop ((num num)
               (res (mbrot *r *i *n *step (SFX= num 1))))
       (if (SFX= num 1)
@@ -47,4 +47,3 @@
 
 (define (check result)
    (eq? result 'done))
-
