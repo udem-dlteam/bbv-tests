@@ -86,7 +86,9 @@ def compile(file, system, vlimit, params):
     system_flag = {"bigloo": "-b",
                    "gambit": "-g"}[system]
 
-    command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} -P {file}"
+    primitive_count_flag = "-P" if params["primitive_count"] else ""
+
+    command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} {primitive_count_flag} {file}"
 
     env = os.environ.copy()
     timeout = params['compilation_timeout']
@@ -293,6 +295,10 @@ if __name__ == "__main__":
     parser.add_argument('-g',
                         dest='wipgambitdir',
                         help='Gambit root')
+    parser.add_argument('-p',
+                        dest='primitive_count',
+                        action='store_true',
+                        help='count primitive calls')
     parser.add_argument('-csv',
                         dest='csvfile',
                         metavar='FILENAME',
