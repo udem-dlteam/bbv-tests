@@ -79,6 +79,9 @@ while [ "$#" != "0" ]; do
     -P) # primitive counts
       PRIMITIVE_COUNT=1
       ;;
+    -X) # output the code with bbv inbclusions
+      OUTPUT_INCLUDED_CODE=1
+      ;;
     -c|--clean) # clean
       rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o* tests/*/*~ tests/*/*.bbv.dot tests/*/*.exe
       exit
@@ -158,6 +161,13 @@ for file in $FILES ; do
       DECL="(declare (version-limit $VERSION_LIMIT) (inlining-limit $INLINING_LIMIT) (standard-bindings) (extended-bindings) (not safe) (block)) (define-macro (%%%) (eval '(define arithmetic '$ARITHMETIC))) (%%%) (define-macro (npnull? x) (quasiquote (let ((x ,x)) (and (not (##pair? x)) (##null? x)))))"
       base="$filenoext.gambit.$INLINING_LIMIT$ARITHMETIC$VERSION_LIMIT"
       exe=$base.exe
+      echo "$OUTPUT_INCLUDED_CODE"
+      if [ "$OUTPUT_INCLUDED_CODE" = "1" ]; then
+        inclusions=$base.code.scm;
+        echo "$DECL (define-macro (%%%2) (eval '(define compilation-mode 'normal))) (%%%2)" > $inclusions;
+        cat $SCRIPT_DIR/gambit/bbv.scm $file >> $inclusions;
+        echo "(run)" >> $inclusions;
+      fi
       $GAMBITCOMP -prelude "$DECL (define-macro (%%%2) (eval '(define compilation-mode 'normal))) (%%%2) (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(load \"$SCRIPT_DIR/gambit/main\")" -keep-temp -gvm -cfg -exe -o $exe $file
       if [ "$PRIMITIVE_COUNT" = "1" ]; then
         $GAMBITCOMP -prelude "$DECL (define-macro (%%%2) (eval '(define compilation-mode 'gvm-interpret))) (%%%2) (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(run)" -gvm-interpret $file
