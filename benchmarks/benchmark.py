@@ -117,9 +117,9 @@ def bench(executable, n, params):
     verbose(output)
 
     elapsed, delta, pdelta = get_numbers_on_line_with(output, "seconds time elapsed")
-    branch_misses, pbranch_misses, pbranch_misses_delta = get_numbers_on_line_with(output, "branch-misses:u")
-    branches, _, _ = get_numbers_on_line_with(output, "branches:u")
-    instructions, ipc, _ = get_numbers_on_line_with(output, "instructions:u")
+    branch_misses, pbranch_misses, pbranch_misses_delta = get_numbers_on_line_with(output, "branch-misses")
+    branches, _, _ = get_numbers_on_line_with(output, "branches")
+    instructions, ipc, _ = get_numbers_on_line_with(output, "instructions")
 
     return {
         "time": f"{elapsed}s (± {pdelta}%)",
