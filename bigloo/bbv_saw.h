@@ -1,9 +1,9 @@
 /*=====================================================================*/
-/*    serrano/prgm/project/bigloo/work/bbv/bbv_saw.h                   */
+/*    serrano/prgm/project/bbv-tests/bigloo/bbv_saw.h                  */
 /*    -------------------------------------------------------------    */
 /*    Author      :  Manuel Serrano                                    */
 /*    Creation    :  Thu Mar 16 18:48:21 1995                          */
-/*    Last change :  Tue Oct 25 15:50:16 2022 (serrano)                */
+/*    Last change :  Wed Jul  5 11:15:36 2023 (serrano)                */
 /*    -------------------------------------------------------------    */
 /*    Bigloo's stuff                                                   */
 /*=====================================================================*/
@@ -80,6 +80,15 @@ static long saw_mulfx_ov = 0;
 
 #  undef BGL_MULFX_OV
 #  define BGL_MULFX_OV(x, y, res) (saw_mulfx_ov++, __builtin_smull_overflow((long)x, (long)y, (long*)&res))
+
+#  undef BGL_ADDFX_SANS_OV
+#  define BGL_ADDFX_SANS_OV(x, y) (saw_add++, BINT(CINT(x) + CINT(y)))
+
+#  undef BGL_SUBFX_SANS_OV
+#  define BGL_SUBFX_SANS_OV(x, y) (saw_sub++, BINT(CINT(x) - CINT(y)))
+
+#  undef BGL_MULFX_SANS_OV
+#  define BGL_MULFX_SANS_OV(x, y) (saw_mul++, BINT(CINT(x) * CINT(y)))
 
 int bbv_saw_statistics() {
    fprintf(stderr, "ifne: %ld\n", saw_ifne + saw_ifeq);
