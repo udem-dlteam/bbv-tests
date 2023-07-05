@@ -42,7 +42,9 @@ else
 fi
 
 # for bigloo
-BIGLOODIR="$SCRIPT_DIR/bigloo/local"
+if [ "$BIGLOODIR " = " " ]; then
+  BIGLOODIR="$SCRIPT_DIR/bigloo/local"
+fi  
 BIGLOOCOMP="$BIGLOODIR/bin/bigloo"
 BGLCFG="$BIGLOODIR/bin/bglcfg"
 
@@ -190,9 +192,9 @@ for file in $FILES ; do
 	SAWBBV=
       fi
       (cd $SCRIPT_DIR/bigloo && \
-	 $BIGLOOCOMP -O3 -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -saw -fsaw-bbv -o $exe)
+	 $BIGLOOCOMP $BIGLOOOPT -O3 -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -saw -fsaw-bbv -o $exe)
 
-      if [ -f $SCRIPT_DIR/bigloo/$base-program.bbv.cfg ]; then
+      if [ -f $base-program.bbv.cfg ]; then
         (cd $SCRIPT_DIR/bigloo && \
 	   $BGLCFG $base-program.bbv.cfg > $base.dot && \
 	   run_dot $base-program.bbv.dot)
