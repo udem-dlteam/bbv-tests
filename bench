@@ -6,7 +6,7 @@
 #
 #    ./bench -g fib
 #    ./bench -g -P fib   # add branch counts to CFG
-#    ./bench -g -G -S -V 0 -V 5 -I 0 -I 350 fib fibfp tak takl
+#    ./bench -g -G -S -V 0 -V 5 -I 0 -I 370 fib fibfp tak takl
 #    ./bench -g
 #
 #  For bigloo:
@@ -132,14 +132,14 @@ if $debug ; then
 
 fi
 
-#if [ "$WIPGAMBITDIR" = "" ] ; then
-#  export WIPGAMBITDIR=`pwd`/../gambit
-#fi
+if [ "$WIPGAMBITDIR" = "" ] ; then
+  export WIPGAMBITDIR=`pwd`/gambit/gambit
+fi
 
 if [ `uname -s` = "Darwin" ] ; then
   TIME=time
   TIMEARGS=
-  GCC=gcc-12
+  GCC=gcc-13
 else
   TIME=/usr/bin/time
   TIMEARGS="-f real:%e"
@@ -166,6 +166,7 @@ for program in $PROGRAMS ; do
        sum) bench=gabriel/sum ; args="n: 10000" ; repeat=200000 ;;
      sumfp) bench=gabriel/sumfp ; args="n: 1e6" ; repeat=500 ;;
    triangl) bench=gabriel/triangl ; args="i: 22 depth: 1" ; repeat=50 ;;
+ almabench) bench=bglstone/almabench ; args="" ; repeat=10 ;;
 
   esac
 

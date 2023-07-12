@@ -32,7 +32,8 @@ get_available_parallelism()
   fi
 }
 
-get_available_parallelism
+#get_available_parallelism
+AVAILABLE_PARALLELISM="1"
 
 MAKE_JOBS="-j$AVAILABLE_PARALLELISM"
 
@@ -54,7 +55,13 @@ if test ! -e makefile ; then
 
   echo "========== configuring Gambit"
 
-  ./configure --enable-single-host --prefix="$GAMBITINSTDIR"
+  if [ `uname -s` = "Darwin" ] ; then
+    GCC=gcc-13
+  else
+    GCC=gcc
+  fi
+
+  ./configure --enable-single-host --prefix="$GAMBITINSTDIR" CC=$GCC
 
   echo "========== building Gambit"
 
