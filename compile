@@ -35,7 +35,7 @@ PRIMITIVE_COUNT=0 # enables primitive (0 to disable)
 
 # for gambit
 if test "$WIPGAMBITDIR" != "" ; then
-  GAMBITCOMP="$WIPGAMBITDIR/gsc/gsc -:=$WIPGAMBITDIR"
+  GAMBITCOMP="$WIPGAMBITDIR/gsi/gsi -:=$WIPGAMBITDIR $WIPGAMBITDIR/gsc/igsc.scm"
 else
   GAMBITDIR="$SCRIPT_DIR/gambit/gambit"
   GAMBITCOMP="$GAMBITDIR/gsc/gsc -:=$GAMBITDIR"
