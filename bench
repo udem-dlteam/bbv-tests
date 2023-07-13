@@ -313,7 +313,7 @@ for program in $PROGRAMS ; do
           run=0
           while [ "$run" -lt "$DRY_RUNS" ] ; do
             run=$((run+1))
-	    exec_time=`(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
+            real_time=`(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
           done
           run=0
           while [ "$run" -lt "$RUNS" ] ; do

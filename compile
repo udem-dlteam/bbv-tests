@@ -160,7 +160,7 @@ for file in $FILES ; do
   case "$SYSTEM" in
 
     gambit)
-      DECL="(declare (version-limit $VERSION_LIMIT) (inlining-limit $INLINING_LIMIT) (standard-bindings) (extended-bindings) (not safe) (block)) (define-macro (%%%) (eval '(define arithmetic '$ARITHMETIC))) (%%%) (define-macro (npnull? x) (quasiquote (let ((x ,x)) (and (not (##pair? x)) (##null? x)))))"
+      DECL="(declare (version-limit $VERSION_LIMIT) (inlining-limit $INLINING_LIMIT)) (define-macro (%%%) (eval '(define arithmetic '$ARITHMETIC))) (%%%) (define-macro (npnull? x) (quasiquote (let ((x ,x)) (and (not (##pair? x)) (##null? x)))))"
       base="$filenoext.gambit.$INLINING_LIMIT$ARITHMETIC$VERSION_LIMIT"
       exe=$base.exe
       echo "$OUTPUT_INCLUDED_CODE"

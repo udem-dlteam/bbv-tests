@@ -1,3 +1,10 @@
+(declare
+  (standard-bindings)
+  (extended-bindings)
+  (not safe)
+  (block)
+)
+
 (define-macro (for-syntax . exprs)
   (for-each eval exprs)
   `(begin))
@@ -8,7 +15,7 @@
 
 (define-macro (FLop op . args)   `(,(symbol-append '|##fl| op) ,@args))
 (define-macro (FXop op . args)   `(,(symbol-append '|##fx| op) ,@args))
-(define-macro (PRIMop op . args) `(,(symbol-append '|##| op) ,@args))
+(define-macro (PRIMop op . args) `(let () (declare (not inline-primitives)) (,(symbol-append '|##| op) ,@args)))
 
 (define-macro (unknown x . rest)
   (if (eq? compilation-mode 'gvm-interpret)
@@ -135,13 +142,14 @@
            (PRIMop ,op ,a ,y))))))
    (else
     (let ((a (gensym))
-          (b (gensym)))
+          (b (gensym))
+          (c (gensym)))
       `(let ((,a ,x)
              (,b ,y))
          (cond
           ((and (FIXNUM? ,a) (FIXNUM? ,b))
-           (or (,(symbol-append '|##fx| op '?) ,a ,b)
-               (PRIMop ,op ,a ,b)))
+           (let ((,c (,(symbol-append '|##fx| op '?) ,a ,b)))
+             (if ,c ,c (PRIMop ,op ,a ,b))))
           ((and (FLONUM? ,a) (FLONUM? ,b))
            (FLop ,op ,a ,b))
           (else
