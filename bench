@@ -30,6 +30,9 @@ compile=true
 execute=true
 #execute=false
 
+plot=true
+#plot=false
+
 # find script directory
 SCRIPT_DIR="$0"
 if test "${SCRIPT_DIR#/}" = "$SCRIPT_DIR" ; then
@@ -44,6 +47,8 @@ PROGRAMS=""
 V=""
 I=""
 PRIMITIVE_COUNT=""
+RUNS="1"
+DRY_RUNS="1"
 
 while [ "$#" != "0" ]; do
   case "$1" in
@@ -77,6 +82,31 @@ while [ "$#" != "0" ]; do
       ;;
     -P) # primitive counts
       PRIMITIVE_COUNT="-P"
+      ;;
+    -runs) # number of runs
+      shift
+      if [ "$#" = "0" ]; then
+        printf "number of runs (-runs) option needs an argument"
+        exit 1
+      fi
+      RUNS="$1"
+      ;;
+    -dry-runs) # number of dry runs
+      shift
+      if [ "$#" = "0" ]; then
+        printf "number of dry runs (-dry-runs) option needs an argument"
+        exit 1
+      fi
+      DRY_RUNS="$1"
+      ;;
+    -nocompile) # don't compile benchmarks
+      compile=false
+      ;;
+    -noexecute) # don't execute benchmarks
+      execute=false
+      ;;
+    -noplot) # don't plot results
+      plot=false
       ;;
     -*) # other options
       printf "*** unknown option: $1\n"
@@ -140,11 +170,55 @@ if [ `uname -s` = "Darwin" ] ; then
   TIME=time
   TIMEARGS=
   GCC=gcc-13
+  PROCESSOR_MODEL=`system_profiler SPHardwareDataType | fgrep Chip: | sed -e "s,.*Chip: ,," -e "s, ,-,g"`
+  PROCESSOR_MODEL="Apple-M2-Max"
 else
   TIME=/usr/bin/time
   TIMEARGS="-f real:%e"
   GCC=gcc
+  PROCESSOR_MODEL=`fgrep "model name" /proc/cpuinfo | sed -e "s,model name[^:]*: ,," -e "s,([^)]*),,g" -e "s, ,-,g" | head -1`
 fi
+
+create_gnuplot()
+{
+    cat <<EOF > $1
+set terminal pdf font 'Verdana,12'
+set ylabel 'execution time (in sec)' offset 0,0
+
+set auto x
+
+set style data histogram
+set style histogram gap 0 errorbars lw 1
+set errorbars lc rgb '#444444'
+set xtics rotate by 45 right font ',8'
+set boxwidth 0.9
+set style fill solid
+set style line 11 linecolor rgb '#0d52bd' linetype 1 linewidth 1
+set style line 12 linecolor rgb '#37fd12' linetype 1 linewidth 1
+set style line 13 linecolor rgb '#57a0d3' linetype 1 linewidth 1
+set style line 14 linecolor rgb '#4fc978' linetype 1 linewidth 1
+set style line 51 linecolor rgb '#efcbab' linetype 1 linewidth 1
+set style line 61 linecolor rgb '#821831' linetype 1 linewidth 1
+
+set style line 100 linecolor rgb '#000000' linetype 1 linewidth 1
+
+set grid ytics
+set xtics scale 0
+set datafile separator ','
+
+set key top rm
+set ylabel 'execution time (in sec)'
+
+set yrange [0:]
+
+unset xtic
+EOF
+}
+
+color_gambit=10
+color_bigloo=20
+color_gcc=50
+color_clang=60
 
 for program in $PROGRAMS ; do
 
@@ -166,7 +240,8 @@ for program in $PROGRAMS ; do
        sum) bench=gabriel/sum ; args="n: 10000" ; repeat=200000 ;;
      sumfp) bench=gabriel/sumfp ; args="n: 1e6" ; repeat=500 ;;
    triangl) bench=gabriel/triangl ; args="i: 22 depth: 1" ; repeat=50 ;;
- almabench) bench=bglstone/almabench ; args="" ; repeat=10 ;;
+
+# almabench) bench=bglstone/almabench ; args="" ; repeat=10 ;;
 
   esac
 
@@ -176,9 +251,9 @@ for program in $PROGRAMS ; do
 
     if test -e $bench.scm ; then
       for SC in $SC_range ; do
-        for SG in $SG_range ; do
-          for V in $V_range ; do
-            for I in $I_range ; do
+        for I in $I_range ; do
+          for SG in $SG_range ; do
+            for V in $V_range ; do
               $SCRIPT_DIR/compile --$SC -I $I -$SG -V $V $PRIMITIVE_COUNT $bench.scm
             done
           done
@@ -203,14 +278,26 @@ for program in $PROGRAMS ; do
 
   if $execute ; then
 
-    rm -f $bench.results
-
     if test -e $bench.scm ; then
       for SC in $SC_range ; do
-        for SG in $SG_range ; do
-          for V in $V_range ; do
-            for I in $I_range ; do
-              printf "(%s $SC %s V=%s I=%s)\n" `(eval $TIME $TIMEARGS $bench.$SC.$I$SG$V.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/.*0m//' -e 's/ *//' -e 's/[s ].*//'` $SG $V $I >> $bench.results
+        for I in $I_range ; do
+          for SG in $SG_range ; do
+            csv_file="$bench.$SC.$I$SG.csv"
+            rm -f "$csv_file"
+            for V in $V_range ; do
+              printf "$V" >> $csv_file
+              run=0
+              while [ "$run" -lt "$DRY_RUNS" ] ; do
+                run=$((run+1))
+                real_time=`(eval $TIME $TIMEARGS $bench.$SC.$I$SG$V.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
+              done
+              run=0
+              while [ "$run" -lt "$RUNS" ] ; do
+                run=$((run+1))
+                real_time=`(eval $TIME $TIMEARGS $bench.$SC.$I$SG$V.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
+                printf ",%s" $real_time >> $csv_file
+              done
+              printf "\n" >> $csv_file
             done
           done
         done
@@ -219,15 +306,85 @@ for program in $PROGRAMS ; do
 
     if test -e $bench.c.c ; then
       for CC in $CC_range ; do
+        csv_file="$bench.$CC.csv"
+        rm -f "$csv_file"
         for O in $O_range ; do
-          printf "(%s $CC -O%s)\n" `(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/.*0m//' -e 's/ *//' -e 's/[s ].*//'` $O >> $bench.results
+          printf "O$O" >> $csv_file
+          run=0
+          while [ "$run" -lt "$DRY_RUNS" ] ; do
+            run=$((run+1))
+            printf "(%s $CC -O%s)\n" `(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'` $O > /dev/null
+          done
+          run=0
+          while [ "$run" -lt "$RUNS" ] ; do
+            run=$((run+1))
+            real_time=`(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
+            printf ",%s" $real_time >> $csv_file
+          done
+          printf "\n" >> $csv_file
         done
       done
     fi
 
-    printf "########### EXECUTION TIMES FOR $program\n"
+  fi
 
-    sort -n $bench.results
+  if $plot ; then
+
+    gnuplot_file="$bench.gnuplot"
+    pdf_file="$bench.$PROCESSOR_MODEL.pdf"
+    rm -f "$gnuplot_file"
+
+    create_gnuplot "$gnuplot_file"
+
+    printf "set output '$pdf_file'\n" >> "$gnuplot_file"
+    printf "set title '$program on $PROCESSOR_MODEL'\n" >> "$gnuplot_file"
+    printf "%s\n" "plot \\" >> "$gnuplot_file"
+
+    if test -e $bench.scm ; then
+      csv_files=""
+      for SC in $SC_range ; do
+        eval color=\$color_$SC
+        for I in $I_range ; do
+          for SG in $SG_range ; do
+            csv_file="$bench.$SC.$I$SG.csv"
+            csv_files="$csv_files $csv_file"
+
+            color=$((color+1))
+            run=0
+            fields=""
+            while [ "$run" -lt "$RUNS" ] ; do
+              run=$((run+1))
+              fields="$fields$((run+1)):"
+            done
+
+            printf "newhistogram lt 1, \\\\\n" >> "$gnuplot_file"
+            printf "'%s' u %s title '%s' ls %s , \\\\\n" "$csv_file" "${fields}xtic(1)" "$SC.$I$SG" "$color" >> "$gnuplot_file"
+
+          done
+        done
+      done
+      if test -e $bench.c.c ; then
+        for CC in $CC_range ; do
+          eval color=\$color_$CC
+          color=$((color+1))
+          csv_file="$bench.$CC.csv"
+          csv_files="$csv_files $csv_file"
+          printf "newhistogram lt 1, \\\\\n" >> "$gnuplot_file"
+          printf "'%s' u %s title '%s' ls %s , \\\\\n" "$csv_file" "${fields}xtic(1)" "$CC" "$color" >> "$gnuplot_file"
+
+        done
+      fi
+      echo "$csv_files"
+
+    fi
+
+    gnuplot "$gnuplot_file"
+
+    printf "%s\n" "created $pdf_file"
+
+    if [ `uname -s` = "Darwin" ] ; then
+      open "$pdf_file"
+    fi
 
   fi
 
