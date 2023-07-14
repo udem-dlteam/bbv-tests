@@ -19,7 +19,7 @@ DEFAULT_SC="gambit bigloo"
 DEFAULT_SG="S G"
 DEFAULT_V="0 5"
 DEFAULT_I="0"
-DEFAULT_PROGRAMS="ack fib fibfp tak takl diviter divrec array1 browse mazefun nqueens puzzle quicksort sum sumfp triangl"
+DEFAULT_PROGRAMS="ack fib fibfp tak takl diviter divrec array1 browse mazefun nqueens puzzle quicksort sum sumfp triangl almabench"
 
 #debug=true
 debug=false
@@ -240,8 +240,7 @@ for program in $PROGRAMS ; do
        sum) bench=gabriel/sum ; args="n: 10000" ; repeat=200000 ;;
      sumfp) bench=gabriel/sumfp ; args="n: 1e6" ; repeat=500 ;;
    triangl) bench=gabriel/triangl ; args="i: 22 depth: 1" ; repeat=50 ;;
-
-# almabench) bench=bglstone/almabench ; args="" ; repeat=10 ;;
+ almabench) bench=bglstone/almabench ; args="K: 36525" ; repeat=1 ;;
 
   esac
 
