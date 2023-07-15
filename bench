@@ -33,6 +33,8 @@ execute=true
 plot=true
 #plot=false
 
+withC=false
+
 # find script directory
 SCRIPT_DIR="$0"
 if test "${SCRIPT_DIR#/}" = "$SCRIPT_DIR" ; then
@@ -99,6 +101,9 @@ while [ "$#" != "0" ]; do
       fi
       DRY_RUNS="$1"
       ;;
+    -withC) # run C benchmarks
+      withC=true
+      ;;
     -nocompile) # don't compile benchmarks
       compile=false
       ;;
@@ -162,9 +167,9 @@ if $debug ; then
 
 fi
 
-if [ "$WIPGAMBITDIR" = "" ] ; then
-  export WIPGAMBITDIR=`pwd`/gambit/gambit
-fi
+#if [ "$WIPGAMBITDIR" = "" ] ; then
+#  export WIPGAMBITDIR=`pwd`/gambit/gambit
+#fi
 
 if [ `uname -s` = "Darwin" ] ; then
   TIME=time
@@ -204,7 +209,6 @@ set style line 100 linecolor rgb '#000000' linetype 1 linewidth 1
 
 set grid ytics
 set xtics scale 0
-set datafile separator ','
 
 set key top rm
 set ylabel 'execution time (in sec)'
@@ -260,17 +264,19 @@ for program in $PROGRAMS ; do
       done
     fi
 
-    if test -e $bench.c.c ; then
-      for CC in $CC_range ; do
-        if [ "$CC" = "gcc" ] ; then
-          ACTUAL_CC="$GCC"
-        else
-          ACTUAL_CC="$CC"
-        fi
-        for O in $O_range ; do
-          $ACTUAL_CC -fomit-frame-pointer -O$O $bench.c.c -o $bench.$CC.O$O.exe
+    if $withC ; then
+      if test -e $bench.c.c ; then
+        for CC in $CC_range ; do
+          if [ "$CC" = "gcc" ] ; then
+            ACTUAL_CC="$GCC"
+          else
+            ACTUAL_CC="$CC"
+          fi
+          for O in $O_range ; do
+            $ACTUAL_CC -fomit-frame-pointer -O$O $bench.c.c -o $bench.$CC.O$O.exe
+          done
         done
-      done
+      fi
     fi
 
   fi
@@ -303,34 +309,37 @@ for program in $PROGRAMS ; do
       done
     fi
 
-    if test -e $bench.c.c ; then
-      for CC in $CC_range ; do
-        csv_file="$bench.$CC.csv"
-        rm -f "$csv_file"
-        for O in $O_range ; do
-          printf "O$O" >> $csv_file
-          run=0
-          while [ "$run" -lt "$DRY_RUNS" ] ; do
-            run=$((run+1))
-            real_time=`(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
+    if $withC ; then
+      if test -e $bench.c.c ; then
+        for CC in $CC_range ; do
+          csv_file="$bench.$CC.csv"
+          rm -f "$csv_file"
+          for O in $O_range ; do
+            printf "O$O" >> $csv_file
+            run=0
+            while [ "$run" -lt "$DRY_RUNS" ] ; do
+              run=$((run+1))
+              real_time=`(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
+            done
+            run=0
+            while [ "$run" -lt "$RUNS" ] ; do
+              run=$((run+1))
+              real_time=`(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
+              printf ",%s" $real_time >> $csv_file
+            done
+            printf "\n" >> $csv_file
           done
-          run=0
-          while [ "$run" -lt "$RUNS" ] ; do
-            run=$((run+1))
-            real_time=`(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
-            printf ",%s" $real_time >> $csv_file
-          done
-          printf "\n" >> $csv_file
         done
-      done
+      fi
     fi
 
   fi
 
   if $plot ; then
 
-    gnuplot_file="$bench.gnuplot"
-    pdf_file="$bench.$PROCESSOR_MODEL.pdf"
+    COMPUTE_STATS="awk -F',' '{ N=NF-1; sum=0; for (i=2; i<=N+1; i++) sum+=\$i; mean=sum/N; sumsq=0; for (i=2; i<=N+1; i++) sumsq+=(\$i-mean)**2; print \$1,mean,sqrt(sumsq/N) }'"
+    gnuplot_file="$program.gnuplot"
+    pdf_file="$program.$PROCESSOR_MODEL.pdf"
     rm -f "$gnuplot_file"
 
     create_gnuplot "$gnuplot_file"
@@ -340,40 +349,32 @@ for program in $PROGRAMS ; do
     printf "%s\n" "plot \\" >> "$gnuplot_file"
 
     if test -e $bench.scm ; then
-      csv_files=""
       for SC in $SC_range ; do
         eval color=\$color_$SC
         for I in $I_range ; do
           for SG in $SG_range ; do
-            csv_file="$bench.$SC.$I$SG.csv"
-            csv_files="$csv_files $csv_file"
-
             color=$((color+1))
-            run=0
-            fields=""
-            while [ "$run" -lt "$RUNS" ] ; do
-              run=$((run+1))
-              fields="$fields$((run+1)):"
-            done
+            csv_file="$bench.$SC.$I$SG.csv"
 
             printf "newhistogram lt 1, \\\\\n" >> "$gnuplot_file"
-            printf "'%s' u %s title '%s' ls %s , \\\\\n" "$csv_file" "${fields}xtic(1)" "$SC.$I$SG" "$color" >> "$gnuplot_file"
+            printf "\"< $COMPUTE_STATS %s\" u 2:3 title '%s' ls %s , \\\\\n" "$csv_file" "$SC.$I$SG" "$color" >> "$gnuplot_file"
 
           done
         done
       done
-      if test -e $bench.c.c ; then
-        for CC in $CC_range ; do
-          eval color=\$color_$CC
-          color=$((color+1))
-          csv_file="$bench.$CC.csv"
-          csv_files="$csv_files $csv_file"
-          printf "newhistogram lt 1, \\\\\n" >> "$gnuplot_file"
-          printf "'%s' u %s title '%s' ls %s , \\\\\n" "$csv_file" "${fields}xtic(1)" "$CC" "$color" >> "$gnuplot_file"
+      if $withC ; then
+        if test -e $bench.c.c ; then
+          for CC in $CC_range ; do
+            eval color=\$color_$CC
+            color=$((color+1))
+            csv_file="$bench.$CC.csv"
 
-        done
+            printf "newhistogram lt 1, \\\\\n" >> "$gnuplot_file"
+            printf "\"< $COMPUTE_STATS %s\" u 2:3 title '%s' ls %s , \\\\\n" "$csv_file" "$CC" "$color" >> "$gnuplot_file"
+
+          done
+        fi
       fi
-      echo "$csv_files"
 
     fi
 
