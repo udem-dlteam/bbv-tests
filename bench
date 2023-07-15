@@ -337,7 +337,7 @@ for program in $PROGRAMS ; do
 
   if $plot ; then
 
-    COMPUTE_STATS="awk -F',' '{ N=NF-1; sum=0; for (i=2; i<=N+1; i++) sum+=\$i; mean=sum/N; sumsq=0; for (i=2; i<=N+1; i++) sumsq+=(\$i-mean)**2; print \$1,mean,sqrt(sumsq/N) }'"
+    COMPUTE_STATS="awk -F',' '{ N=NF-1; sum=0; for (i=2; i<=N+1; i++) sum+=\$i; mean=sum/N; sumsq=0; for (i=2; i<=N+1; i++) sumsq+=(\$i-mean)*(\$i-mean); print \$1,mean,sqrt(sumsq/N) }'"
     gnuplot_file="$program.gnuplot"
     pdf_file="$program.$PROCESSOR_MODEL.pdf"
     rm -f "$gnuplot_file"
