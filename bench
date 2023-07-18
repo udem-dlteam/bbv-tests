@@ -37,7 +37,7 @@ withC=false
 
 # find script directory
 SCRIPT_DIR="$0"
-if test "${SCRIPT_DIR#/}" = "$SCRIPT_DIR" ; then
+if [ "${SCRIPT_DIR#/}" = "$SCRIPT_DIR" ] ; then
   SCRIPT_DIR="$(pwd)/$SCRIPT_DIR"
 fi
 SCRIPT_DIR="${SCRIPT_DIR%/*}"
@@ -202,6 +202,10 @@ set style line 11 linecolor rgb '#0d52bd' linetype 1 linewidth 1
 set style line 12 linecolor rgb '#37fd12' linetype 1 linewidth 1
 set style line 13 linecolor rgb '#57a0d3' linetype 1 linewidth 1
 set style line 14 linecolor rgb '#4fc978' linetype 1 linewidth 1
+set style line 21 linecolor rgb '#de3161' linetype 1 linewidth 1
+set style line 22 linecolor rgb '#ff00ff' linetype 1 linewidth 1
+set style line 23 linecolor rgb '#e04d83' linetype 1 linewidth 1
+set style line 24 linecolor rgb '#fa86c5' linetype 1 linewidth 1
 set style line 51 linecolor rgb '#efcbab' linetype 1 linewidth 1
 set style line 61 linecolor rgb '#821831' linetype 1 linewidth 1
 
@@ -252,9 +256,10 @@ for program in $PROGRAMS ; do
 
   if $compile ; then
 
-    if test -e $bench.scm ; then
+    if [ -e $bench.scm ] ; then
       for SC in $SC_range ; do
         for I in $I_range ; do
+          if [ "bigloo" = "$SC" -a "$I" = "0" ] ; then continue ; fi
           for SG in $SG_range ; do
             for V in $V_range ; do
               $SCRIPT_DIR/compile --$SC -I $I -$SG -V $V $PRIMITIVE_COUNT $bench.scm
@@ -265,7 +270,7 @@ for program in $PROGRAMS ; do
     fi
 
     if $withC ; then
-      if test -e $bench.c.c ; then
+      if [ -e $bench.c.c ] ; then
         for CC in $CC_range ; do
           if [ "$CC" = "gcc" ] ; then
             ACTUAL_CC="$GCC"
@@ -283,24 +288,27 @@ for program in $PROGRAMS ; do
 
   if $execute ; then
 
-    if test -e $bench.scm ; then
+    if [ -e $bench.scm ] ; then
       for SC in $SC_range ; do
         for I in $I_range ; do
+          if [ "bigloo" = "$SC" -a "$I" = "0" ] ; then continue ; fi
           for SG in $SG_range ; do
             csv_file="$bench.$SC.$I$SG.csv"
             rm -f "$csv_file"
             for V in $V_range ; do
               printf "$V" >> $csv_file
-              run=0
-              while [ "$run" -lt "$DRY_RUNS" ] ; do
-                run=$((run+1))
-                real_time=`(eval $TIME $TIMEARGS $bench.$SC.$I$SG$V.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
-              done
-              run=0
+              run=$((-DRY_RUNS))
               while [ "$run" -lt "$RUNS" ] ; do
                 run=$((run+1))
-                real_time=`(eval $TIME $TIMEARGS $bench.$SC.$I$SG$V.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
-                printf ",%s" $real_time >> $csv_file
+                if (eval $TIME $TIMEARGS ./$bench.$SC.$I$SG$V.exe repeat: $repeat $args) > ./$bench.$SC.$I$SG$V.out 2>&1 ; then
+                  real_time=`fgrep real < ./$bench.$SC.$I$SG$V.out | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
+                  rm ./$bench.$SC.$I$SG$V.out
+                else
+                  real_time="0"
+                fi
+                if [ "$run" -gt "0" ] ; then
+                  printf ",%s" $real_time >> $csv_file
+                fi
               done
               printf "\n" >> $csv_file
             done
@@ -310,22 +318,25 @@ for program in $PROGRAMS ; do
     fi
 
     if $withC ; then
-      if test -e $bench.c.c ; then
+      if [ -e $bench.c.c ] ; then
         for CC in $CC_range ; do
           csv_file="$bench.$CC.csv"
           rm -f "$csv_file"
           for O in $O_range ; do
             printf "O$O" >> $csv_file
-            run=0
-            while [ "$run" -lt "$DRY_RUNS" ] ; do
-              run=$((run+1))
-              real_time=`(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
-            done
-            run=0
+
+            run=$((-DRY_RUNS))
             while [ "$run" -lt "$RUNS" ] ; do
               run=$((run+1))
-              real_time=`(eval $TIME $TIMEARGS $bench.$CC.O$O.exe repeat: $repeat $args) 2>&1 | fgrep real | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
-              printf ",%s" $real_time >> $csv_file
+              if (eval $TIME $TIMEARGS ./$bench.$CC.O$O.exe repeat: $repeat $args) > ./$bench.$CC.O$O.out 2>&1 ; then
+                real_time=`fgrep real < ./$bench.$CC.O$O.out | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
+                rm ./$bench.$CC.O$O.out
+              else
+                real_time="0"
+              fi
+              if [ "$run" -gt "0" ] ; then
+                printf ",%s" $real_time >> $csv_file
+              fi
             done
             printf "\n" >> $csv_file
           done
@@ -348,10 +359,11 @@ for program in $PROGRAMS ; do
     printf "set title '$program on $PROCESSOR_MODEL'\n" >> "$gnuplot_file"
     printf "%s\n" "plot \\" >> "$gnuplot_file"
 
-    if test -e $bench.scm ; then
+    if [ -e $bench.scm ] ; then
       for SC in $SC_range ; do
         eval color=\$color_$SC
         for I in $I_range ; do
+          if [ "bigloo" = "$SC" -a "$I" = "0" ] ; then continue ; fi
           for SG in $SG_range ; do
             color=$((color+1))
             csv_file="$bench.$SC.$I$SG.csv"
@@ -363,7 +375,7 @@ for program in $PROGRAMS ; do
         done
       done
       if $withC ; then
-        if test -e $bench.c.c ; then
+        if [ -e $bench.c.c ] ; then
           for CC in $CC_range ; do
             eval color=\$color_$CC
             color=$((color+1))
