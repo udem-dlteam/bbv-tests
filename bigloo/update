@@ -41,7 +41,7 @@ BIGLOOGIT=https://github.com/manuel-serrano/bigloo.git
 # when BIGLOOURL is defined it will override getting bigloo from the git repo
 BIGLOOURL=http://www-sop.inria.fr/indes/fp/Bigloo/download/bigloo-unstable.tar.gz
 
-if [ -z "$BIGLOOURL" -o ! -d "$BIGLOOREPODIR" ] ; then
+if [ ! -z "$BIGLOOURL" -o ! -d "$BIGLOOREPODIR" ] ; then
 
   if [ -n "$BIGLOOURL" ] ; then
 
@@ -64,7 +64,13 @@ if [ -z "$BIGLOOURL" -o ! -d "$BIGLOOREPODIR" ] ; then
 
   echo "========== configuring Bigloo"
 
-  ./configure --prefix="$BIGLOOINSTDIR"
+  if [ `uname -s` = "Darwin" ] ; then
+    GCC=gcc-13
+  else
+    GCC=gcc
+  fi
+
+  CC=$GCC ./configure --prefix="$BIGLOOINSTDIR" --disable-unistring
 
   echo "========== building Bigloo"
 
