@@ -191,6 +191,9 @@ for file in $FILES ; do
       if [ "$VERSION_LIMIT " = "1 " ]; then
 	SAWBBV=
       fi
+      if [ "$INLINING_LIMIT " = "0 " ]; then
+	BIGLOOOPT="$BIGLOOOPT -fno-user-inlining"
+      fi
       echo "cd $SCRIPT_DIR/bigloo; BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -O3 -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe"
       (cd $SCRIPT_DIR/bigloo && \
 	 BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -O3 -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe)

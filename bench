@@ -259,9 +259,9 @@ for program in $PROGRAMS ; do
     if [ -e $bench.scm ] ; then
       for SC in $SC_range ; do
         for I in $I_range ; do
-          if [ "bigloo" = "$SC" -a "$I" = "0" ] ; then continue ; fi
           for SG in $SG_range ; do
             for V in $V_range ; do
+	      echo "$SCRIPT_DIR/compile --$SC -I $I -$SG -V $V $PRIMITIVE_COUNT $bench.scm"
               $SCRIPT_DIR/compile --$SC -I $I -$SG -V $V $PRIMITIVE_COUNT $bench.scm
             done
           done
@@ -291,7 +291,6 @@ for program in $PROGRAMS ; do
     if [ -e $bench.scm ] ; then
       for SC in $SC_range ; do
         for I in $I_range ; do
-          if [ "bigloo" = "$SC" -a "$I" = "0" ] ; then continue ; fi
           for SG in $SG_range ; do
             csv_file="$bench.$SC.$I$SG.csv"
             rm -f "$csv_file"
@@ -363,7 +362,6 @@ for program in $PROGRAMS ; do
       for SC in $SC_range ; do
         eval color=\$color_$SC
         for I in $I_range ; do
-          if [ "bigloo" = "$SC" -a "$I" = "0" ] ; then continue ; fi
           for SG in $SG_range ; do
             color=$((color+1))
             csv_file="$bench.$SC.$I$SG.csv"
