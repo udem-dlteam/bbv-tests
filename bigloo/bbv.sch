@@ -371,10 +371,10 @@
 
 (define-macro (call-with-current-continuation f)
    (match-case f
-      ((lambda (?esc) ?body)
-       `(bind-exit (,esc) ,body))
+      ((lambda (?esc) . ?body)
+       `(bind-exit (,esc) ,@body))
       (else
-       (error "call-with-current-continuation" "bad form" ',f))))
+       (error "call-with-current-continuation" "bad form" `',f))))
 
 (define-macro (Smake-vector1 n)
    (define arithmetic
