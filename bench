@@ -299,7 +299,7 @@ for program in $PROGRAMS ; do
               run=$((-DRY_RUNS))
               while [ "$run" -lt "$RUNS" ] ; do
                 run=$((run+1))
-                if (eval $TIME $TIMEARGS ./$bench.$SC.$I$SG$V.exe repeat: $repeat $args) > ./$bench.$SC.$I$SG$V.out 2>&1 ; then
+                if (eval $TIME $TIMEARGS ./$bench.$SC.$I$SG$V.exe repeat: $repeat align-stack: $((3*(run+DRY_RUNS))) $args) > ./$bench.$SC.$I$SG$V.out 2>&1 ; then
                   real_time=`fgrep real < ./$bench.$SC.$I$SG$V.out | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
                   rm ./$bench.$SC.$I$SG$V.out
                 else
