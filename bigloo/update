@@ -30,7 +30,8 @@ get_available_parallelism()
   fi
 }
 
-get_available_parallelism
+#get_available_parallelism
+AVAILABLE_PARALLELISM="1"
 
 MAKE_JOBS="-j$AVAILABLE_PARALLELISM"
 
@@ -70,7 +71,7 @@ if [ ! -z "$BIGLOOURL" -o ! -d "$BIGLOOREPODIR" ] ; then
     GCC=gcc
   fi
 
-  CC=$GCC ./configure --prefix="$BIGLOOINSTDIR" --disable-unistring
+  CC=$GCC ./configure --prefix="$BIGLOOINSTDIR" --disable-unistring --disable-gmp
 
   echo "========== building Bigloo"
 
