@@ -20,7 +20,7 @@ DEFAULT_SG="G"
 DEFAULT_V="0 1 2 3 4 5"
 DEFAULT_I="370"
 DEFAULT_PROGRAMS="ack fib fibfp tak takl diviter divrec array1 browse mazefun nqueens puzzle quicksort sum sumfp triangl almabench"
-DEFAULT_M="linear"
+DEFAULT_M="linear entropy"
 
 #debug=true
 debug=false

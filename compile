@@ -38,7 +38,9 @@ MERGE_STRATEGY="linear" # default merge strategy
 if test "$WIPGAMBITDIR" != "" ; then
   GAMBITCOMP="$WIPGAMBITDIR/gsi/gsi -:=$WIPGAMBITDIR $WIPGAMBITDIR/gsc/igsc.scm"
 else
-  GAMBITDIR="$SCRIPT_DIR/gambit/gambit"
+  if test "$GAMBITDIR" = "" ; then
+    GAMBITDIR="$SCRIPT_DIR/gambit/gambit"
+  fi
   GAMBITCOMP="$GAMBITDIR/gsc/gsc -:=$GAMBITDIR"
 fi
 
