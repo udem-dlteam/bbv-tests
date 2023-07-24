@@ -30,7 +30,8 @@ get_available_parallelism()
   fi
 }
 
-get_available_parallelism
+#get_available_parallelism
+AVAILABLE_PARALLELISM="1"
 
 MAKE_JOBS="-j$AVAILABLE_PARALLELISM"
 
@@ -38,17 +39,39 @@ BIGLOOREPODIR="$SCRIPT_DIR/bigloo"
 BIGLOOINSTDIR="$SCRIPT_DIR/local"
 BIGLOOGIT=https://github.com/manuel-serrano/bigloo.git
 
-if test ! -d "$BIGLOOREPODIR" ; then
+# when BIGLOOURL is defined it will override getting bigloo from the git repo
+BIGLOOURL=http://www-sop.inria.fr/indes/fp/Bigloo/download/bigloo-unstable.tar.gz
 
-  echo "========== cloning Bigloo to $BIGLOOREPODIR"
+if [ ! -z "$BIGLOOURL" -o ! -d "$BIGLOOREPODIR" ] ; then
 
-  git clone $BIGLOOGIT "$BIGLOOREPODIR"
+  if [ -n "$BIGLOOURL" ] ; then
+
+    echo "========== downloading Bigloo to $BIGLOOREPODIR from $BIGLOOURL"
+
+    rm -rf bigloo-unstable.tar.gz bigloo-unstable "$BIGLOOREPODIR" "$BIGLOOINSTDIR"
+    curl "$BIGLOOURL" > bigloo-unstable.tar.gz
+    tar zxf bigloo-unstable.tar.gz
+    mv bigloo-unstable bigloo
+
+  else
+
+    echo "========== cloning Bigloo to $BIGLOOREPODIR"
+
+    git clone $BIGLOOGIT "$BIGLOOREPODIR"
+
+  fi
 
   cd "$BIGLOOREPODIR"
 
   echo "========== configuring Bigloo"
 
-  ./configure --prefix="$BIGLOOINSTDIR"
+  if [ `uname -s` = "Darwin" ] ; then
+    GCC=gcc-13
+  else
+    GCC=gcc
+  fi
+
+  CC=$GCC ./configure --prefix="$BIGLOOINSTDIR" --disable-unistring --disable-gmp
 
   echo "========== building Bigloo"
 
@@ -63,6 +86,7 @@ if test ! -d "$BIGLOOREPODIR" ; then
   make -C tools bglcfg
 
 else
+
   cd "$BIGLOOREPODIR"
 
   git pull > pull.out
