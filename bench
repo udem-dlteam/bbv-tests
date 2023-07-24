@@ -279,7 +279,7 @@ for program in $PROGRAMS ; do
         for I in $I_range ; do
           for SG in $SG_range ; do
             for V in $V_range ; do
-                          for M in $M_range ; do
+              for M in $M_range ; do
                 echo "$SCRIPT_DIR/compile --$SC -I $I -$SG -V $V -M $M $PRIMITIVE_COUNT $bench.scm"
                 $SCRIPT_DIR/compile --$SC -I $I -$SG -V $V -M $M $PRIMITIVE_COUNT $bench.scm
               done
@@ -312,24 +312,26 @@ for program in $PROGRAMS ; do
       for SC in $SC_range ; do
         for I in $I_range ; do
           for SG in $SG_range ; do
-            csv_file="$bench.$SC.$I$SG.csv"
-            rm -f "$csv_file"
-            for V in $V_range ; do
-              printf "$V" >> $csv_file
-              run=$((-DRY_RUNS))
-              while [ "$run" -lt "$RUNS" ] ; do
-                run=$((run+1))
-                if (eval $TIME $TIMEARGS ./$bench.$SC.$I$SG$V.exe repeat: $repeat align-stack: $((3*(run+DRY_RUNS))) $args) > ./$bench.$SC.$I$SG$V.out 2>&1 ; then
-                  real_time=`fgrep real < ./$bench.$SC.$I$SG$V.out | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
-                  rm ./$bench.$SC.$I$SG$V.out
-                else
-                  real_time="0"
-                fi
-                if [ "$run" -gt "0" ] ; then
-                  printf ",%s" $real_time >> $csv_file
-                fi
+            for M in $M_range ; do
+              csv_file="$bench.$SC.$I$SG$M.csv"
+              rm -f "$csv_file"
+              for V in $V_range ; do
+                printf "$V" >> $csv_file
+                run=$((-DRY_RUNS))
+                while [ "$run" -lt "$RUNS" ] ; do
+                  run=$((run+1))
+                  if (eval $TIME $TIMEARGS ./$bench.$SC.$I$SG$M$V.exe repeat: $repeat align-stack: $((3*(run+DRY_RUNS))) $args) > ./$bench.$SC.$I$SG$M$V.out 2>&1 ; then
+                    real_time=`fgrep real < ./$bench.$SC.$I$SG$M$V.out | sed -e 's/^[^0-9]*//' -e 's/^0m//' -e 's/ *//' -e 's/[s ].*//'`
+                    rm ./$bench.$SC.$I$SG$M$V.out
+                  else
+                    real_time="0"
+                  fi
+                  if [ "$run" -gt "0" ] ; then
+                    printf ",%s" $real_time >> $csv_file
+                  fi
+                done
+                printf "\n" >> $csv_file
               done
-              printf "\n" >> $csv_file
             done
           done
         done
@@ -383,12 +385,13 @@ for program in $PROGRAMS ; do
         eval color=\$color_$SC
         for I in $I_range ; do
           for SG in $SG_range ; do
-            color=$((color+1))
-            csv_file="$bench.$SC.$I$SG.csv"
+            for M in $M_range ; do
+              color=$((color+1))
+              csv_file="$bench.$SC.$I$SG$M.csv"
 
-            printf "newhistogram lt 1, \\\\\n" >> "$gnuplot_file"
-            printf "\"< $COMPUTE_STATS %s\" u 2:3 title '%s' ls %s , \\\\\n" "$csv_file" "$SC.$I$SG" "$color" >> "$gnuplot_file"
-
+              printf "newhistogram lt 1, \\\\\n" >> "$gnuplot_file"
+              printf "\"< $COMPUTE_STATS %s\" u 2:3 title '%s' ls %s , \\\\\n" "$csv_file" "$SC.$I$SG$M" "$color" >> "$gnuplot_file"
+            done
           done
         done
       done
