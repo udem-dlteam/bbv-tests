@@ -50,7 +50,7 @@ PROGRAMS=""
 V=""
 I=""
 PRIMITIVE_COUNT=""
-RUNS="1"
+RUNS="5"
 DRY_RUNS="1"
 M=""
 
