@@ -20,6 +20,7 @@ DEFAULT_SG="S G"
 DEFAULT_V="0 5"
 DEFAULT_I="0"
 DEFAULT_PROGRAMS="ack fib fibfp tak takl diviter divrec array1 browse mazefun nqueens puzzle quicksort sum sumfp triangl almabench"
+DEFAULT_M="linear"
 
 #debug=true
 debug=false
@@ -49,6 +50,7 @@ I=""
 PRIMITIVE_COUNT=""
 RUNS="1"
 DRY_RUNS="1"
+M=""
 
 while [ "$#" != "0" ]; do
   case "$1" in
@@ -71,6 +73,14 @@ while [ "$#" != "0" ]; do
         exit 1
       fi
       V="$V $1"
+      ;;
+    -M) # merge strategy
+      shift
+      if [ "$#" = "0" ]; then
+        printf "merge strategy (-M) option needs an argument"
+        exit 1
+      fi
+      M="$M $1"
       ;;
     -I) # inlining limit
       shift
@@ -108,6 +118,9 @@ while [ "$#" != "0" ]; do
     -noplot) # don't plot results
       plot=false
       ;;
+    -nocfg) # don't plot cfg
+      cfg=false
+      ;;
     -*) # other options
       printf "*** unknown option: $1\n"
       exit 1
@@ -131,6 +144,10 @@ if [ "$V" = "" ] ; then
   V="$DEFAULT_V"
 fi
 
+if [ "$M" = "" ] ; then
+  M="$DEFAULT_M"
+fi
+
 if [ "$I" = "" ] ; then
   I="$DEFAULT_I"
 fi
@@ -143,6 +160,7 @@ SC_range="$SC"
 SG_range="$SG"
 V_range="$V"
 I_range="$I"
+M_range="$M"
 
 CC_range="gcc clang"
 O_range="0 1 2 3"
@@ -253,7 +271,9 @@ for program in $PROGRAMS ; do
         for I in $I_range ; do
           for SG in $SG_range ; do
             for V in $V_range ; do
-              $SCRIPT_DIR/compile --$SC -I $I -$SG -V $V $PRIMITIVE_COUNT $bench.scm
+              for M in $M_range ; do
+                $SCRIPT_DIR/compile --$SC -I $I -$SG -V $V -M $M $PRIMITIVE_COUNT $bench.scm
+              done
             done
           done
         done
