@@ -18,47 +18,52 @@ BBV( source:CFG, VERSION_LIMIT:int ) => CFG
 
 
 
-def BBV(bbs, VERSION_LIMIT):
+def BBV(source, VERSION_LIMIT):
 
     work_queue = []
 
     def merged_ctx_mapping(bb, ctx):
         return result of mapping built in merge (recursively follows the mapping)
 
-    def merge(bb):
-        # versions is a mapping where keys are type contexts and values are basic blocks
-        versions_to_merge, versions_to_keep = choose_candidates(bb.versions)
+    def merge(orig_bb):
+        # This could merge more than 2 versions, but we only do 2 right now
+        versions_to_merge, versions_to_keep = choose_candidates(orig_bb.versions)
     
         new_versions = versions_to_keep
 
-        merged_ctx = union_with_widening(new_versions.keys())
+        merged_ctx = union_with_widening(versions_to_merge)
 
         if merged_ctx in versions_to_merge:
+            # A version to merge was a superset of all others
             new_version = versions_to_merge[merged_ctx]
         else:
             new_version = BBVersion(ctx_before=merged_ctx, bb=orib_bb)
             work_queue.push(new_version)
 
-        for ctx, bbversion in versions_to_merge:
-            merged_ctx_mapping(bb, ctx) -> merged_ctx
-            bbversion.merged_to = new_version
+        for ctx, version in versions_to_merge:
+            merged_ctx_mapping(bb, ctx) -> merged_ctx # to compute representative
+            version.merged_to = new_version
 
         new_versions[merged_ctx] = new_version
 
-        bb.versions = new_versions
+        orig_bb.versions = new_versions
+
+        # GC to compute reachability and remove unreachables
+        compute_reachability()
 
 
-    def reach(bb, ctx):
-        ctx = most_recent_merged_ctx(bb, ctx)
+    def reach(orig_bb, ctx):
+        ctx = orig_bb.all_seen_versions[ctx].representative
 
-        if ctx in bb.versions:
-            return bb.versions[ctx]
+        if ctx in orig_bb.versions:
+            return orig_bb.versions[ctx]
 
-        new_version = bb.versions[ctx] = BBVersion(ctx_before=ctx, bb=orib_bb)
+        new_version = BBVersion(ctx_before=ctx, bb=orib_bb)
+        orig_bb.all_seen_versions[ctx] = orig_bb.versions[ctx] = new_version
         work_queue.push(new_version)
 
-        if len(bb.versions) > VERSION_LIMIT:
-            merge(bb)
+        if len(orig_bb.versions) > VERSION_LIMIT:
+            merge(orig_bb)
 
         return new_version
         
@@ -75,7 +80,7 @@ def BBV(bbs, VERSION_LIMIT):
             version.target_if_true = reach(bb.target_if_true, ctx_if_true)
             version.target_if_false = reach(bb.target_if_false, ctx_if_false)
 
-    new_entry = reach(bbs.entry, empty_context)
+    new_entry = reach(source.entry, empty_context)
     
     while work_queue is not empty:
         version = work_queue.pop()
