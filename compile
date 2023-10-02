@@ -35,14 +35,11 @@ PRIMITIVE_COUNT=0 # enables primitive (0 to disable)
 MERGE_STRATEGY="linear" # default merge strategy
 
 # for gambit
-if test "$WIPGAMBITDIR" != "" ; then
-  GAMBITCOMP="$WIPGAMBITDIR/gsi/gsi -:=$WIPGAMBITDIR $WIPGAMBITDIR/gsc/igsc.scm"
-else
-  if test "$GAMBITDIR" = "" ; then
-    GAMBITDIR="$SCRIPT_DIR/gambit/gambit"
-  fi
-  GAMBITCOMP="$GAMBITDIR/gsc/gsc -:=$GAMBITDIR"
+if test "$GAMBITDIR" = "" ; then
+  GAMBITDIR="$SCRIPT_DIR/gambit/gambit"
 fi
+
+GAMBITCOMP="$GAMBITDIR/gsc/gsc -:=$GAMBITDIR"
 
 # for bigloo
 if [ "$BIGLOODIR " = " " ]; then

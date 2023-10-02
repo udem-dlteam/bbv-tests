@@ -10,6 +10,8 @@ import shlex
 import statistics
 import subprocess
 
+import matplotlib.pyplot as plt
+
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 def aton(n):
@@ -20,46 +22,100 @@ def aton(n):
 
 VERBOSE = False
 COMPILE_SCRIPT = "../compile"
-DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
-
-TITLES_ORDER = ['version', 'time', 'instr', 'branches', 'branch_miss']
-
-SIMILAR_PRIMITIVES = [['##fx+', '##fx+?'],
-                      ['##fx-', '##fx-?'],
-                      ['##fx*', '##fx*?']]
-
-SIMILAR_PRIMITIVES_TABLE = {prim: simils for simils in SIMILAR_PRIMITIVES for prim in simils}
 
 def verbose(*args, **kwargs):
     if VERBOSE: print(*args, **kwargs)
 
-def group_similar_primitives(primitives):
-    grouped_primitives = {}
-    seen = {}
 
-    for k, v in primitives.items():
-        group = SIMILAR_PRIMITIVES_TABLE.get(k)
-        if group:
-            group_name = ' & '.join(group)
+class BenchResults:
+    def __init__(self, file, system, versions, merge_strategy, repeat, perf_output, primitives):
+        self._perf_output = perf_output
 
-            grouped_primitives.setdefault(group_name, 0)
-            seen.setdefault(group_name, 0)
+        self.file = file
+        self.system = system
+        self.merge_strategy = merge_strategy
+        self.versions = versions
+        self.repeat = repeat
+        self.primitives = primitives
 
-            grouped_primitives[group_name] += v
-            seen[group_name] += 1
+        self.task_clock = self._get_value("task-clock")
+        self.task_clock_unit = "ms"
+        self.time_elapsed = self._get_value("seconds time elapsed")
+        self.time_elapse_unit = "s"
+        self.instructions = self._get_value("instructions")
 
-    relevant_grouped_primitives = {k: v for k, v in grouped_primitives.items() if seen[k] > 1}
+    @property
+    def title(self):
+        if m:=self.merge_strategy:
+            return f"{os.path.basename(self.file)}/{m}"
+        else:
+            return os.path.basename(self.file)
 
-    return {**primitives, **relevant_grouped_primitives}
+    def _get_numbers_on_line_with(self, marker):
+        for line in self._perf_output.splitlines():
+            if marker in line:
+                numbers = re.findall(r"[\d\.,]+", line)
+                return [aton(n) for n in numbers]
 
-def extract_primitives_count(content):
-    if DEFAULT_PRIMITIVE_COUNTER_MARKER in content:
-        counter_section = content.split(DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
-        counts = re.findall("\(([^ ]+) (\d+)\)", counter_section)
+        raise OSError(f"no line with '{marker}' in 'perf stat' output (is perf installed?)")
 
-        return group_similar_primitives({k: int(v) for k, v in counts})
-    else:
-        return None
+    def _get_value(self, name):
+        return self._get_numbers_on_line_with(name)[0]
+
+
+class PrimitivesCount:
+    DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
+    SIMILAR_PRIMITIVES = [['##fx+', '##fx+?'],
+                          ['##fx-', '##fx-?'],
+                          ['##fx*', '##fx*?']]
+    SIMILAR_PRIMITIVES_TABLE = {prim: simils for simils in SIMILAR_PRIMITIVES for prim in simils}
+
+    def __new__(cls, compiler_output):
+        self = super().__new__(cls)
+
+        primitive_count = self._extract_primitives_count(compiler_output)
+
+        if not primitive_count:
+            return None
+
+        self.raw_primitives = primitive_count
+        self.primitives = self._group_similar_primitives(primitive_count)
+
+        return self
+
+    def get(self, name):
+        return self.primitives.get(name, 0)
+
+    @property
+    def typechecks(self):
+        return self.get('##fixnum?') + self.get('##flonum?')
+
+    def _group_similar_primitives(self, primitives):
+        grouped_primitives = {}
+        seen = {}
+
+        for k, v in primitives.items():
+            group = self.SIMILAR_PRIMITIVES_TABLE.get(k)
+            if group:
+                group_name = ' & '.join(group)
+
+                grouped_primitives.setdefault(group_name, 0)
+                seen.setdefault(group_name, 0)
+
+                grouped_primitives[group_name] += v
+                seen[group_name] += 1
+
+        relevant_grouped_primitives = {k: v for k, v in grouped_primitives.items() if seen[k] > 1}
+
+        return {**primitives, **relevant_grouped_primitives}
+
+    def _extract_primitives_count(self, compiler_output):
+        if self.DEFAULT_PRIMITIVE_COUNTER_MARKER in compiler_output:
+            counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
+            counts = re.findall("\(([^ ]+) (\d+)\)", counter_section)
+            return {k: int(v) for k, v in counts}
+        else:
+            return None
 
 def extract_executable_name(content):
     return re.search(r"\*\*\*executable: (.+)", content).group(1)
@@ -88,180 +144,96 @@ def compile(file, system, vlimit, params):
 
     primitive_count_flag = "-P" if params["primitive_count"] else ""
 
-    command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} {primitive_count_flag} {file}"
+    merge_strategy = params.get("merge_strategy")
+    merge_strategy = f"-M {merge_strategy}" if merge_strategy else ""
+
+    command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} {merge_strategy} {primitive_count_flag} {file}"
 
     env = os.environ.copy()
     timeout = params['compilation_timeout']
-    if 'wipgambitdir' in params: env["WIPGAMBITDIR"] = params["wipgambitdir"]
+    if 'gambitdir' in params: env["GAMBITDIR"] = params["gambitdir"]
 
     output = run_command(command, timeout, env)
 
-    primitive_count = extract_primitives_count(output)
+    verbose(output)
+
+    primitive_count = PrimitivesCount(output)
     executable = extract_executable_name(output)
 
     return executable, primitive_count
 
 def bench(executable, n, params):
-    def get_numbers_on_line_with(text, marker):
-        for line in text.splitlines():
-            if marker in line:
-                numbers = re.findall(r"[\d\.,]+", line)
-                return [aton(n) for n in numbers]
-
-        raise OSError(f"no line with '{marker}' in 'perf stat' output (is perf installed?)")
-
-
     command = f"perf stat -r {n} {executable}"
     verbose(command)
-    output = subprocess.run(command, shell=True, capture_output=True).stderr.decode()
-    verbose(output)
+    return subprocess.run(command, shell=True, capture_output=True).stderr.decode()
 
-    elapsed, delta, pdelta = get_numbers_on_line_with(output, "seconds time elapsed")
-    branch_misses, pbranch_misses, pbranch_misses_delta = get_numbers_on_line_with(output, "branch-misses")
-    branches, _, _ = get_numbers_on_line_with(output, "branches")
-    instructions, ipc, _ = get_numbers_on_line_with(output, "instructions")
 
-    return {
-        "time": f"{elapsed}s (± {pdelta}%)",
-        "branches": branches,
-        "branch_misses": f"{branch_misses} (± {pbranch_misses_delta}%)",
-        "instructions": instructions,
-        "instr/cycle": ipc,
-        }
+def write_chart_file(chartfile, results):
+    dirpath = os.path.dirname(chartfile)
+    if dirpath: os.makedirs(os.path.dirname(chartfile), exist_ok=True)
 
-def add_percentages_to_results(bench_results, all_primitive_names):
-    def make_getter(*path):
-        def get(o, default):
-            for k in path[:-1]: o = o[k]
-            return read_number(o.get(path[-1], default))
-        return get
+    versions = [str(r.versions) for r in results]
+    times = [r.task_clock for r in results]
 
-    def make_setter(*path, ratio_only=False):
-        def set(o, v, base):
-            if ratio_only:
-                result = f'{v / base:.3f}x'
-            elif v == base:
-                result = f'{format_number(v)}'
-            else:
-                result = f'{format_number(v)} ({v * 100 / base:.1f}%)'
+    fig, axis1 = plt.subplots()
 
-            for k in path[:-1]: o = o[k]
-            o[path[-1]] = result
-        return set
+    x = range(len(versions))
+    bar_width = 0.4
 
-    def make_getter_setter(*path):
-        return make_getter(*path), make_setter(*path)
+    axis1.bar([pos - bar_width / 2 for pos in x], times, bar_width,
+              label='Execution time',
+              color='darkblue')
+    axis1.set_ylabel(f'Execution time ({results[0].task_clock_unit})')
+    axis1.set_ylabel(f'Time ({results[0].task_clock_unit})')
 
-    def read_number(x):
-        if isinstance(x, (int, float)):
-            return x
-        elif isinstance(x, str):
-            return aton(re.search(r"[\d\.,]+", x).group())
-        else:
-            raise TypeError("cannot read {x} as number")
+    axis1.set_title(results[0].title)
+    axis1.set_xlabel('Number of versions')
+    axis1.set_xticks(list(x))
+    axis1.set_xticklabels(versions)
+    
+    handles, labels = axis1.get_legend_handles_labels()
 
-    def format_number(x):
-        if isinstance(x, int):
-            return str(x)
-        else:
-            return f'{x:.3f}'
+    if any(r.primitives for r in results):
+        typechecks = [r.primitives.typechecks if r.primitives else 0 for r in results]
 
-    def add_percentage(bench_results, getter, setter):
-        counts = [getter(b, 0) for b in bench_results]
-        base = counts[0]
+        axis2 = axis1.twinx()
+        axis2.bar([pos + bar_width / 2 for pos in x], typechecks, bar_width, label='Typechecks',
+                  color='orange')
+        axis2.set_ylabel('Number of typechecks')
+        handles2, labels2 = axis2.get_legend_handles_labels()
+        handles.extend(handles2)
+        labels.extend(labels2)
 
-        for b, c in zip(bench_results, counts):
-            setter(b, c, base)
+        fig.legend(handles, labels, loc='upper center', ncol=2)
 
-    bench_results = copy.deepcopy(bench_results)
+    fig.tight_layout()
 
-    add_percentage(bench_results, make_getter('time'), make_setter('time_ratio', ratio_only=True))
-    add_percentage(bench_results, make_getter('branch_misses'), make_setter('branch_misses_ratio', ratio_only=True))
-    add_percentage(bench_results, make_getter('instructions'), make_setter('instructions'))
-    add_percentage(bench_results, make_getter('branches'), make_setter('branches'))
+    fig.subplots_adjust(top=0.85)
 
-    for name in all_primitive_names:
-        add_percentage(bench_results, *make_getter_setter('primitives', name))
-
-    return bench_results
-
-def results_to_table(bench_results):
-    # Get all primitive names across all executions
-    all_primitive_names = []
-    for bench in bench_results:
-        if bench['primitives']  is not None:
-            all_primitive_names.extend(bench['primitives'].keys())
-    all_primitive_names = sorted(set(all_primitive_names))
-
-    bench_results = add_percentages_to_results(bench_results, all_primitive_names)
-
-    # Convert dict to table
-    def priority(name):
-        for i, k in enumerate(TITLES_ORDER):
-            if k.lower() in name.lower():
-                return (i, name)
-        return (len(TITLES_ORDER), name)
-
-    names = [n for n in bench_results[0].keys() if n != 'primitives']
-    names.sort(key=priority)
-    table = [[*(n.upper().replace('_', ' ') for n in names), *all_primitive_names]]
-
-    for results in bench_results:
-        row = [results[n] for n in names]
-        primitive_count = results['primitives']
-        if primitive_count is None:
-            row.extend([None] * len(all_primitive_names))
-        else:
-            for n in all_primitive_names:
-                count = primitive_count.get(n, 0)
-                row.append(primitive_count.get(n, 0))
-        table.append(row)
-    return table
-
-def print_table(table):
-    def join(values, sep):
-        return sep + sep.join(values) + sep
-
-    table = [[str(e) for e in row] for row in table]
-    widths = [max(len(l[i]) for l in table) + 1 for i in range(len(table[0]))]
-
-    line = join(['-' * w for w in widths], '+') + '\n'
-
-    row_texts = []
-
-    for row in table:
-        row_text = join([row[0].ljust(widths[0]),
-                         *(i.rjust(w) for i, w in zip(row[1:], widths[1:]))],
-                        '|')
-        row_text += '\n'
-        row_texts.append(row_text)
-
-    text = join(row_texts, line)
-
-    print(text, end='')
+    plt.savefig(chartfile)
 
 def main(*, file, system, vlimits, executions, **params):
     results = []
 
     for v in vlimits:
         executable, primitive_count = compile(file, system, v, params)
-        results.append({'versions': v,
-                        **bench(executable, executions, params),
-                        'primitives': primitive_count})
-
-    table = results_to_table(results)
+        perf_output = bench(executable, executions, params)
+        verbose(perf_output)
+        results.append(BenchResults(file,
+                                    system,
+                                    v,
+                                    params.get('merge_strategy'),
+                                    executions,
+                                    perf_output,
+                                    primitive_count))
 
     csvfile = params.get('csvfile')
+    chartfile = params.get('chartfile')
 
     if csvfile:
-        dirpath = os.path.dirname(csvfile)
-        if dirpath: os.makedirs(os.path.dirname(csvfile), exist_ok=True)
-
-        with open(csvfile, 'w') as f:
-            writer = csv.writer(f)
-            writer.writerows(table)
-    else:
-        print_table(table)
+        raise NotImplementedError
+    if chartfile:
+        write_chart_file(chartfile, results)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark BBV")
@@ -293,16 +265,25 @@ if __name__ == "__main__":
                         choices=['gambit', 'bigloo'],
                         help='system')
     parser.add_argument('-g',
-                        dest='wipgambitdir',
+                        dest='gambitdir',
                         help='Gambit root')
     parser.add_argument('-p',
                         dest='primitive_count',
                         action='store_true',
                         help='count primitive calls')
+    parser.add_argument('-m',
+                        dest='merge_strategy',
+                        help='merge strategy')
     parser.add_argument('-csv',
                         dest='csvfile',
                         metavar='FILENAME',
                         help='save results to a CSV')
+
+    parser.add_argument('-chart',
+                        dest='chartfile',
+                        metavar='FILENAME',
+                        help='generate a bar chart of the result')
+
     parser.add_argument('file',
                         help="Scheme program to benchmark")
 
@@ -311,6 +292,6 @@ if __name__ == "__main__":
     VERBOSE = args.verbose
 
     args.file = os.path.abspath(args.file)
-    args.wipgambitdir = args.wipgambitdir and os.path.abspath(args.wipgambitdir)
+    args.gambitdir = args.gambitdir and os.path.abspath(args.gambitdir)
 
     main(**vars(args))
