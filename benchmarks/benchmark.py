@@ -164,52 +164,80 @@ def bench(executable, n, params):
     verbose(command)
     return subprocess.run(command, shell=True, capture_output=True).stderr.decode()
 
-chart_selectors = {
-    'time': (lambda r: r.task_clock, "Execution Time (ms)"),
-    'typechecks': (lambda r: r.primitives.typechecks if r.primitives else 0, "Typechecks"),
-    'machine_instructions': (lambda r: r.instructions, "Machine Instructions")
-}
-
-def write_chart_file(chartfile, results, selector, selector_name):
-    # Group results by merge strategy
+def merge_strategy_grouper(results, params):
     sorted_results = sorted(results, key=lambda r: (r.merge_strategy or '', r.versions))
     bench_by_merge_strategy = itertools.groupby(sorted_results, key=lambda r: r.merge_strategy)
-    bench_groups = [list(g) for _, g in bench_by_merge_strategy]
-    n_merge_strategies = len(bench_groups)
+    return [list(g) for _, g in bench_by_merge_strategy]
+
+def name_by_merge_strategy(group):
+    return group[0].merge_strategy or ''
+
+def overflow_grouper(results, params):
+    results = merge_strategy_grouper(results, params)[0] # ignore merge strategy by taking the first one
+    new_results = []
+
+    for prim in params.get("chart_y_params") or ["##fx+"]:
+        row = []
+        for result in results:
+            bench_copy = copy.copy(result)
+            bench_copy.__selector_value = bench_copy.primitives.get(prim) if bench_copy.primitives else 0
+            bench_copy.__selector_name = prim
+            row.append(bench_copy)
+        new_results.append(row)
+    return new_results
+        
+
+chart_selectors = {
+    'time': (lambda r: r.task_clock,
+             "Execution Time (ms)",
+             name_by_merge_strategy,
+             merge_strategy_grouper),
+    'typechecks': (lambda r: r.primitives.typechecks if r.primitives else 0,
+                   "Typechecks",
+                   name_by_merge_strategy,
+                   merge_strategy_grouper),
+    'machine_instructions': (lambda r: r.instructions,
+                             "Machine Instructions",
+                             name_by_merge_strategy,
+                             merge_strategy_grouper),
+    'primitives': (lambda r: r.__selector_value,
+                 "Primitive Calls",
+                 lambda group: group[0].__selector_name,
+                 overflow_grouper),
+}
+
+def write_chart_file(chartfile, results, params, selector, yname, group_namer, grouper):
+    # Group results by merge strategy
+    bench_groups = grouper(results, params)
+    n_groups = len(bench_groups)
 
     # Generate data for x and y axis
     versions = [str(v) for v in sorted(set(r.versions for r in results))]
-    rows = [[selector(r) for r in g] for g in bench_groups]
 
     # Compute some dimension, purely aesthetic
     x = range(len(versions))
-    bar_width = 0.8 / n_merge_strategies
+    bar_width = 0.8 / n_groups
 
     # Initialize the figure
     fig, axis = plt.subplots()
-    axis.set_ylabel(selector_name)
+    axis.set_ylabel(yname)
 
     colors = ["#219C90", "#E9B824", "#EE9322", "#D83F31"]
 
-    for benchs, offset, color in zip(bench_groups, range(-n_merge_strategies // 2 + 1, n_merge_strategies // 2 + 2), colors):
+    for benchs, offset, color in zip(bench_groups, range(-n_groups // 2 + 1, n_groups // 2 + 2), colors):
         axis.bar([pos + bar_width * offset for pos in x],
                  [selector(r) for r in benchs],
                  bar_width,
                  color=color,
-                 label=benchs[0].merge_strategy or '')
+                 label=group_namer(benchs))
 
     axis.set_xlabel('Number of versions')
     axis.set_xticks(list(x))
     axis.set_xticklabels(versions)
     
-    # Add legend only if there were multiple merge strategies
-    if n_merge_strategies < 2 and results[0].merge_strategy:
-        axis.set_title(f'{results[0].title}/{results[0].merge_strategy}')
-    else:
-        axis.set_title(results[0].title)
+    axis.set_title(results[0].title)
 
-    if n_merge_strategies > 1:
-        axis.legend()
+    axis.legend()
 
     fig.tight_layout()
 
@@ -238,7 +266,7 @@ def main(*, file, system, vlimits, executions, **params):
         raise NotImplementedError
     if chartfile:
         
-        write_chart_file(chartfile, results, *chart_selectors[params['chart_y']])
+        write_chart_file(chartfile, results, params, *chart_selectors[params['chart_y']])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark BBV")
@@ -291,12 +319,18 @@ if __name__ == "__main__":
                         metavar='FILENAME',
                         help='generate a bar chart of the result')
 
-    parser.add_argument('-charty',
+    parser.add_argument('-chart_y',
                         dest='chart_y',
                         metavar='Y',
                         choices=list(chart_selectors.keys()),
                         default=next(iter(chart_selectors)),
                         help='bar chart y axis')
+
+    parser.add_argument('-chart_y_params',
+                        dest='chart_y_params',
+                        nargs='+',
+                        metavar='param',
+                        help='params for the chart y axis mode')
 
     parser.add_argument('file',
                         help="Scheme program to benchmark")
