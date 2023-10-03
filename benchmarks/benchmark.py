@@ -3,6 +3,7 @@
 import argparse
 import csv
 import copy
+import itertools
 import locale
 import os
 import re
@@ -46,10 +47,7 @@ class BenchResults:
 
     @property
     def title(self):
-        if m:=self.merge_strategy:
-            return f"{os.path.basename(self.file)}/{m}"
-        else:
-            return os.path.basename(self.file)
+        return os.path.basename(self.file)
 
     def _get_numbers_on_line_with(self, marker):
         for line in self._perf_output.splitlines():
@@ -138,16 +136,15 @@ def run_command(command, timeout, env):
             verbose(f"killing process")
             process.kill()
 
-def compile(file, system, vlimit, params):
+def compile(file, system, vlimit, merge_strategy, params):
     system_flag = {"bigloo": "-b",
                    "gambit": "-g"}[system]
 
     primitive_count_flag = "-P" if params["primitive_count"] else ""
 
-    merge_strategy = params.get("merge_strategy")
-    merge_strategy = f"-M {merge_strategy}" if merge_strategy else ""
+    merge_strategy_cmd = f"-M {merge_strategy}" if merge_strategy else ""
 
-    command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} {merge_strategy} {primitive_count_flag} {file}"
+    command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} {merge_strategy_cmd} {primitive_count_flag} {file}"
 
     env = os.environ.copy()
     timeout = params['compilation_timeout']
@@ -167,48 +164,51 @@ def bench(executable, n, params):
     verbose(command)
     return subprocess.run(command, shell=True, capture_output=True).stderr.decode()
 
+chart_selectors = {
+    'time': (lambda r: r.task_clock, "Execution Time (ms)"),
+    'typechecks': (lambda r: r.primitives.typechecks if r.primitives else 0, "Typechecks"),
+    'machine_instructions': (lambda r: r.instructions, "Machine Instructions")
+}
 
-def write_chart_file(chartfile, results):
-    dirpath = os.path.dirname(chartfile)
-    if dirpath: os.makedirs(os.path.dirname(chartfile), exist_ok=True)
+def write_chart_file(chartfile, results, selector, selector_name):
+    # Group results by merge strategy
+    sorted_results = sorted(results, key=lambda r: (r.merge_strategy or '', r.versions))
+    bench_by_merge_strategy = itertools.groupby(sorted_results, key=lambda r: r.merge_strategy)
+    bench_groups = [list(g) for _, g in bench_by_merge_strategy]
+    n_merge_strategies = len(bench_groups)
 
-    versions = [str(r.versions) for r in results]
-    times = [r.task_clock for r in results]
+    # Generate data for x and y axis
+    versions = [str(v) for v in sorted(set(r.versions for r in results))]
+    rows = [[selector(r) for r in g] for g in bench_groups]
 
-    fig, axis1 = plt.subplots()
-
+    # Compute some dimension, purely aesthetic
     x = range(len(versions))
-    bar_width = 0.4
+    bar_width = 0.8 / n_merge_strategies
 
-    axis1.bar([pos - bar_width / 2 for pos in x], times, bar_width,
-              label='Execution time',
-              color='darkblue')
-    axis1.set_ylabel(f'Execution time ({results[0].task_clock_unit})')
-    axis1.set_ylabel(f'Time ({results[0].task_clock_unit})')
+    # Initialize the figure
+    fig, axis = plt.subplots()
+    axis.set_ylabel(selector_name)
 
-    axis1.set_title(results[0].title)
-    axis1.set_xlabel('Number of versions')
-    axis1.set_xticks(list(x))
-    axis1.set_xticklabels(versions)
+    for benchs, offset in zip(bench_groups, range(-n_merge_strategies // 2 + 1, n_merge_strategies // 2 + 2)):
+        axis.bar([pos + bar_width * offset for pos in x],
+                 [selector(r) for r in benchs],
+                 bar_width,
+                 label=benchs[0].merge_strategy or '')
+
+    axis.set_xlabel('Number of versions')
+    axis.set_xticks(list(x))
+    axis.set_xticklabels(versions)
     
-    handles, labels = axis1.get_legend_handles_labels()
+    # Add legend only if there were multiple merge strategies
+    if n_merge_strategies < 2 and results[0].merge_strategy:
+        axis.set_title(f'{results[0].title}/{results[0].merge_strategy}')
+    else:
+        axis.set_title(results[0].title)
 
-    if any(r.primitives for r in results):
-        typechecks = [r.primitives.typechecks if r.primitives else 0 for r in results]
-
-        axis2 = axis1.twinx()
-        axis2.bar([pos + bar_width / 2 for pos in x], typechecks, bar_width, label='Typechecks',
-                  color='orange')
-        axis2.set_ylabel('Number of typechecks')
-        handles2, labels2 = axis2.get_legend_handles_labels()
-        handles.extend(handles2)
-        labels.extend(labels2)
-
-        fig.legend(handles, labels, loc='upper center', ncol=2)
+    if n_merge_strategies > 1:
+        axis.legend()
 
     fig.tight_layout()
-
-    fig.subplots_adjust(top=0.85)
 
     plt.savefig(chartfile)
 
@@ -216,16 +216,17 @@ def main(*, file, system, vlimits, executions, **params):
     results = []
 
     for v in vlimits:
-        executable, primitive_count = compile(file, system, v, params)
-        perf_output = bench(executable, executions, params)
-        verbose(perf_output)
-        results.append(BenchResults(file,
-                                    system,
-                                    v,
-                                    params.get('merge_strategy'),
-                                    executions,
-                                    perf_output,
-                                    primitive_count))
+        for strat in (params.get("merge_strategies") or [None]):
+            executable, primitive_count = compile(file, system, v, strat, params)
+            perf_output = bench(executable, executions, params)
+            verbose(perf_output)
+            results.append(BenchResults(file,
+                                        system,
+                                        v,
+                                        strat,
+                                        executions,
+                                        perf_output,
+                                        primitive_count))
 
     csvfile = params.get('csvfile')
     chartfile = params.get('chartfile')
@@ -233,7 +234,8 @@ def main(*, file, system, vlimits, executions, **params):
     if csvfile:
         raise NotImplementedError
     if chartfile:
-        write_chart_file(chartfile, results)
+        
+        write_chart_file(chartfile, results, *chart_selectors[params['chart_y']])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark BBV")
@@ -272,8 +274,10 @@ if __name__ == "__main__":
                         action='store_true',
                         help='count primitive calls')
     parser.add_argument('-m',
-                        dest='merge_strategy',
-                        help='merge strategy')
+                        metavar="STRATEGY",
+                        dest='merge_strategies',
+                        nargs="*",
+                        help='merge strategies')
     parser.add_argument('-csv',
                         dest='csvfile',
                         metavar='FILENAME',
@@ -283,6 +287,13 @@ if __name__ == "__main__":
                         dest='chartfile',
                         metavar='FILENAME',
                         help='generate a bar chart of the result')
+
+    parser.add_argument('-charty',
+                        dest='chart_y',
+                        metavar='Y',
+                        choices=list(chart_selectors.keys()),
+                        default=next(iter(chart_selectors)),
+                        help='bar chart y axis')
 
     parser.add_argument('file',
                         help="Scheme program to benchmark")
