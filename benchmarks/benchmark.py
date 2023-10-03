@@ -189,10 +189,13 @@ def write_chart_file(chartfile, results, selector, selector_name):
     fig, axis = plt.subplots()
     axis.set_ylabel(selector_name)
 
-    for benchs, offset in zip(bench_groups, range(-n_merge_strategies // 2 + 1, n_merge_strategies // 2 + 2)):
+    colors = ["#219C90", "#E9B824", "#EE9322", "#D83F31"]
+
+    for benchs, offset, color in zip(bench_groups, range(-n_merge_strategies // 2 + 1, n_merge_strategies // 2 + 2), colors):
         axis.bar([pos + bar_width * offset for pos in x],
                  [selector(r) for r in benchs],
                  bar_width,
+                 color=color,
                  label=benchs[0].merge_strategy or '')
 
     axis.set_xlabel('Number of versions')
