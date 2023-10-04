@@ -12,6 +12,7 @@ import statistics
 import subprocess
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
@@ -83,6 +84,9 @@ class PrimitivesCount:
 
     def get(self, name):
         return self.primitives.get(name, 0)
+
+    def __iter__(self):
+        yield from self.primitives.keys()
 
     @property
     def typechecks(self):
@@ -172,11 +176,28 @@ def merge_strategy_grouper(results, params):
 def name_by_merge_strategy(group):
     return group[0].merge_strategy or ''
 
-def overflow_grouper(results, params):
+def primitives_grouper(results, params):
+    def prim_count(result, p):
+        return result.primitives.get(p) if result.primitives else 0
+
     results = merge_strategy_grouper(results, params)[0] # ignore merge strategy by taking the first one
     new_results = []
 
-    for prim in params.get("chart_y_params") or ["##fx+"]:
+    tracked_primitives = list(params["chart_params"])
+    
+    if not tracked_primitives:
+        tracked_primitives = set()
+        for result in results:
+            tracked_primitives.update(result.primitives or ())
+        tracked_primitives = list(tracked_primitives)
+
+    tracked_primitives.sort(key=lambda p: tuple(prim_count(r, p) for r in results), reverse=True)
+
+    max_prim_count = max(prim_count(r, p) for r in results for p in tracked_primitives)
+
+    tracked_primitives = [p for p in tracked_primitives if max(prim_count(r, p) for r in results) > max_prim_count / 1000]
+
+    for prim in tracked_primitives:
         row = []
         for result in results:
             bench_copy = copy.copy(result)
@@ -187,26 +208,32 @@ def overflow_grouper(results, params):
     return new_results
         
 
-chart_selectors = {
-    'time': (lambda r: r.task_clock,
-             "Execution Time (ms)",
-             name_by_merge_strategy,
-             merge_strategy_grouper),
+chart_modes = {
+    'time': (lambda r: r.task_clock, # selector for the y axis
+             "Execution Time (ms)",  # y axis label
+             name_by_merge_strategy, # function that names each set benchmark result in the legen
+             merge_strategy_grouper, # function that groups the results for multi-bar charts
+             False),                 # does the mode requires primitive count at compile time
     'typechecks': (lambda r: r.primitives.typechecks if r.primitives else 0,
                    "Typechecks",
                    name_by_merge_strategy,
-                   merge_strategy_grouper),
+                   merge_strategy_grouper,
+                   False),
     'machine_instructions': (lambda r: r.instructions,
                              "Machine Instructions",
                              name_by_merge_strategy,
-                             merge_strategy_grouper),
+                             merge_strategy_grouper,
+                             False),
     'primitives': (lambda r: r.__selector_value,
                  "Primitive Calls",
                  lambda group: group[0].__selector_name,
-                 overflow_grouper),
+                 primitives_grouper,
+                 True),
 }
 
-def write_chart_file(chartfile, results, params, selector, yname, group_namer, grouper):
+def write_chart_file(chartfile, results, params):
+    selector, yname, group_namer, grouper, *_ = chart_modes[params['chart_mode']]
+
     # Group results by merge strategy
     bench_groups = grouper(results, params)
     n_groups = len(bench_groups)
@@ -222,7 +249,7 @@ def write_chart_file(chartfile, results, params, selector, yname, group_namer, g
     fig, axis = plt.subplots()
     axis.set_ylabel(yname)
 
-    colors = ["#219C90", "#E9B824", "#EE9322", "#D83F31"]
+    colors = mpl.colormaps['viridis'].resampled(n_groups).colors
 
     for benchs, offset, color in zip(bench_groups, range(-n_groups // 2 + 1, n_groups // 2 + 2), colors):
         axis.bar([pos + bar_width * offset for pos in x],
@@ -265,8 +292,22 @@ def main(*, file, system, vlimits, executions, **params):
     if csvfile:
         raise NotImplementedError
     if chartfile:
-        
-        write_chart_file(chartfile, results, params, *chart_selectors[params['chart_y']])
+        write_chart_file(chartfile, results, params)
+
+
+def get_chart_mode(args):
+    mode = args._chart_params[0]
+
+    if mode not in chart_modes:
+        raise ValueError(f"chart-params first argument must be in {', '.join(chart_modes)}")
+
+    return mode
+
+def get_chart_params(args):
+    return args._chart_params[1:]
+
+def get_chart_mode_needs_primitives(args):
+    return chart_modes[get_chart_mode(args)][4]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark BBV")
@@ -319,18 +360,12 @@ if __name__ == "__main__":
                         metavar='FILENAME',
                         help='generate a bar chart of the result')
 
-    parser.add_argument('-chart_y',
-                        dest='chart_y',
-                        metavar='Y',
-                        choices=list(chart_selectors.keys()),
-                        default=next(iter(chart_selectors)),
-                        help='bar chart y axis')
-
-    parser.add_argument('-chart_y_params',
-                        dest='chart_y_params',
+    parser.add_argument('-chart-params',
+                        dest='_chart_params',
                         nargs='+',
-                        metavar='param',
-                        help='params for the chart y axis mode')
+                        metavar='PARAM',
+                        default=(next(iter(chart_modes)),),
+                        help=f'params for the bar chart, available modes: {", ".join(chart_modes)}')
 
     parser.add_argument('file',
                         help="Scheme program to benchmark")
@@ -341,5 +376,9 @@ if __name__ == "__main__":
 
     args.file = os.path.abspath(args.file)
     args.gambitdir = args.gambitdir and os.path.abspath(args.gambitdir)
+
+    args.chart_mode = get_chart_mode(args)
+    args.chart_params = get_chart_params(args)
+    args.primitive_count = args.primitive_count or get_chart_mode_needs_primitives(args)
 
     main(**vars(args))
