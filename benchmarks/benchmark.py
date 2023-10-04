@@ -190,6 +190,7 @@ def primitives_grouper(results, params):
         for result in results:
             tracked_primitives.update(result.primitives or ())
         tracked_primitives = list(tracked_primitives)
+        tracked_primitives = [p for p in tracked_primitives if " & " not in p]
 
     tracked_primitives.sort(key=lambda p: tuple(prim_count(r, p) for r in results), reverse=True)
 
