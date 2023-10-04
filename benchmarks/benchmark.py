@@ -192,11 +192,12 @@ def primitives_grouper(results, params):
         tracked_primitives = list(tracked_primitives)
         tracked_primitives = [p for p in tracked_primitives if " & " not in p]
 
-    tracked_primitives.sort(key=lambda p: tuple(prim_count(r, p) for r in results), reverse=True)
+        max_prim_count = max(prim_count(r, p) for r in results for p in tracked_primitives)
 
-    max_prim_count = max(prim_count(r, p) for r in results for p in tracked_primitives)
-
-    tracked_primitives = [p for p in tracked_primitives if max(prim_count(r, p) for r in results) > max_prim_count / 1000]
+        tracked_primitives = [p for p in tracked_primitives if max(
+            prim_count(r, p) for r in results) > max_prim_count / 1000]
+        
+        tracked_primitives.sort(key=lambda p: tuple(prim_count(r, p) for r in results), reverse=True)
 
     for prim in tracked_primitives:
         row = []
