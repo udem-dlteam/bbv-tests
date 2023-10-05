@@ -90,7 +90,13 @@ class PrimitivesCount:
 
     @property
     def typechecks(self):
-        return self.get('##fixnum?') + self.get('##flonum?')
+        typechecks = ("##fixnum?", '##flonum?', "##vector?", "##pair?", "##box?", "##procedure?",
+                      "##bignum?", "##ratnum?", "##boolean?", "##string?", "##char?",
+                      "##bytevector?", "##u8vector?", "##u16vector?", "##u32vector?",
+                      "##u64vector?", "##s8vector?", "##s16vector?", "##s32vector?",
+                      "##s64vector?", "##f8vector?", "##f16vector?", "##f32vector?",
+                      "##f64vector?", "##null?")
+        return sum(self.get(p) for p in typechecks)
 
     def _group_similar_primitives(self, primitives):
         grouped_primitives = {}
