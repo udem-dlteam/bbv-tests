@@ -1,1 +1,4 @@
 matplotlib
+pony
+distro
+psutil

@@ -3,136 +3,141 @@
 import argparse
 import csv
 import copy
+import datetime
 import itertools
 import locale
+import logging
+import math
 import os
+import pathlib
+import platform
 import re
 import shlex
 import statistics
 import subprocess
 
+try:
+    import distro
+except ImportError:
+    distro = None
+
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+from pony.orm import *
 
-def aton(n):
-    try:
-        return locale.atoi(n)
-    except ValueError:
-        return locale.atof(n)
+import psutil
 
-VERBOSE = False
-COMPILE_SCRIPT = "../compile"
+logger = logging.getLogger(__name__)
 
-def verbose(*args, **kwargs):
-    if VERBOSE: print(*args, **kwargs)
+##############################################################################
+## Database
+##############################################################################
 
+db = Database()
 
-class BenchResults:
-    def __init__(self, file, system, versions, merge_strategy, repeat, perf_output, primitives):
-        self._perf_output = perf_output
-
-        self.file = file
-        self.system = system
-        self.merge_strategy = merge_strategy
-        self.versions = versions
-        self.repeat = repeat
-        self.primitives = primitives
-
-        self.task_clock = self._get_value("task-clock")
-        self.task_clock_unit = "ms"
-        self.time_elapsed = self._get_value("seconds time elapsed")
-        self.time_elapse_unit = "s"
-        self.instructions = self._get_value("instructions")
-
-    @property
-    def title(self):
-        return os.path.basename(self.file)
-
-    def _get_numbers_on_line_with(self, marker):
-        for line in self._perf_output.splitlines():
-            if marker in line:
-                numbers = re.findall(r"[\d\.,]+", line)
-                return [aton(n) for n in numbers]
-
-        raise OSError(f"no line with '{marker}' in 'perf stat' output (is perf installed?)")
-
-    def _get_value(self, name):
-        return self._get_numbers_on_line_with(name)[0]
-
-
-class PrimitivesCount:
-    DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
-    SIMILAR_PRIMITIVES = [['##fx+', '##fx+?'],
-                          ['##fx-', '##fx-?'],
-                          ['##fx*', '##fx*?']]
-    SIMILAR_PRIMITIVES_TABLE = {prim: simils for simils in SIMILAR_PRIMITIVES for prim in simils}
-
-    def __new__(cls, compiler_output):
-        self = super().__new__(cls)
-
-        primitive_count = self._extract_primitives_count(compiler_output)
-
-        if not primitive_count:
-            return None
-
-        self.raw_primitives = primitive_count
-        self.primitives = self._group_similar_primitives(primitive_count)
-
-        return self
-
-    def get(self, name):
-        return self.primitives.get(name, 0)
-
-    def __iter__(self):
-        yield from self.primitives.keys()
-
-    @property
-    def typechecks(self):
-        typechecks = ("##fixnum?", '##flonum?', "##vector?", "##pair?", "##box?", "##procedure?",
-                      "##bignum?", "##ratnum?", "##boolean?", "##string?", "##char?",
-                      "##bytevector?", "##u8vector?", "##u16vector?", "##u32vector?",
-                      "##u64vector?", "##s8vector?", "##s16vector?", "##s32vector?",
-                      "##s64vector?", "##f8vector?", "##f16vector?", "##f32vector?",
-                      "##f64vector?", "##null?")
-        return sum(self.get(p) for p in typechecks)
-
-    def _group_similar_primitives(self, primitives):
-        grouped_primitives = {}
-        seen = {}
-
-        for k, v in primitives.items():
-            group = self.SIMILAR_PRIMITIVES_TABLE.get(k)
-            if group:
-                group_name = ' & '.join(group)
-
-                grouped_primitives.setdefault(group_name, 0)
-                seen.setdefault(group_name, 0)
-
-                grouped_primitives[group_name] += v
-                seen[group_name] += 1
-
-        relevant_grouped_primitives = {k: v for k, v in grouped_primitives.items() if seen[k] > 1}
-
-        return {**primitives, **relevant_grouped_primitives}
-
-    def _extract_primitives_count(self, compiler_output):
-        if self.DEFAULT_PRIMITIVE_COUNTER_MARKER in compiler_output:
-            counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
-            counts = re.findall("\(([^ ]+) (\d+)\)", counter_section)
-            return {k: int(v) for k, v in counts}
+# Some monkey patching
+if not hasattr(db.Entity, "get_or_create"):
+    @classmethod
+    def get_or_create(cls, **kwargs):
+        r = cls.get(**kwargs)
+        if r is None:
+            return cls(**kwargs), True
         else:
-            return None
+            return r, False
+    db.Entity.get_or_create=get_or_create
+    del get_or_create
 
-def extract_executable_name(content):
-    return re.search(r"\*\*\*executable: (.+)", content).group(1)
+class System(db.Entity):
+    compiler = Required(str)
+    compiler_commit = Required(str)
+    benchmark_commit = Required(str)
+    os = Required(str)
+    distribution = Optional(str)
+    ram = Required(str)
+    cpu = Required(str)
+    runs = Set('Run')
+
+    @staticmethod
+    def get_commit(dirpath):
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=dirpath,
+                                       universal_newlines=True).strip()
+
+    @classmethod
+    def get_current_system(cls, compilerdir):
+        # get compiler from 
+        compiler = compilerdir.name
+        system = platform.system()
+
+        if system != "Linux":
+            raise ValueError('{system} not supported, maybe use Linux?')
+
+        if distro:
+            distribution = f'{distro.name(pretty=True)} ({distro.lsb_release_info()["codename"]})'
+        else:
+            distribution = None
+
+        ram = f'{math.ceil(psutil.virtual_memory().total / (1024 ** 3))} GB'
+
+        with open('/proc/cpuinfo') as f:
+            # Get the first line that starts with 'model name' or 'Processor'.
+            match = re.search(r'model name\s*:\s*(.*)', f.read())
+            if match:
+                cpu = match.group(1).strip()
+            else:
+                raise ValueError('could not identify your cpu')
+
+        compiler_commit = cls.get_commit(compilerdir)
+        benchmark_commit = cls.get_commit(os.path.curdir)
+
+        return cls.get_or_create(
+            compiler=compiler,
+            compiler_commit=compiler_commit,
+            benchmark_commit=benchmark_commit,
+            os=system,
+            distribution=distribution,
+            ram=ram,
+            cpu=cpu)
+
+class Benchmark(db.Entity):
+    path = Required(str)
+    content = Required(str)
+    runs = Set('Run')
+
+    @property
+    def filename(self):
+        return os.path.basename(self.path)
+
+class PrimitiveCount(db.Entity):
+    name = Required(str)
+    count = Required(int, size=64)
+    run = Required('Run')
+
+class Run(db.Entity):
+    benchmark = Required('Benchmark')
+    system = Required('System')
+    version_limit = Required(int)
+    repetitions = Required(int)
+    merge_strategy = Required(str)
+    primitives = Set('PrimitiveCount')
+    machine_instructions = Required(int, size=64)
+    time = Required(float)
+    timestamp = Required(datetime.datetime, default=datetime.datetime.now)
+
+
+db.bind(provider='sqlite', filename='benchmarks.db', create_db=True)
+db.generate_mapping(create_tables=True)
+
+##############################################################################
+# Utils
+##############################################################################
 
 def run_command(command, timeout, env):
-    if timeout:
-        verbose(command, f"(with timeout: {timeout}s)")
-    else:
-        verbose(command)
+    logger.info(command)
+    logger.debug(env)
+
+    if timeout is not None:
+        logger.info(f"(with timeout: {timeout}s)")
 
     try:
         process = subprocess.Popen(shlex.split(command),
@@ -140,116 +145,160 @@ def run_command(command, timeout, env):
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT)
         output, _ = process.communicate(timeout=timeout)
+        logger.debug(output)
         return output.decode()
     finally:
         if process.poll() is None:
-            verbose(f"killing process")
+            logger.info("killing process")
             process.kill()
 
-def compile(file, system, vlimit, merge_strategy, params):
-    system_flag = {"bigloo": "-b",
-                   "gambit": "-g"}[system]
+##############################################################################
+# Data parsers
+##############################################################################
 
-    primitive_count_flag = "-P" if params["primitive_count"] else ""
+locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
-    merge_strategy_cmd = f"-M {merge_strategy}" if merge_strategy else ""
+class PrimitivesCountParser:
+    DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
+    SIMILAR_PRIMITIVES = [['##fx+', '##fx+?'],
+                          ['##fx-', '##fx-?'],
+                          ['##fx*', '##fx*?']]
+    SIMILAR_PRIMITIVES_TABLE = {prim: simils for simils in SIMILAR_PRIMITIVES for prim in simils}
 
-    command = f"{COMPILE_SCRIPT} {system_flag} -V {vlimit} {merge_strategy_cmd} {primitive_count_flag} {file}"
+    typechecks = ("##fixnum?", '##flonum?', "##vector?", "##pair?", "##box?", "##procedure?",
+                  "##bignum?", "##ratnum?", "##boolean?", "##string?", "##char?",
+                  "##bytevector?", "##u8vector?", "##u16vector?", "##u32vector?",
+                  "##u64vector?", "##s8vector?", "##s16vector?", "##s32vector?",
+                  "##s64vector?", "##f8vector?", "##f16vector?", "##f32vector?",
+                  "##f64vector?", "##null?")
+
+    def __new__(cls, compiler_output):
+        self = super().__new__(cls)
+
+        if cls.DEFAULT_PRIMITIVE_COUNTER_MARKER not in compiler_output:
+            logger.debug(compiler_output)
+            raise ValueError(f"{cls.DEFAULT_PRIMITIVE_COUNTER_MARKER} not found in compiler output")
+
+        counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
+        counts = re.findall("\(([^ ]+) (\d+)\)", counter_section)
+        self.primitives = {k: int(v) for k, v in counts}
+        return self
+
+    def __getitem__(self, name):
+        return self.primitives.get(name, 0)
+
+    def keys(self):
+        return self.primitives.keys()
+
+    def items(self):
+        return self.primitives.items()
+
+    def values(self):
+        return self.primitives.values()
+
+    def __iter__(self):
+        yield from self.primitives.keys()
+
+    @classmethod
+    def is_typecheck(cls, primitive):
+        return primitive in cls.typechecks
+
+
+class BenchResultsParser:
+    def __init__(self, perf_output):
+        self.time = self._get_value(perf_output, "task-clock")
+        self.machine_instructions = self._get_value(perf_output, "instructions")
+
+    @staticmethod
+    def string_to_number(n):
+        try:
+            return locale.atoi(n)
+        except ValueError:
+            return locale.atof(n)
+
+    @classmethod
+    def _get_numbers_on_line_with(cls, perf_output, marker):
+        for line in perf_output.splitlines():
+            if marker in line:
+                numbers = re.findall(r"[\d\.,]+", line)
+                return [cls.string_to_number(n) for n in numbers]
+
+        raise ValueError(f"no line with '{marker}' in 'perf stat' output (is perf installed?)")
+
+    @classmethod
+    def _get_value(cls, perf_output, name):
+        return cls._get_numbers_on_line_with(perf_output, name)[0]
+
+
+##############################################################################
+# Benchmark execution
+##############################################################################
+
+COMPILE_SCRIPT = "../compile"
+
+
+def extract_executable_from_compiler_output(content):
+    return re.search(r"\*\*\*executable: (.+)", content).group(1)
+
+
+def compile(compilerdir, file, vlimit, merge_strategy, timeout=None):
+
+    command = f"{COMPILE_SCRIPT} -g -V {vlimit} -M {merge_strategy} -P {file}"
 
     env = os.environ.copy()
-    timeout = params['compilation_timeout']
-    if 'gambitdir' in params: env["GAMBITDIR"] = params["gambitdir"]
+    env["GAMBITDIR"] = compilerdir
 
     output = run_command(command, timeout, env)
 
-    verbose(output)
+    executable = extract_executable_from_compiler_output(output)
 
-    primitive_count = PrimitivesCount(output)
-    executable = extract_executable_name(output)
+    logger.info(f"executable created at: {executable}")
+
+    primitive_count = PrimitivesCountParser(output)
+
+    if not primitive_count:
+        logger.warning("Failed to parse primitive count")
+    else:
+        logger.debug(f"Primitive count: {dict(primitive_count)}")
 
     return executable, primitive_count
 
-def bench(executable, n, params):
-    command = f"perf stat -r {n} {executable}"
-    verbose(command)
-    return subprocess.run(command, shell=True, capture_output=True).stderr.decode()
 
-def merge_strategy_grouper(results, params):
-    sorted_results = sorted(results, key=lambda r: (r.merge_strategy or '', r.versions))
-    bench_by_merge_strategy = itertools.groupby(sorted_results, key=lambda r: r.merge_strategy)
-    return [list(g) for _, g in bench_by_merge_strategy]
+def run_benchmark(executable, repetitions):
+    command = f"perf stat -r {repetitions} {executable}"
+    logger.info(command)
+    output = subprocess.run(command, shell=True, capture_output=True).stderr.decode()
+    logger.debug(output)
+    return BenchResultsParser(output)
 
-def name_by_merge_strategy(group):
-    return group[0].merge_strategy or ''
+@db_session
+def run_and_save_benchmark(compilerdir, file, vlimits, repetitions, merge_strategy, timeout=None):
+    system, _ = System.get_current_system(compilerdir)
 
-def primitives_grouper(results, params):
-    def prim_count(result, p):
-        return result.primitives.get(p) if result.primitives else 0
+    for v in vlimits:
+        executable, primitive_count = compile(compilerdir, file, v, merge_strategy, timeout)
+        result = run_benchmark(executable, repetitions)
 
-    results = merge_strategy_grouper(results, params)[0] # ignore merge strategy by taking the first one
-    new_results = []
+        with open(file) as f:
+            benchmark, _ = Benchmark.get_or_create(path=str(file), content=f.read())
 
-    tracked_primitives = list(params["chart_params"])
-    
-    if len(tracked_primitives) == 1 and tracked_primitives[0].isdigit():
-        primitives_limit = int(tracked_primitives[0])
-        tracked_primitives = None
-    else:
-        primitives_limit = 5
-    
-    if not tracked_primitives:
-        tracked_primitives = set()
-        for result in results:
-            tracked_primitives.update(result.primitives or ())
-        tracked_primitives = list(tracked_primitives)
-        tracked_primitives = [p for p in tracked_primitives if " & " not in p]
+        run = Run(
+            benchmark=benchmark,
+            system = system,
+            version_limit=v,
+            repetitions=repetitions,
+            merge_strategy=merge_strategy,
+            machine_instructions=result.machine_instructions,
+            time=result.time)
 
-        max_prim_count = max(prim_count(r, p) for r in results for p in tracked_primitives)
+        for prim, count in primitive_count.items():
+            PrimitiveCount(name=prim, count=count, run=run)
 
-        tracked_primitives = [p for p in tracked_primitives if max(
-            prim_count(r, p) for r in results) > max_prim_count / 500]
-        
-        tracked_primitives.sort(key=lambda p: tuple(prim_count(r, p) for r in results), reverse=True)
 
-        
 
-        if len(tracked_primitives) > primitives_limit:
-            tracked_primitives.remove("##identity")
-            tracked_primitives = tracked_primitives[:primitives_limit]
-
-    for prim in tracked_primitives:
-        row = []
-        for result in results:
-            bench_copy = copy.copy(result)
-            bench_copy.__selector_value = bench_copy.primitives.get(prim) if bench_copy.primitives else 0
-            bench_copy.__selector_name = prim
-            row.append(bench_copy)
-        new_results.append(row)
-    return new_results
-        
-
-chart_modes = {
-    'time': (lambda r: r.task_clock, # selector for the y axis
-             "Execution Time (ms)",  # y axis label
-             name_by_merge_strategy, # function that names each set benchmark result in the legen
-             merge_strategy_grouper, # function that groups the results for multi-bar charts
-             False),                 # does the mode requires primitive count at compile time
-    'typechecks': (lambda r: r.primitives.typechecks if r.primitives else 0,
-                   "Typechecks",
-                   name_by_merge_strategy,
-                   merge_strategy_grouper,
-                   True),
-    'machine_instructions': (lambda r: r.instructions,
-                             "Machine Instructions",
-                             name_by_merge_strategy,
-                             merge_strategy_grouper,
-                             False),
-    'primitives': (lambda r: r.__selector_value,
-                 "Primitive Calls",
-                 lambda group: group[0].__selector_name,
-                 primitives_grouper,
-                 True),
-}
+##############################################################################
+# Chart generation
+##############################################################################
 
 def write_chart_file(chartfile, results, params):
     selector, yname, group_namer, grouper, *_ = chart_modes[params['chart_mode']]
@@ -297,29 +346,6 @@ def write_chart_file(chartfile, results, params):
 
     plt.savefig(chartfile)
 
-def main(*, file, system, vlimits, executions, **params):
-    results = []
-
-    for v in vlimits:
-        for strat in (params.get("merge_strategies") or [None]):
-            executable, primitive_count = compile(file, system, v, strat, params)
-            perf_output = bench(executable, executions, params)
-            verbose(perf_output)
-            results.append(BenchResults(file,
-                                        system,
-                                        v,
-                                        strat,
-                                        executions,
-                                        perf_output,
-                                        primitive_count))
-
-    csvfile = params.get('csvfile')
-    chartfile = params.get('chartfile')
-
-    if csvfile:
-        raise NotImplementedError
-    if chartfile:
-        write_chart_file(chartfile, results, params)
 
 
 def get_chart_mode(args):
@@ -336,78 +362,97 @@ def get_chart_params(args):
 def get_chart_mode_needs_primitives(args):
     return chart_modes[get_chart_mode(args)][4]
 
+
+logger = logging.getLogger(__name__)
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Benchmark BBV")
+    # helpers for path parsing
+    def directory_path(value):
+        path = pathlib.Path(value)
+        if path.is_dir():
+            return path
+        else:
+            raise NotADirectoryError(f"{value} is not a valid directory")
 
-    parser.add_argument('-v',
-                        dest='verbose',
-                        action='store_true',
-                        help='verbose')
-    parser.add_argument('-l',
-                        dest="vlimits",
-                        metavar="LIMIT",
-                        nargs="+",
-                        default=(0, 1, 2, 3, 4, 5),
-                        type=int,
-                        help="BBV versions limits")
-    parser.add_argument('-n',
-                        dest="executions",
-                        default=10,
-                        type=int,
-                        help="number of executions")
-    parser.add_argument('-t',
-                        dest="compilation_timeout",
-                        metavar='TIMEOUT',
-                        type=float,
-                        help="compilation timeout (in secondes)")
-    parser.add_argument('-s',
-                        dest='system',
-                        default='gambit',
-                        choices=['gambit', 'bigloo'],
-                        help='system')
-    parser.add_argument('-g',
-                        dest='gambitdir',
-                        help='Gambit root')
-    parser.add_argument('-p',
-                        dest='primitive_count',
-                        action='store_true',
-                        help='count primitive calls')
-    parser.add_argument('-m',
-                        metavar="STRATEGY",
-                        dest='merge_strategies',
-                        nargs="*",
-                        help='merge strategies')
-    parser.add_argument('-csv',
-                        dest='csvfile',
-                        metavar='FILENAME',
-                        help='save results to a CSV')
 
-    parser.add_argument('-chart',
-                        dest='chartfile',
-                        metavar='FILENAME',
-                        help='generate a bar chart of the result')
+    def file_path(value):
+        path = pathlib.Path(value)
+        if path.is_file():
+            return path
+        else:
+            raise FileNotFoundError(f"{value} is not a valid file")
 
-    parser.add_argument('-chart-params',
-                        dest='_chart_params',
-                        nargs='+',
-                        metavar='PARAM',
-                        default=(next(iter(chart_modes)),),
-                        help=f'params for the bar chart, available modes: {", ".join(chart_modes)}')
+    # Main parser
+    parser = argparse.ArgumentParser(description="Benchmark BBV for Gambit")
+    subparsers = parser.add_subparsers(dest='command')
 
-    parser.add_argument('file',
-                        help="Scheme program to benchmark")
+    parser.add_argument('-d', '--debug',
+                        help="Print lots of debugging statements",
+                        action="store_const",
+                        dest="loglevel",
+                        const=logging.DEBUG,
+                        default=logging.WARNING,)
+
+    parser.add_argument('-v', '--verbose',
+                        help="Be verbose",
+                        action="store_const",
+                        dest="loglevel",
+                        const=logging.INFO,)
+
+    
+
+    # Parser for running benchmarks
+    benchmark_parser = subparsers.add_parser('benchmark', help='Run benchmark and store results')
+
+    benchmark_parser.add_argument('file', type=file_path)
+
+    benchmark_parser.add_argument('-g', '--gambit-dir',
+                                  dest='compilerdir',
+                                  type=directory_path,
+                                  metavar='PATH',
+                                  required=True,
+                                  help='Gambit root')
+
+    benchmark_parser.add_argument('-l', '--limit',
+                                  dest="version_limits",
+                                  metavar="LIMIT",
+                                  nargs="+",
+                                  default=(0, 1, 2, 3, 4, 5),
+                                  type=int,
+                                  help="BBV versions limits")
+
+    benchmark_parser.add_argument('-r', '--repetitions',
+                                  dest="repetitions",
+                                  metavar='N',
+                                  default=10,
+                                  type=int,
+                                  help="Number of repetition when executing")
+
+    benchmark_parser.add_argument('-t', '--timeout',
+                                  dest="timeout",
+                                  metavar='T',
+                                  type=float,
+                                  help="Compilation timeout (in secondes)")
+
+    benchmark_parser.add_argument('-m', '--merge-strategy',
+                                  metavar="STRATEGY",
+                                  dest='merge_strategy',
+                                  default='linear',
+                                  help='BBV merge strategies')
 
     args = parser.parse_args()
 
-    VERBOSE = args.verbose
+    # Set logger level
+    logger.setLevel(args.loglevel)
+    console = logging.StreamHandler()
+    logger.addHandler(console)
+    
+    logger.debug(args)
 
-    args.file = os.path.abspath(args.file)
-    args.gambitdir = args.gambitdir and os.path.abspath(args.gambitdir)
-
-    args.chart_mode = get_chart_mode(args)
-    args.chart_params = get_chart_params(args)
-    args.primitive_count = args.primitive_count or get_chart_mode_needs_primitives(args)
-
-    verbose(args)
-
-    main(**vars(args))
+    if args.command == 'benchmark':
+        run_and_save_benchmark(args.compilerdir.resolve(),
+                               args.file.resolve(),
+                               args.version_limits,
+                               args.repetitions,
+                               args.merge_strategy,
+                               args.timeout)
