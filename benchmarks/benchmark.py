@@ -201,7 +201,7 @@ def primitives_grouper(results, params):
         max_prim_count = max(prim_count(r, p) for r in results for p in tracked_primitives)
 
         tracked_primitives = [p for p in tracked_primitives if max(
-            prim_count(r, p) for r in results) > max_prim_count / 1000]
+            prim_count(r, p) for r in results) > max_prim_count / 500]
         
         tracked_primitives.sort(key=lambda p: tuple(prim_count(r, p) for r in results), reverse=True)
 
@@ -401,5 +401,7 @@ if __name__ == "__main__":
     args.chart_mode = get_chart_mode(args)
     args.chart_params = get_chart_params(args)
     args.primitive_count = args.primitive_count or get_chart_mode_needs_primitives(args)
+
+    verbose(args)
 
     main(**vars(args))
