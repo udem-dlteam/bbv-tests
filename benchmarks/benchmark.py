@@ -11,6 +11,7 @@ import platform
 import re
 import shlex
 import subprocess
+import time
 
 try:
     import distro
@@ -62,10 +63,12 @@ class Compiler(db.Entity):
         output = subprocess.check_output(['git', 'show', '-s', f'--format={format_str}'],
                                          cwd=compilerdir, universal_newlines=True).strip()
 
-        logger.debug(output)
+        name = compilerdir.name
         sha, author, description, timestamp = output.splitlines()
 
-        compiler, _ = Compiler.get_or_create(name=compilerdir.name,
+        logger.debug(f"current compiler is: {name}, {sha}, {author}, {description}, {timestamp}")
+
+        compiler, _ = Compiler.get_or_create(name=name,
                                              commit_sha=sha,
                                              commit_description=description,
                                              commit_author=author,
@@ -102,6 +105,8 @@ class System(db.Entity):
             else:
                 raise ValueError('could not identify your cpu')
 
+        logger.debug(f"current system is: {os_name}, {distribution}, {ram}, {cpu}")
+
         system, _ = cls.get_or_create(os=os_name,
                                       distribution=distribution,
                                       ram=ram,
@@ -133,7 +138,7 @@ class Run(db.Entity):
     primitives = Set('PrimitiveCount')
     machine_instructions = Required(int, size=64)
     time = Required(float)
-    timestamp = Required(datetime.datetime, default=datetime.datetime.now)
+    timestamp = Required(int, default=lambda: int(time.time()))
 
 
 db.bind(provider='sqlite', filename='benchmarks.db', create_db=True)
@@ -145,7 +150,6 @@ db.generate_mapping(create_tables=True)
 
 def run_command(command, timeout, env):
     logger.info(command)
-    logger.debug(env)
 
     if timeout is not None:
         logger.info(f"(with timeout: {timeout}s)")
