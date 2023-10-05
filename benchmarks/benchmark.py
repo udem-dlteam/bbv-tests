@@ -44,29 +44,48 @@ if not hasattr(db.Entity, "get_or_create"):
     db.Entity.get_or_create=get_or_create
     del get_or_create
 
+
+class Compiler(db.Entity):
+    name = Required(str)
+    commit_sha = Required(str)
+    commit_description = Required(str)
+    commit_author = Required(str)
+    commit_timestamp = Required(int)
+    runs = Set('Run')
+
+    @classmethod
+    def get_compiler(cls, compilerdir):
+        # Define the format for the commit details we want
+        # %H: commit hash, %an: author name, %s: subject, %ct: committer date (Unix timestamp)
+        format_str = "%H%n%an%n%s%n%ct"
+
+        output = subprocess.check_output(['git', 'show', '-s', f'--format={format_str}'],
+                                         cwd=compilerdir, universal_newlines=True).strip()
+
+        logger.debug(output)
+        sha, author, description, timestamp = output.splitlines()
+
+        compiler, _ = Compiler.get_or_create(name=compilerdir.name,
+                                             commit_sha=sha,
+                                             commit_description=description,
+                                             commit_author=author,
+                                             commit_timestamp=timestamp)
+
+        return compiler
+
 class System(db.Entity):
-    compiler = Required(str)
-    compiler_commit = Required(str)
-    benchmark_commit = Required(str)
     os = Required(str)
     distribution = Optional(str)
     ram = Required(str)
     cpu = Required(str)
     runs = Set('Run')
 
-    @staticmethod
-    def get_commit(dirpath):
-        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=dirpath,
-                                       universal_newlines=True).strip()
-
     @classmethod
-    def get_current_system(cls, compilerdir):
-        # get compiler from 
-        compiler = compilerdir.name
-        system = platform.system()
+    def get_current_system(cls):
+        os_name = platform.system()
 
-        if system != "Linux":
-            raise ValueError('{system} not supported, maybe use Linux?')
+        if os_name != "Linux":
+            raise ValueError('{os_name} not supported, maybe use Linux?')
 
         if distro:
             distribution = f'{distro.name(pretty=True)} ({distro.lsb_release_info()["codename"]})'
@@ -83,17 +102,12 @@ class System(db.Entity):
             else:
                 raise ValueError('could not identify your cpu')
 
-        compiler_commit = cls.get_commit(compilerdir)
-        benchmark_commit = cls.get_commit(os.path.curdir)
+        system, _ = cls.get_or_create(os=os_name,
+                                      distribution=distribution,
+                                      ram=ram,
+                                      cpu=cpu)
 
-        return cls.get_or_create(
-            compiler=compiler,
-            compiler_commit=compiler_commit,
-            benchmark_commit=benchmark_commit,
-            os=system,
-            distribution=distribution,
-            ram=ram,
-            cpu=cpu)
+        return system
 
 class Benchmark(db.Entity):
     path = Required(str)
@@ -112,6 +126,7 @@ class PrimitiveCount(db.Entity):
 class Run(db.Entity):
     benchmark = Required('Benchmark')
     system = Required('System')
+    compiler = Required('Compiler')
     version_limit = Required(int)
     repetitions = Required(int)
     merge_strategy = Required(str)
@@ -269,7 +284,8 @@ def run_benchmark(executable, repetitions):
 
 @db_session
 def run_and_save_benchmark(compilerdir, file, vlimits, repetitions, merge_strategy, timeout=None):
-    system, _ = System.get_current_system(compilerdir)
+    system = System.get_current_system()
+    compiler = Compiler.get_compiler(compilerdir)
 
     for v in vlimits:
         executable, primitive_count = compile(compilerdir, file, v, merge_strategy, timeout)
@@ -281,6 +297,7 @@ def run_and_save_benchmark(compilerdir, file, vlimits, repetitions, merge_strate
         run = Run(
             benchmark=benchmark,
             system = system,
+            compiler = compiler,
             version_limit=v,
             repetitions=repetitions,
             merge_strategy=merge_strategy,
