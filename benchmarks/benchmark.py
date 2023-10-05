@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-import csv
-import copy
 import datetime
-import itertools
 import locale
 import logging
 import math
@@ -13,7 +10,6 @@ import pathlib
 import platform
 import re
 import shlex
-import statistics
 import subprocess
 
 try:
