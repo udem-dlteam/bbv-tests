@@ -1,13 +1,7 @@
 #!/bin/bash
 #set -euxo pipefail
 
-files=("bglstone/almabench"
-       "bglstone/bague"
-       "bglstone/beval"
-       "bglstone/maze"
-       "bglstone/mbrot"
-       "bglstone/peval"
-       "recursive/ack"
+files=("recursive/ack"
        "recursive/fib"
        "recursive/fibfp"
        "recursive/tak"
@@ -17,6 +11,12 @@ files=("bglstone/almabench"
        "recursive/array1"
        "recursive/primes"
        "recursive/newton"
+       "bglstone/almabench"
+       "bglstone/bague"
+       "bglstone/beval"
+       "bglstone/maze"
+       "bglstone/mbrot"
+       "bglstone/peval"
        "gabriel/browse"
        "gabriel/mazefun"
        "gabriel/nqueens"
@@ -26,6 +26,13 @@ files=("bglstone/almabench"
        "gabriel/sumfp"
        "gabriel/triangl")
 
+. ./venv/bin/activate
+
+gambit=../../gambit
+
 for file in ${files[@]}; do
-  timeout 1200 ./benchmark.py ../tests/${file}.scm -g ../../gambit -v -l 0 1 2 3 4 5 6 7 8 -t 300 -csv results/${file}.csv
+  python ./benchmark.py ../tests/${file}.scm -g ${gambit} -n 5 -v -l 0 1 2 3 4 5 -m linear entropy sametypes -chart results/${file}-time.png -chart-params time
+  python ./benchmark.py ../tests/${file}.scm -g ${gambit} -n 5 -v -l 0 1 2 3 4 5 -m linear entropy sametypes -chart results/${file}-instructions.png -chart-params machine_instructions
+  python ./benchmark.py ../tests/${file}.scm -g ${gambit} -n 5 -v -l 0 1 2 3 4 5 -m linear entropy sametypes -chart results/${file}-typechecks.png -chart-params typechecks
+  python ./benchmark.py ../tests/${file}.scm -g ${gambit} -n 5 -v -l 0 1 2 3 4 5 -chart results/${file}-primitives.png -chart-params primitives 8
 done

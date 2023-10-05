@@ -185,6 +185,12 @@ def primitives_grouper(results, params):
 
     tracked_primitives = list(params["chart_params"])
     
+    if len(tracked_primitives) == 1 and tracked_primitives[0].isdigit():
+        primitives_limit = int(tracked_primitives[0])
+        tracked_primitives = None
+    else:
+        primitives_limit = 5
+    
     if not tracked_primitives:
         tracked_primitives = set()
         for result in results:
@@ -198,6 +204,12 @@ def primitives_grouper(results, params):
             prim_count(r, p) for r in results) > max_prim_count / 1000]
         
         tracked_primitives.sort(key=lambda p: tuple(prim_count(r, p) for r in results), reverse=True)
+
+        
+
+        if len(tracked_primitives) > primitives_limit:
+            tracked_primitives.remove("##identity")
+            tracked_primitives = tracked_primitives[:primitives_limit]
 
     for prim in tracked_primitives:
         row = []
@@ -220,7 +232,7 @@ chart_modes = {
                    "Typechecks",
                    name_by_merge_strategy,
                    merge_strategy_grouper,
-                   False),
+                   True),
     'machine_instructions': (lambda r: r.instructions,
                              "Machine Instructions",
                              name_by_merge_strategy,
@@ -269,6 +281,13 @@ def write_chart_file(chartfile, results, params):
     axis.legend()
 
     fig.tight_layout()
+
+    # Get the directory name from the file path
+    directory = os.path.dirname(chartfile)
+
+    # If the directory does not exist, create it
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
 
     plt.savefig(chartfile)
 
