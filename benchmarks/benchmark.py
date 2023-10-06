@@ -479,8 +479,7 @@ if __name__ == "__main__":
 
     # Set logger level
     logger.setLevel(args.loglevel)
-    console = logging.StreamHandler()
-    logger.addHandler(console)
+    logger.addHandler(logging.StreamHandler())
     
     logger.debug(args)
 
