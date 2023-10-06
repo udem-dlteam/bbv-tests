@@ -128,16 +128,24 @@ class PrimitiveCount(db.Entity):
     count = Required(int, size=64)
     run = Required('Run')
 
+class PerfResult(db.Entity):
+    time = Required(float)
+    machine_instructions = Required(int, size=64)
+    page_faults = Required(int, size=64)
+    cycles = Required(int, size=64)
+    branches = Required(int, size=64)
+    branch_misses = Required(int, size=64)
+    run = Optional('Run')
+
 class Run(db.Entity):
-    benchmark = Required('Benchmark')
-    system = Required('System')
-    compiler = Required('Compiler')
+    benchmark = Required('Benchmark', reverse='runs')
+    system = Required('System', reverse='runs')
+    compiler = Required('Compiler', reverse='runs')
     version_limit = Required(int)
     repetitions = Required(int)
     merge_strategy = Required(str)
-    primitives = Set('PrimitiveCount')
-    machine_instructions = Required(int, size=64)
-    time = Required(float)
+    primitives = Set('PrimitiveCount', reverse='run')
+    perf_result = Required('PerfResult', reverse='run')
     timestamp = Required(int, default=lambda: int(time.time()))
 
 
@@ -219,10 +227,14 @@ class PrimitivesCountParser:
         return primitive in cls.typechecks
 
 
-class BenchResultsParser:
+class BenchResultParser:
     def __init__(self, perf_output):
         self.time = self._get_value(perf_output, "task-clock")
         self.machine_instructions = self._get_value(perf_output, "instructions")
+        self.page_faults = self._get_value(perf_output, "page-faults")
+        self.cycles = self._get_value(perf_output, "cycles")
+        self.branches = self._get_value(perf_output, "branches")
+        self.branch_misses = self._get_value(perf_output, "branch-misses")
 
     @staticmethod
     def string_to_number(n):
@@ -284,7 +296,7 @@ def run_benchmark(executable, repetitions):
     logger.info(command)
     output = subprocess.run(command, shell=True, capture_output=True).stderr.decode()
     logger.debug(output)
-    return BenchResultsParser(output)
+    return BenchResultParser(output)
 
 @db_session
 def run_and_save_benchmark(compilerdir, file, vlimits, repetitions, merge_strategy, timeout=None):
@@ -298,6 +310,13 @@ def run_and_save_benchmark(compilerdir, file, vlimits, repetitions, merge_strate
         with open(file) as f:
             benchmark, _ = Benchmark.get_or_create(path=str(file), content=f.read())
 
+        perf_result = PerfResult(time=result.time,
+                                 machine_instructions=result.machine_instructions,
+                                 page_faults=result.page_faults,
+                                 cycles=result.cycles,
+                                 branches=result.branches,
+                                 branch_misses=result.branch_misses)
+
         run = Run(
             benchmark=benchmark,
             system = system,
@@ -305,8 +324,7 @@ def run_and_save_benchmark(compilerdir, file, vlimits, repetitions, merge_strate
             version_limit=v,
             repetitions=repetitions,
             merge_strategy=merge_strategy,
-            machine_instructions=result.machine_instructions,
-            time=result.time)
+            perf_result=perf_result)
 
         for prim, count in primitive_count.items():
             PrimitiveCount(name=prim, count=count, run=run)
