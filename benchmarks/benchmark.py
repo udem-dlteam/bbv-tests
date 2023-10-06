@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import ast
 import datetime
 import locale
 import logging
@@ -55,7 +56,7 @@ class Compiler(db.Entity):
     runs = Set('Run')
 
     @classmethod
-    def get_compiler(cls, compilerdir):
+    def get_or_create_compiler(cls, compilerdir):
         # Define the format for the commit details we want
         # %H: commit hash, %an: author name, %s: subject, %ct: committer date (Unix timestamp)
         format_str = "%H%n%an%n%s%n%ct"
@@ -68,13 +69,11 @@ class Compiler(db.Entity):
 
         logger.debug(f"current compiler is: {name}, {sha}, {author}, {description}, {timestamp}")
 
-        compiler, _ = Compiler.get_or_create(name=name,
-                                             commit_sha=sha,
-                                             commit_description=description,
-                                             commit_author=author,
-                                             commit_timestamp=timestamp)
-
-        return compiler
+        return Compiler.get_or_create(name=name,
+                                      commit_sha=sha,
+                                      commit_description=description,
+                                      commit_author=author,
+                                      commit_timestamp=timestamp)
 
 class System(db.Entity):
     os = Required(str)
@@ -84,7 +83,7 @@ class System(db.Entity):
     runs = Set('Run')
 
     @classmethod
-    def get_current_system(cls):
+    def get_system_data(cls):
         os_name = platform.system()
 
         if os_name != "Linux":
@@ -107,21 +106,20 @@ class System(db.Entity):
 
         logger.debug(f"current system is: {os_name}, {distribution}, {ram}, {cpu}")
 
-        system, _ = cls.get_or_create(os=os_name,
-                                      distribution=distribution,
-                                      ram=ram,
-                                      cpu=cpu)
+        return dict(os=os_name, distribution=distribution, ram=ram, cpu=cpu)
 
-        return system
+    @classmethod
+    def get_current_system(cls):
+        return cls.get(**cls.get_system_data())
+
+    @classmethod
+    def get_or_create_current_system(cls):
+        return cls.get_or_create(**cls.get_system_data())
 
 class Benchmark(db.Entity):
     path = Required(str)
     content = Required(str)
     runs = Set('Run')
-
-    @property
-    def filename(self):
-        return os.path.basename(self.path)
 
 class PrimitiveCount(db.Entity):
     name = Required(str)
@@ -300,8 +298,8 @@ def run_benchmark(executable, repetitions):
 
 @db_session
 def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge_strategy, force_execution=False, timeout=None):
-    system = System.get_current_system()
-    compiler = Compiler.get_compiler(compilerdir)
+    system, _ = System.get_or_create_current_system()
+    compiler, _ = Compiler.get_or_create_compiler(compilerdir)
 
     with open(file) as f:
         benchmark, _ = Benchmark.get_or_create(path=str(file), content=f.read())
@@ -350,6 +348,20 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
 ##############################################################################
 # Chart generation
 ##############################################################################
+
+@db_session
+def plot_benchmarks(benchmark):
+    compiler_name = "gambit"
+
+    system = System.get_current_system()
+    compiler = select(c for c in Compiler if c.name == compiler_name).order_by(desc(Compiler.commit_timestamp)).first()
+
+    runs = select(r for r in Run if r.system == system and r.compiler ==
+                  compiler and r.benchmark.path.endswith("/" + benchmark))
+
+    for run in runs:
+        print(run.benchmark.path)
+
 
 def write_chart_file(chartfile, results, params):
     selector, yname, group_namer, grouper, *_ = chart_modes[params['chart_mode']]
@@ -433,6 +445,19 @@ if __name__ == "__main__":
         else:
             raise FileNotFoundError(f"{value} is not a valid file")
 
+    class KeyValueAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            params = {}
+            for item in values:
+                try:
+                    key, value = item.split("=")
+                except ValueError as e:
+                    raise argparse.ArgumentError(self, f"requires format NAME=VALUE, got {repr(item)}")
+
+                params[key] = value.split(',') if ',' in value else value
+
+            setattr(namespace, self.dest, params)
+
     # Main parser
     parser = argparse.ArgumentParser(description="Benchmark BBV for Gambit")
     subparsers = parser.add_subparsers(dest='command')
@@ -494,6 +519,14 @@ if __name__ == "__main__":
                                   action='store_true',
                                   help='rerun benchmark even if results already exist')
 
+    # Parser for running benchmarks
+    plot_parser = subparsers.add_parser('plot', help='Plot benchmarks')
+
+    plot_parser.add_argument('-b', '--benchmark',
+                             required=True,
+                             dest="benchmark",
+                             help="benchmark filename")
+
     args = parser.parse_args()
 
     # Set logger level
@@ -510,3 +543,5 @@ if __name__ == "__main__":
                                merge_strategy=args.merge_strategy,
                                force_execution=args.force_execution,
                                timeout=args.timeout)
+    elif args.command == 'plot':
+        plot_benchmarks(benchmark=args.benchmark)
