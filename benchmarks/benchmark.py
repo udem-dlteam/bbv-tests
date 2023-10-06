@@ -299,16 +299,33 @@ def run_benchmark(executable, repetitions):
     return BenchResultParser(output)
 
 @db_session
-def run_and_save_benchmark(compilerdir, file, vlimits, repetitions, merge_strategy, timeout=None):
+def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge_strategy, force_execution=False, timeout=None):
     system = System.get_current_system()
     compiler = Compiler.get_compiler(compilerdir)
 
-    for v in vlimits:
+    with open(file) as f:
+        benchmark, _ = Benchmark.get_or_create(path=str(file), content=f.read())
+
+    for v in version_limits:
+        logger.info(f'- benchmark: {file}\n'
+                    f'- merge strategy:{merge_strategy}\n'
+                    f'- version limit:{v}')
+
+        if not force_execution:
+            existing_run = Run.get(benchmark=benchmark,
+                                   system=system,
+                                   compiler=compiler,
+                                   version_limit=v,
+                                   repetitions=repetitions,
+                                   merge_strategy=merge_strategy)
+            if existing_run:
+                logger.info('benchmark has an existing run, skip it')
+                continue
+            else:
+                logger.info('no run exists for this benchmark, execute it')
+
         executable, primitive_count = compile(compilerdir, file, v, merge_strategy, timeout)
         result = run_benchmark(executable, repetitions)
-
-        with open(file) as f:
-            benchmark, _ = Benchmark.get_or_create(path=str(file), content=f.read())
 
         perf_result = PerfResult(time=result.time,
                                  machine_instructions=result.machine_instructions,
@@ -317,14 +334,13 @@ def run_and_save_benchmark(compilerdir, file, vlimits, repetitions, merge_strate
                                  branches=result.branches,
                                  branch_misses=result.branch_misses)
 
-        run = Run(
-            benchmark=benchmark,
-            system = system,
-            compiler = compiler,
-            version_limit=v,
-            repetitions=repetitions,
-            merge_strategy=merge_strategy,
-            perf_result=perf_result)
+        run = Run(benchmark=benchmark,
+                  system=system,
+                  compiler=compiler,
+                  version_limit=v,
+                  repetitions=repetitions,
+                  merge_strategy=merge_strategy,
+                  perf_result=perf_result)
 
         for prim, count in primitive_count.items():
             PrimitiveCount(name=prim, count=count, run=run)
@@ -434,8 +450,6 @@ if __name__ == "__main__":
                         dest="loglevel",
                         const=logging.INFO,)
 
-    
-
     # Parser for running benchmarks
     benchmark_parser = subparsers.add_parser('benchmark', help='Run benchmark and store results')
 
@@ -475,6 +489,11 @@ if __name__ == "__main__":
                                   default='linear',
                                   help='BBV merge strategies')
 
+    benchmark_parser.add_argument('-f', '--force-execution',
+                                  dest='force_execution',
+                                  action='store_true',
+                                  help='rerun benchmark even if results already exist')
+
     args = parser.parse_args()
 
     # Set logger level
@@ -484,9 +503,10 @@ if __name__ == "__main__":
     logger.debug(args)
 
     if args.command == 'benchmark':
-        run_and_save_benchmark(args.compilerdir.resolve(),
-                               args.file.resolve(),
-                               args.version_limits,
-                               args.repetitions,
-                               args.merge_strategy,
-                               args.timeout)
+        run_and_save_benchmark(compilerdir=args.compilerdir.resolve(),
+                               file=args.file.resolve(),
+                               version_limits=args.version_limits,
+                               repetitions=args.repetitions,
+                               merge_strategy=args.merge_strategy,
+                               force_execution=args.force_execution,
+                               timeout=args.timeout)
