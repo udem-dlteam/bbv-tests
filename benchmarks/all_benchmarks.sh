@@ -4,27 +4,7 @@
 files=("recursive/ack"
        "recursive/fib"
        "recursive/fibfp"
-       "recursive/tak"
-       "recursive/takl"
-       "recursive/diviter"
-       "recursive/divrec"
-       "recursive/array1"
-       "recursive/primes"
-       "recursive/newton"
-       "bglstone/almabench"
-       "bglstone/bague"
-       "bglstone/beval"
-       "bglstone/maze"
-       "bglstone/mbrot"
-       "bglstone/peval"
-       "gabriel/browse"
-       "gabriel/mazefun"
-       "gabriel/nqueens"
-       "gabriel/puzzle"
-       "gabriel/quicksort"
-       "gabriel/sum"
-       "gabriel/sumfp"
-       "gabriel/triangl")
+       "recursive/tak")
 
 strategies=("linear"
             "sametypes"
@@ -36,7 +16,7 @@ gambit=../../gambit
 
 for file in ${files[@]}; do
   for strat in ${strategies[@]}; do
-    python ./benchmark.py -v benchmark ../tests/${file}.scm -g ${gambit} -m ${strat}
+    python ./benchmark.py -v benchmark ../tests/${file}.scm -g ${gambit} -m ${strat} -f
   done
 done
 

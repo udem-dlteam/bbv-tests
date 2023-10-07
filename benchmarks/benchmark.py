@@ -11,6 +11,7 @@ import pathlib
 import platform
 import re
 import shlex
+import string
 import subprocess
 import time
 
@@ -416,18 +417,96 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
 # Chart generation
 ##############################################################################
 
-@db_session
-def plot_benchmarks(benchmark):
-    compiler_name = "gambit"
 
-    system = System.get_current_system()
+def choose_output_path(output, system_name, compiler_name, benchmark, perf_event_names, primitive_names,
+                       valid_chars="-_.()" + string.ascii_letters + string.digits):
+    path = pathlib.Path(output or '.').resolve()
+    suffix = path.suffix
+    
+    if not suffix:
+        # No extension means the output is a folder where to output the plot
+        logger.debug(f"output into folder {path}")
+
+        # build default filename
+        primitive_segment = "_primitives" if primitive_names else ""
+        filename = f"{benchmark}_{'_'.join(perf_event_names)}{primitive_segment}_{compiler_name}_{system_name}.png"
+
+        # sanitize filename
+        filename = ''.join(c for c in filename if c in valid_chars)
+
+        path = path / filename
+        logger.info(f"output to file {path}")
+        return path
+    elif suffix == ".png":
+        logger.info(f"output to file {path}")
+        return path
+    else:
+        raise ValueError(f"output must be a folder of .png target, got {output}")
+
+
+@db_session
+def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, primitive_names, output):
+    system = System.get_current_system() if system_name is None else System.get(name=system_name)
     compiler = select(c for c in Compiler if c.name == compiler_name).order_by(desc(Compiler.commit_timestamp)).first()
 
-    runs = select(r for r in Run if r.system == system and r.compiler ==
-                  compiler and r.benchmark.path.endswith("/" + benchmark))
+    # Select only the latest runs for a given version limit and merge strategy
+    runs = select(
+        r for r in Run
+        if r.system == system and r.compiler == compiler and r.benchmark.name == benchmark
+        and r.timestamp == max(select(
+            r2.timestamp for r2 in Run
+            if r2.system == system and r2.compiler == compiler
+            and r2.benchmark.name == benchmark
+            and r2.version_limit == r.version_limit
+            and r2.merge_strategy == r.merge_strategy)))\
+        .order_by(Run.merge_strategy).order_by(Run.version_limit)
+
+    logger.info(f"found {len(runs)} (only latest)")
+
+    data = extract_data_from_runs(runs, perf_event_names, primitive_names)
+    output_path = choose_output_path(output=output,
+                                     system_name=system.name,
+                                     compiler_name=compiler.name,
+                                     benchmark=benchmark,
+                                     perf_event_names=perf_event_names,
+                                     primitive_names=primitive_names)
+
+    logger.info(f"output to {output_path}")
+
+    plot_data(data, output_path)
+
+
+def extract_data_from_runs(runs, perf_event_names, primitive_names):
+    data = []
 
     for run in runs:
-        print(run.benchmark.path)
+        perf_events = []
+
+        for name in perf_event_names:
+            if not (event := PerfEvent.get(run=run, event=name)):
+                raise ValueError(f'Cannot find {repr(name)}')
+            perf_events.append((name, event.value))
+
+        primitive_counts = []
+
+        for name in primitive_names:
+            if prim := PrimitiveCount.get(run=run, name=name):
+                primitive_counts.append((name, prim.count))
+            else:
+                logger.debug(f"{name} primitive not found, defaulting to 0")
+                primitive_counts.append((name, 0))
+
+        data.append((run, perf_events, primitive_counts))
+
+    return data
+
+
+def plot_data(data, output_path):
+    print(f"will plot to {output_path}")
+
+    for datum in data:
+        run, *metrics = datum
+        print(run.version_limit, run.merge_strategy, *metrics)
 
 
 def write_chart_file(chartfile, results, params):
@@ -503,7 +582,6 @@ if __name__ == "__main__":
             return path
         else:
             raise NotADirectoryError(f"{value} is not a valid directory")
-
 
     def file_path(value):
         path = pathlib.Path(value)
@@ -592,7 +670,32 @@ if __name__ == "__main__":
     plot_parser.add_argument('-b', '--benchmark',
                              required=True,
                              dest="benchmark",
-                             help="benchmark filename")
+                             help="benchmark name or path")
+
+    plot_parser.add_argument('-s', '--systen',
+                             dest="system_name",
+                             help="plot benchmark of this system")
+
+    plot_parser.add_argument('-c', '--compiler',
+                             dest="compiler_name",
+                             default="gambit",
+                             help="plot benchmark of this compiler")
+
+    plot_parser.add_argument('-e', '--perf-events',
+                             nargs="+",
+                             default=(),
+                             dest="perf_event_names",
+                             help="perf stat events to plot")
+
+    plot_parser.add_argument('-p', '--primitives',
+                             nargs="+",
+                             default=(),
+                             dest="primitive_names",
+                             help="primitive calls to plot")
+
+    plot_parser.add_argument('-o', '--output',
+                             dest="output",
+                             help="where to output the chart (file or folder)")
 
     args = parser.parse_args()
 
@@ -611,4 +714,9 @@ if __name__ == "__main__":
                                force_execution=args.force_execution,
                                timeout=args.timeout)
     elif args.command == 'plot':
-        plot_benchmarks(benchmark=args.benchmark)
+        plot_benchmarks(benchmark=args.benchmark,
+                        compiler_name=args.compiler_name,
+                        system_name=args.system_name,
+                        perf_event_names=args.perf_event_names,
+                        primitive_names=args.primitive_names,
+                        output=args.output)
