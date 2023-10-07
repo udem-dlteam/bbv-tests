@@ -428,7 +428,7 @@ def choose_output_path(output, system_name, compiler_name, benchmark, perf_event
         logger.debug(f"output into folder {path}")
 
         # build default filename
-        primitive_segment = "_primitives" if primitive_names else ""
+        primitive_segment = f"_{len(primitive_names)}primitives" if primitive_names else ""
         filename = f"{benchmark}_{'_'.join(perf_event_names)}{primitive_segment}_{compiler_name}_{system_name}.png"
 
         # sanitize filename
