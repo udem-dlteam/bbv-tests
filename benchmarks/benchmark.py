@@ -130,14 +130,10 @@ class PrimitiveCount(db.Entity):
     count = Required(int, size=64)
     run = Required('Run')
 
-class PerfResult(db.Entity):
-    time = Required(float)
-    machine_instructions = Required(int, size=64)
-    page_faults = Required(int, size=64)
-    cycles = Required(int, size=64)
-    branches = Required(int, size=64)
-    branch_misses = Required(int, size=64)
-    run = Optional('Run')
+class PerfEvent(db.Entity):
+    event = Required(str)
+    value = Required(int, size=64)
+    run = Required('Run')
 
 class Run(db.Entity):
     benchmark = Required('Benchmark', reverse='runs')
@@ -147,7 +143,7 @@ class Run(db.Entity):
     repetitions = Required(int)
     merge_strategy = Required(str)
     primitives = Set('PrimitiveCount', reverse='run')
-    perf_result = Required('PerfResult', reverse='run')
+    perf_events = Set('PerfEvent', reverse='run')
     timestamp = Required(int, default=lambda: int(time.time()))
 
 
@@ -230,16 +226,66 @@ class PrimitivesCountParser:
 
 
 class BenchResultParser:
+    time_event = 'task-clock'
+    event_names = [
+        time_event,
+        "cycles",
+        "instructions",
+        "branches",
+        "branch-misses",
+        "cache-references",
+        "cache-misses",
+        "mem-loads",
+        "mem-stores",
+        "page-faults",
+        "minor-faults",
+        "major-faults",
+        "context-switches",
+        "cpu-migrations",
+        "stalled-cycles-frontend",
+        "stalled-cycles-backend",
+        # CPU Cache events
+        "L1-dcache-loads",
+        "L1-dcache-load-misses",
+        "L1-dcache-stores",
+        "L1-dcache-store-misses",
+        "L1-icache-loads",
+        "L1-icache-load-misses",
+        # Branch Prediction
+        "branch-load-misses",
+        "branch-loads",
+    ]
+
     def __init__(self, perf_output):
-        self.time = self._get_value(perf_output, "task-clock")
-        self.machine_instructions = self._get_value(perf_output, "instructions")
-        self.page_faults = self._get_value(perf_output, "page-faults")
-        self.cycles = self._get_value(perf_output, "cycles")
-        self.branches = self._get_value(perf_output, "branches")
-        self.branch_misses = self._get_value(perf_output, "branch-misses")
+        if 'Performance counter stats' not in perf_output:
+            raise ValueError(f"wrong 'perf stat' output (is perf installed?)")
+
+        self.events = {}
+        
+        for e in self.event_names:
+            if (result := self._get_value(perf_output, e)) is not None:
+                self.events[e] = result
+
+    def keys(self):
+        return self.events.keys()
+
+    def values(self):
+        return self.events.values()
+
+    def items(self):
+        return self.events.items()
+
+    def update(self, other):
+        self.events.update(other.events)
+
+    def __getitem__(self, event_name):
+        return self.events[event_name]
+
+    def __contains__(self, event_name):
+        return event_name in self.events
 
     @staticmethod
-    def string_to_number(n):
+    def _string_to_number(n):
         try:
             return locale.atoi(n)
         except ValueError:
@@ -250,13 +296,16 @@ class BenchResultParser:
         for line in perf_output.splitlines():
             if marker in line:
                 numbers = re.findall(r"[\d\.,]+", line)
-                return [cls.string_to_number(n) for n in numbers]
+                logger.debug(f"found perf stat event {marker} ({numbers})")
+                return [cls._string_to_number(n) for n in numbers]
 
-        raise ValueError(f"no line with '{marker}' in 'perf stat' output (is perf installed?)")
+        logger.debug(f"could not find perf stat event {marker}")
+        return None
 
     @classmethod
     def _get_value(cls, perf_output, name):
-        return cls._get_numbers_on_line_with(perf_output, name)[0]
+        results = cls._get_numbers_on_line_with(perf_output, name)
+        return results[0] if results else None
 
 
 ##############################################################################
@@ -294,11 +343,30 @@ def compile(compilerdir, file, vlimit, merge_strategy, timeout=None):
 
 
 def run_benchmark(executable, repetitions):
-    command = f"perf stat -r {repetitions} {executable}"
-    logger.info(command)
-    output = subprocess.run(command, shell=True, capture_output=True).stderr.decode()
-    logger.debug(output)
-    return BenchResultParser(output)
+    # Run program to measure time only
+    time_command = f"perf stat -e {BenchResultParser.time_event} -r {repetitions} {executable}"
+    logger.info(time_command)
+    time_output = subprocess.run(time_command, shell=True, capture_output=True).stderr.decode()
+    logger.debug(time_output)
+
+    # Run program with all perf stat events on
+    other_events = ' '.join(f"-e {e}" for e in BenchResultParser.event_names)
+    other_command = f"perf stat {other_events} -r {repetitions} {executable}"
+    logger.info(other_command)
+    other_output = subprocess.run(other_command, shell=True, capture_output=True).stderr.decode()
+    logger.debug(other_output)
+
+    # parse and join outputs
+    time_parser = BenchResultParser(time_output)
+    other_parser = BenchResultParser(other_output)
+
+    other_parser.update(time_parser)
+
+    for event in BenchResultParser.event_names:
+        if event not in other_parser:
+            logger.warning(f"Could not find perf stat event {repr(event)} when running {executable}")
+
+    return other_parser
 
 @db_session
 def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge_strategy, force_execution=False, timeout=None):
@@ -331,20 +399,15 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
         executable, primitive_count = compile(compilerdir, file, v, merge_strategy, timeout)
         result = run_benchmark(executable, repetitions)
 
-        perf_result = PerfResult(time=result.time,
-                                 machine_instructions=result.machine_instructions,
-                                 page_faults=result.page_faults,
-                                 cycles=result.cycles,
-                                 branches=result.branches,
-                                 branch_misses=result.branch_misses)
-
         run = Run(benchmark=benchmark,
                   system=system,
                   compiler=compiler,
                   version_limit=v,
                   repetitions=repetitions,
-                  merge_strategy=merge_strategy,
-                  perf_result=perf_result)
+                  merge_strategy=merge_strategy)
+
+        for event, value in result.items():
+            PerfEvent(event=event, value=int(value), run=run)
 
         for prim, count in primitive_count.items():
             PrimitiveCount(name=prim, count=count, run=run)
