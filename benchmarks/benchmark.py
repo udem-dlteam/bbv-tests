@@ -76,14 +76,16 @@ class Compiler(db.Entity):
                                       commit_timestamp=timestamp)
 
 class System(db.Entity):
+    name = Required(str)
     os = Required(str)
     distribution = Optional(str)
     ram = Required(str)
     cpu = Required(str)
     runs = Set('Run')
 
-    @classmethod
-    def get_system_data(cls):
+    @staticmethod
+    def get_system_data():
+        name = platform.node()
         os_name = platform.system()
 
         if os_name != "Linux":
@@ -106,7 +108,7 @@ class System(db.Entity):
 
         logger.debug(f"current system is: {os_name}, {distribution}, {ram}, {cpu}")
 
-        return dict(os=os_name, distribution=distribution, ram=ram, cpu=cpu)
+        return dict(name=name, os=os_name, distribution=distribution, ram=ram, cpu=cpu)
 
     @classmethod
     def get_current_system(cls):
@@ -117,8 +119,10 @@ class System(db.Entity):
         return cls.get_or_create(**cls.get_system_data())
 
 class Benchmark(db.Entity):
+    name = Required(str)
     path = Required(str)
     content = Required(str)
+    timestamp = Required(int)
     runs = Set('Run')
 
 class PrimitiveCount(db.Entity):
@@ -302,7 +306,9 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
     compiler, _ = Compiler.get_or_create_compiler(compilerdir)
 
     with open(file) as f:
-        benchmark, _ = Benchmark.get_or_create(path=str(file), content=f.read())
+        name = os.path.splitext(os.path.basename(file))[0]
+        timestamp = int(os.path.getmtime(file))
+        benchmark, _ = Benchmark.get_or_create(name=name, path=str(file), content=f.read(), timestamp=timestamp)
 
     for v in version_limits:
         logger.info(f'- benchmark: {file}\n'
@@ -342,8 +348,6 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
 
         for prim, count in primitive_count.items():
             PrimitiveCount(name=prim, count=count, run=run)
-
-
 
 ##############################################################################
 # Chart generation
