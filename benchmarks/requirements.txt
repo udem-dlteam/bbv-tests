@@ -4,3 +4,4 @@ distro
 psutil
 numpy
 pandas
+seaborn

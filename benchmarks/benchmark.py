@@ -27,11 +27,13 @@ import matplotlib as mpl
 
 import numpy as np
 
+import pandas as pd
+
 from pony.orm import *
 
 import psutil
 
-logger = logging.getLogger(__name__)
+import seaborn as sns
 
 ##############################################################################
 ## Database
@@ -422,14 +424,17 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
 ##############################################################################
 
 
+def sanitize_filename(filename, valid_chars="-_.()" + string.ascii_letters + string.digits):
+    return ''.join(c for c in filename if c in valid_chars)
+
+
 def ensure_directory_exists(filepath):
     dir_name = os.path.dirname(filepath)
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
 
 
-def choose_output_path(output, system_name, compiler_name, benchmark, perf_event_names, primitive_names,
-                       valid_chars="-_.()" + string.ascii_letters + string.digits):
+def choose_barchart_output_path(output, system_name, compiler_name, benchmark, perf_event_names, primitive_names):
     path = pathlib.Path(output or '.').resolve()
     suffix = path.suffix
     
@@ -442,7 +447,7 @@ def choose_output_path(output, system_name, compiler_name, benchmark, perf_event
         filename = f"{benchmark}_{'_'.join(sorted(perf_event_names))}{primitive_segment}_{compiler_name}_{system_name}.png"
 
         # sanitize filename
-        filename = ''.join(c for c in filename if c in valid_chars)
+        filename = sanitize_filename(filename)
 
         path = path / filename
         logger.info(f"output to file {path}")
@@ -464,16 +469,28 @@ def select_primitives_names(runs, primitive_names_or_amount):
         return primitive_names_or_amount
 
 
-@db_session
-def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, primitive_names_or_amount, output):
+def get_system_from_name_or_default(system_name=None):
     system = System.get_current_system() if system_name is None else System.get(name=system_name)
-    compiler = select(c for c in Compiler if c.name == compiler_name).order_by(desc(Compiler.commit_timestamp)).first()
 
     if not system:
         raise ValueError(f"could not find system {repr(system_name) or ''}")
 
+    return system
+
+
+def get_compiler_from_name(compiler_name):
+    compiler = select(c for c in Compiler if c.name == compiler_name).order_by(desc(Compiler.commit_timestamp)).first()
+
     if not compiler:
         raise ValueError(f"could not find compiler {repr(compiler_name)}")
+
+    return compiler
+
+
+@db_session
+def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, primitive_names_or_amount, output):
+    system = get_system_from_name_or_default(system_name)
+    compiler = get_compiler_from_name(compiler_name)
 
     # Select only the latest runs for a given version limit and merge strategy
     runs = select(
@@ -495,7 +512,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
         logger.info(f"primitives to plot: {', '.join(primitive_names)}")
 
     data = extract_data_from_runs(runs, perf_event_names, primitive_names)
-    output_path = choose_output_path(output=output,
+    output_path = choose_barchart_output_path(output=output,
                                      system_name=system.name,
                                      compiler_name=compiler.name,
                                      benchmark=benchmark,
@@ -645,6 +662,122 @@ def plot_data(data, output_path):
 
 
 ##############################################################################
+# Correlation analysis
+##############################################################################
+
+def choose_analysis_output_path(output, merge_strategy, system_name, compiler_name,
+                                valid_chars="-_.()" + string.ascii_letters + string.digits):
+    path = pathlib.Path(output or '.').resolve()
+    suffix = path.suffix
+
+    if not suffix:
+        # No extension means the output is a folder where to output the plot
+        logger.debug(f"output into folder {path}")
+
+        # build default filename
+        filename = f"analysis_{merge_strategy}_{compiler_name}_{system_name}.png"
+
+        # sanitize filename
+        filename = sanitize_filename(filename)
+
+        path = path / filename
+        logger.info(f"output to file {path}")
+        return path
+    elif suffix == ".png":
+        logger.info(f"output to file {path}")
+        return path
+    else:
+        raise ValueError(f"output must be a folder of .png target, got {output}")
+
+@db_session
+def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compiler_name, output):
+    system = get_system_from_name_or_default(system_name)
+    compiler = get_compiler_from_name(compiler_name)
+
+    output_path = choose_analysis_output_path(output=output,
+                                              merge_strategy=merge_strategy,
+                                              system_name=system.name,
+                                              compiler_name=compiler.name)
+
+    # Select benchmarks for analysis
+    if benchmark_names is None:
+        benchmark_names_filter = list(select(b.name for b in Benchmark).distinct())
+    else:
+        benchmark_names_filter = benchmark_names
+
+    for benchmark_name in benchmark_names_filter[:]:
+        bench = Benchmark.get(name=benchmark_name)
+
+        if not bench:
+            benchmark_names_filter.remove(benchmark_name)
+            logger.warning(f"benchmark does not exist: {repr(benchmark_name)}")
+
+        elif not exists(r for r in Run if r.benchmark == bench
+                      and r.system == system and r.compiler == compiler
+                      and r.merge_strategy == merge_strategy):
+            benchmark_names_filter.remove(benchmark_name)
+            logger.warning(f"benchmark does not exist for the provided settings: {repr(benchmark_name)}")
+
+    logger.debug(f"benchmarks used: {', '.join(benchmark_names_filter)}")
+
+    # Select only the latest runs for a given benchmark
+    runs = select(
+        r for r in Run
+        if r.system == system and r.compiler == compiler and r.merge_strategy == merge_strategy
+        and r.benchmark.name in benchmark_names_filter
+        and r.timestamp == max(select(
+            r2.timestamp for r2 in Run
+            if r2.system == system and r2.compiler == compiler
+            and r2.merge_strategy == merge_strategy and r2.benchmark == r.benchmark
+            and r2.version_limit == r.version_limit)))[:]
+
+    logger.info(f"found {len(runs)} (only latest)")
+
+    # Format data in a pandas dataframe
+    perf_attributes = select(e.event for e in PerfEvent if e.run in runs).distinct()[:]
+    attributes = [ "version_limit"]
+
+    all_attributes = [*attributes, *perf_attributes]
+
+    logger.info(f"attributes in analysis: {', '.join(all_attributes)}")
+
+    data_points = []
+
+    for r in runs:
+        point = []
+
+        for attr in attributes:
+            point.append(getattr(r, attr))
+
+        for perf_attr in perf_attributes:
+            point.append(PerfEvent.get(event=perf_attr, run=r).value)
+
+        data_points.append(point)
+
+    df = pd.DataFrame(data_points, columns=all_attributes)
+
+    correlation_matrix = df.corr(method='pearson')
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(20, 15))
+
+    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap="coolwarm", linewidths=.5, vmin=-1, vmax=1, center=0)
+
+    plt.title(f"Correlation Matrix for {repr(merge_strategy)} strategy", fontsize=16, fontweight='bold')
+
+    ax.xaxis.tick_top()
+    plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
+    
+    ax.text(0.5, -0.03, f"benchmarks: {', '.join(benchmark_names_filter)}",
+            size=12, ha="center", transform=ax.transAxes)
+
+    plt.tight_layout()
+
+    ensure_directory_exists(output_path)
+    plt.savefig(output_path)
+
+
+##############################################################################
 # Command line interface
 ##############################################################################
 
@@ -737,7 +870,7 @@ if __name__ == "__main__":
                                   action='store_true',
                                   help='rerun benchmark even if results already exist')
 
-    # Parser for running benchmarks
+    # Parser for plotting benchmarks
     plot_parser = subparsers.add_parser('plot', help='Plot benchmarks')
 
     plot_parser.add_argument('-b', '--benchmark',
@@ -747,7 +880,7 @@ if __name__ == "__main__":
 
     plot_parser.add_argument('-s', '--systen',
                              dest="system_name",
-                             help="plot benchmark of this system")
+                             help="plot benchmark from this system")
 
     plot_parser.add_argument('-c', '--compiler',
                              dest="compiler_name",
@@ -770,6 +903,33 @@ if __name__ == "__main__":
     plot_parser.add_argument('-o', '--output',
                              dest="output",
                              help="where to output the chart (file or folder)")
+
+    # Parser for comparing merge strategy with correlation matrices
+    analysis_parser = subparsers.add_parser('analysis', help='Plot correlation matrice for a merge strategy')
+
+    analysis_parser.add_argument('-m', '--merge-strategy',
+                             required=True,
+                             dest="merge_strategy",
+                             help="merge strategy to analyze")
+
+    analysis_parser.add_argument('-s', '--systen',
+                             dest="system_name",
+                             help="analyze benchmarks from this system")
+
+    analysis_parser.add_argument('-c', '--compiler',
+                             dest="compiler_name",
+                             default="gambit",
+                             help="analyze benchmarks of this compiler")
+
+    analysis_parser.add_argument('-b', '--benchmarks',
+                                 dest="benchmark_names",
+                                 nargs='+',
+                                 help="benchmarks used for analysis (all if none given)")
+
+    analysis_parser.add_argument('-o', '--output',
+                                dest="output",
+                                help="where to output the chart (file or folder)")
+
 
     args = parser.parse_args()
 
@@ -794,3 +954,10 @@ if __name__ == "__main__":
                         perf_event_names=args.perf_event_names,
                         primitive_names_or_amount=args.primitive_names_or_amount,
                         output=args.output)
+    elif args.command == 'analysis':
+        analyze_merge_strategy(
+            merge_strategy=args.merge_strategy,
+            system_name=args.system_name,
+            compiler_name=args.compiler_name,
+            benchmark_names=args.benchmark_names,
+            output=args.output)
