@@ -2,3 +2,4 @@ matplotlib
 pony
 distro
 psutil
+numpy

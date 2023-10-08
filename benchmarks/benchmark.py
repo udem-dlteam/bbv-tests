@@ -2,7 +2,9 @@
 
 import argparse
 import ast
+import collections
 import datetime
+import itertools
 import locale
 import logging
 import math
@@ -22,6 +24,8 @@ except ImportError:
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+
+import numpy as np
 
 from pony.orm import *
 
@@ -449,6 +453,12 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
     system = System.get_current_system() if system_name is None else System.get(name=system_name)
     compiler = select(c for c in Compiler if c.name == compiler_name).order_by(desc(Compiler.commit_timestamp)).first()
 
+    if not system:
+        raise ValueError(f"could not find system {repr(system_name) or ''}")
+
+    if not compiler:
+        raise ValueError(f"could not find compiler {repr(compiler_name)}")
+
     # Select only the latest runs for a given version limit and merge strategy
     runs = select(
         r for r in Run
@@ -480,21 +490,21 @@ def extract_data_from_runs(runs, perf_event_names, primitive_names):
     data = []
 
     for run in runs:
-        perf_events = []
+        perf_events = {}
 
         for name in perf_event_names:
             if not (event := PerfEvent.get(run=run, event=name)):
                 raise ValueError(f'Cannot find {repr(name)}')
-            perf_events.append((name, event.value))
+            perf_events[name] = event.value
 
-        primitive_counts = []
+        primitive_counts = {}
 
         for name in primitive_names:
             if prim := PrimitiveCount.get(run=run, name=name):
-                primitive_counts.append((name, prim.count))
+                primitive_counts[name] = prim.count
             else:
                 logger.debug(f"{name} primitive not found, defaulting to 0")
-                primitive_counts.append((name, 0))
+                primitive_counts[name] = 0
 
         data.append((run, perf_events, primitive_counts))
 
@@ -502,75 +512,56 @@ def extract_data_from_runs(runs, perf_event_names, primitive_names):
 
 
 def plot_data(data, output_path):
-    print(f"will plot to {output_path}")
+    def run_label(run):
+        return f"{run.merge_strategy} {run.version_limit}"
 
-    for datum in data:
-        run, *metrics = datum
-        print(run.version_limit, run.merge_strategy, *metrics)
+    # Compute colors
+    n_perf_stats = max(len(p) for _, p, _ in data)
+    n_primitive_stats = max(len(p) for _, _, p in data)
+    n_measurments = n_perf_stats + n_primitive_stats
 
+    perf_colors = mpl.colormaps.get_cmap('viridis')(np.linspace(0.3, 0.8, n_perf_stats))
+    primitive_colors = mpl.colormaps.get_cmap('inferno')(np.linspace(0.3, 0.8, n_primitive_stats))
 
-def write_chart_file(chartfile, results, params):
-    selector, yname, group_namer, grouper, *_ = chart_modes[params['chart_mode']]
+    # Format data for matplotlib
+    data = sorted(data, key=lambda d: (d[0].version_limit, d[0].merge_strategy))
 
-    # Group results by merge strategy
-    bench_groups = grouper(results, params)
-    n_groups = len(bench_groups)
+    versions = [run_label(r) for r, *_ in data]
+    measures = collections.defaultdict(list)
 
-    # Generate data for x and y axis
-    versions = [str(v) for v in sorted(set(r.versions for r in results))]
+    first = data[0]
+    first_perf_events = first[1]
+    first_primitive_counts = first[2]
 
-    # Compute some dimension, purely aesthetic
-    x = range(len(versions))
-    bar_width = 0.8 / n_groups
+    for run, perf_events, primitive_counts in data:
+        perf_events = sorted(perf_events.items(), key=lambda p: first_perf_events[p[0]], reverse=True)
+        primitive_counts = sorted(primitive_counts.items(), key=lambda p: first_primitive_counts[p[0]], reverse=True)
+        for name, value in itertools.chain(perf_events, primitive_counts):
+            measures[name].append(value)
 
-    # Initialize the figure
-    fig, axis = plt.subplots()
-    axis.set_ylabel(yname)
+    # Label location and bar width
+    x = np.arange(len(versions))
+    width = 0.15
+    multiplier = 0
 
-    colors = mpl.colormaps['viridis'].resampled(n_groups).colors
+    # Plot
+    fig, ax = plt.subplots(layout='constrained')
 
-    for benchs, offset, color in zip(bench_groups, range(-n_groups // 2 + 1, n_groups // 2 + 2), colors):
-        axis.bar([pos + bar_width * offset for pos in x],
-                 [selector(r) for r in benchs],
-                 bar_width,
-                 color=color,
-                 label=group_namer(benchs))
+    for (attribute, measurement), color in zip(measures.items(), itertools.chain(perf_colors, primitive_colors)):
+        offset = width * multiplier
+        rects = ax.bar(x + offset, measurement, width, label=attribute, color=color)
+        multiplier += 1
 
-    axis.set_xlabel('Number of versions')
-    axis.set_xticks(list(x))
-    axis.set_xticklabels(versions)
-    
-    axis.set_title(results[0].title)
+    ax.set_xticks(x + width * (n_measurments / 2 - 0.5), versions, rotation=45, rotation_mode="anchor", ha='right')
 
-    axis.legend()
+    ax.legend(loc='upper right', ncols=3)
 
-    fig.tight_layout()
-
-    # Get the directory name from the file path
-    directory = os.path.dirname(chartfile)
-
-    # If the directory does not exist, create it
-    if directory and not os.path.exists(directory):
-        os.makedirs(directory)
-
-    plt.savefig(chartfile)
+    plt.savefig(output_path)
 
 
-
-def get_chart_mode(args):
-    mode = args._chart_params[0]
-
-    if mode not in chart_modes:
-        raise ValueError(f"chart-params first argument must be in {', '.join(chart_modes)}")
-
-    return mode
-
-def get_chart_params(args):
-    return args._chart_params[1:]
-
-def get_chart_mode_needs_primitives(args):
-    return chart_modes[get_chart_mode(args)][4]
-
+##############################################################################
+# Command line interface
+##############################################################################
 
 logger = logging.getLogger(__name__)
 
