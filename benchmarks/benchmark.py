@@ -448,8 +448,18 @@ def choose_output_path(output, system_name, compiler_name, benchmark, perf_event
         raise ValueError(f"output must be a folder of .png target, got {output}")
 
 
+def select_primitives_names(runs, primitive_names_or_amount):
+    if isinstance(primitive_names_or_amount, int):
+        # Recover the most common primitives
+        primitives = select(prim for prim in PrimitiveCount if prim.run in runs).order_by(desc(PrimitiveCount.count))
+        return list(select(prim.name for prim in primitives if prim.name !=
+                      "##identity").distinct()[:primitive_names_or_amount])
+    else:
+        return primitive_names_or_amount
+
+
 @db_session
-def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, primitive_names, output):
+def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, primitive_names_or_amount, output):
     system = System.get_current_system() if system_name is None else System.get(name=system_name)
     compiler = select(c for c in Compiler if c.name == compiler_name).order_by(desc(Compiler.commit_timestamp)).first()
 
@@ -472,6 +482,11 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
         .order_by(Run.merge_strategy).order_by(Run.version_limit)
 
     logger.info(f"found {len(runs)} (only latest)")
+
+    primitive_names = select_primitives_names(runs, primitive_names_or_amount)
+
+    if primitive_names:
+        logger.info(f"primitives to plot: {', '.join(primitive_names)}")
 
     data = extract_data_from_runs(runs, perf_event_names, primitive_names)
     output_path = choose_output_path(output=output,
@@ -515,6 +530,43 @@ def plot_data(data, output_path):
     def run_label(run):
         return f"{run.merge_strategy} {run.version_limit}"
 
+    def get_magnitude_shift(number, target_range):
+        if number == 0:
+            return 0
+
+        if target_range[0] <= number <= target_range[1]:
+            return 0
+
+        # Find by how many magnitude (powers of ten) the number is bigger than the target_range
+        low = math.log10(target_range[0] / number)
+        high = math.log10(target_range[1] / number)
+        return -(math.ceil(low) if number < target_range[0] else math.floor(high))
+
+    def add_scaling_to_label(name, magnitude_shifts):
+        shift = magnitude_shifts[name]
+
+        unit = "msec" if name == BenchResultParser.time_event else ""
+
+        if shift == 0:
+            return f"{name} ({unit})" if unit else name
+        else:
+            superscript_translation = str.maketrans(string.digits, '⁰¹²³⁴⁵⁶⁷⁸⁹')
+            unit = f" {unit}" if unit else ""
+            return f"{name} (10{str(shift).translate(superscript_translation)}{unit})"
+
+    def get_magnitude():
+        values = set()
+
+        for _, perf, prim in data:
+            values.update(perf.values())
+            values.update(prim.values())
+
+        smallest = min(v for v in values if v > 0)
+        highest = max(values)
+        base = 10 ** math.floor(math.log10(smallest))
+
+        return base, base * 10
+
     # Compute colors
     n_perf_stats = max(len(p) for _, p, _ in data)
     n_primitive_stats = max(len(p) for _, _, p in data)
@@ -534,27 +586,46 @@ def plot_data(data, output_path):
     first_primitive_counts = first[2]
 
     for run, perf_events, primitive_counts in data:
-        perf_events = sorted(perf_events.items(), key=lambda p: first_perf_events[p[0]], reverse=True)
+        def perf_key(p):
+            name = p[0]
+            if name == BenchResultParser.time_event:
+                return math.inf
+            else:
+                return first_perf_events[name]
+
+        perf_events = sorted(perf_events.items(), key=perf_key, reverse=True)
         primitive_counts = sorted(primitive_counts.items(), key=lambda p: first_primitive_counts[p[0]], reverse=True)
         for name, value in itertools.chain(perf_events, primitive_counts):
             measures[name].append(value)
 
+    # Adjust magnitude of data so they fit in a single graph
+    target_range = get_magnitude()
+    magnitude_shifts = {k: get_magnitude_shift(max(v), target_range) for k, v in measures.items()}
+    scaled_measures = {}
+
+    for name in measures:
+        name_with_scaling = add_scaling_to_label(name, magnitude_shifts)
+        scaled_measures[name_with_scaling] = [v / (10 ** magnitude_shifts[name]) for v in measures[name]]
+
     # Label location and bar width
+    n_versions = len(versions)
     x = np.arange(len(versions))
-    width = 0.15
+    width = 0.8 / (len(first_perf_events) + len(first_primitive_counts))
     multiplier = 0
 
     # Plot
     fig, ax = plt.subplots(layout='constrained')
 
-    for (attribute, measurement), color in zip(measures.items(), itertools.chain(perf_colors, primitive_colors)):
+    for (attribute, measurement), color in zip(scaled_measures.items(),
+                                               itertools.chain(perf_colors, primitive_colors)):
         offset = width * multiplier
         rects = ax.bar(x + offset, measurement, width, label=attribute, color=color)
         multiplier += 1
 
     ax.set_xticks(x + width * (n_measurments / 2 - 0.5), versions, rotation=45, rotation_mode="anchor", ha='right')
 
-    ax.legend(loc='upper right', ncols=3)
+    ax.legend(loc='upper right', ncols=2)
+    plt.title(first[0].benchmark.name.title())
 
     plt.savefig(output_path)
 
@@ -581,18 +652,15 @@ if __name__ == "__main__":
         else:
             raise FileNotFoundError(f"{value} is not a valid file")
 
-    class KeyValueAction(argparse.Action):
+    class PrimitivesInput(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
-            params = {}
-            for item in values:
+            if len(values) == 1:
                 try:
-                    key, value = item.split("=")
-                except ValueError as e:
-                    raise argparse.ArgumentError(self, f"requires format NAME=VALUE, got {repr(item)}")
-
-                params[key] = value.split(',') if ',' in value else value
-
-            setattr(namespace, self.dest, params)
+                    setattr(namespace, self.dest, int(values[0]))
+                    return
+                except ValueError:
+                    pass
+            setattr(namespace, self.dest, values)
 
     # Main parser
     parser = argparse.ArgumentParser(description="Benchmark BBV for Gambit")
@@ -681,7 +749,8 @@ if __name__ == "__main__":
     plot_parser.add_argument('-p', '--primitives',
                              nargs="+",
                              default=(),
-                             dest="primitive_names",
+                             dest="primitive_names_or_amount",
+                             action=PrimitivesInput,
                              help="primitive calls to plot")
 
     plot_parser.add_argument('-o', '--output',
@@ -709,5 +778,5 @@ if __name__ == "__main__":
                         compiler_name=args.compiler_name,
                         system_name=args.system_name,
                         perf_event_names=args.perf_event_names,
-                        primitive_names=args.primitive_names,
+                        primitive_names_or_amount=args.primitive_names_or_amount,
                         output=args.output)
