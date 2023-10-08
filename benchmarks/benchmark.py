@@ -422,6 +422,12 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
 ##############################################################################
 
 
+def ensure_directory_exists(filepath):
+    dir_name = os.path.dirname(filepath)
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+
+
 def choose_output_path(output, system_name, compiler_name, benchmark, perf_event_names, primitive_names,
                        valid_chars="-_.()" + string.ascii_letters + string.digits):
     path = pathlib.Path(output or '.').resolve()
@@ -634,6 +640,7 @@ def plot_data(data, output_path):
     ax.legend(loc='upper right', ncols=2)
     plt.title(first[0].benchmark.name.title())
 
+    ensure_directory_exists(output_path)
     plt.savefig(output_path)
 
 

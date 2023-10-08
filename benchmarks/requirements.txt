@@ -3,3 +3,4 @@ pony
 distro
 psutil
 numpy
+pandas
