@@ -585,14 +585,20 @@ def plot_data(data, output_path):
     first_perf_events = first[1]
     first_primitive_counts = first[2]
 
-    for run, perf_events, primitive_counts in data:
-        def perf_key(p):
-            name = p[0]
-            if name == BenchResultParser.time_event:
-                return math.inf
-            else:
-                return first_perf_events[name]
+    def perf_key(p):
+        name = p[0]
+        if name == BenchResultParser.time_event:
+            return math.inf
+        else:
+            return first_perf_events[name]
 
+    sorted_first_perf_events = sorted(first_perf_events.items(), key=perf_key, reverse=True)
+    if len(first_perf_events) == 0:
+        last_perf_event = None
+    else:
+        last_perf_event = sorted_first_perf_events[-1][0]
+
+    for run, perf_events, primitive_counts in data:
         perf_events = sorted(perf_events.items(), key=perf_key, reverse=True)
         primitive_counts = sorted(primitive_counts.items(), key=lambda p: first_primitive_counts[p[0]], reverse=True)
         for name, value in itertools.chain(perf_events, primitive_counts):
@@ -610,8 +616,9 @@ def plot_data(data, output_path):
     # Label location and bar width
     n_versions = len(versions)
     x = np.arange(len(versions))
-    width = 0.8 / (len(first_perf_events) + len(first_primitive_counts))
+    width = 18 / n_versions * (0.75 / (len(first_perf_events) + len(first_primitive_counts) + 1) ** 0.95) # it just looks good
     multiplier = 0
+    spacing_between_perf_and_primitives = width / 0.5
 
     # Plot
     fig, ax = plt.subplots(layout='constrained')
@@ -620,7 +627,7 @@ def plot_data(data, output_path):
                                                itertools.chain(perf_colors, primitive_colors)):
         offset = width * multiplier
         rects = ax.bar(x + offset, measurement, width, label=attribute, color=color)
-        multiplier += 1
+        multiplier += 1 + (last_perf_event in attribute) * spacing_between_perf_and_primitives
 
     ax.set_xticks(x + width * (n_measurments / 2 - 0.5), versions, rotation=45, rotation_mode="anchor", ha='right')
 
