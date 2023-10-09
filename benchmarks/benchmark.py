@@ -794,7 +794,7 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     vmin = max(np.nanmin(df_ratio.values), 0.5)
     vmax = max(np.nanmax(df_ratio.values), 1.2)
 
-    sns.heatmap(df_ratio, cmap="coolwarm", linewidths=.5, vmin=vmin, vmax=vmax, center=1)
+    sns.heatmap(df_ratio, annot=True, fmt='.2f', cmap="coolwarm", linewidths=.5, vmin=vmin, vmax=vmax, center=1)
 
     plt.title(f"Ratio for {repr(merge_strategy)} strategy", fontsize=16, fontweight='bold')
 
