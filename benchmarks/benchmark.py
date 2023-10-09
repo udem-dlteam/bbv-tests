@@ -137,6 +137,16 @@ class PrimitiveCount(db.Entity):
     count = Required(int, size=64)
     run = Required('Run')
 
+    @property
+    def is_typecheck(self):
+        typechecks = ("##fixnum?", '##flonum?', "##vector?", "##pair?", "##box?", "##procedure?",
+                "##bignum?", "##ratnum?", "##boolean?", "##string?", "##char?",
+                "##bytevector?", "##u8vector?", "##u16vector?", "##u32vector?",
+                "##u64vector?", "##s8vector?", "##s16vector?", "##s32vector?",
+                "##s64vector?", "##f8vector?", "##f16vector?", "##f32vector?",
+                "##f64vector?", "##null?")
+        return self.name in typechecks
+
 class PerfEvent(db.Entity):
     event = Required(str)
     value = Required(int, size=64)
@@ -701,75 +711,99 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
 
     # Select benchmarks for analysis
     if benchmark_names is None:
-        benchmark_names_filter = list(select(b.name for b in Benchmark).distinct())
+        benchmarks_filter = list(select(b.name for b in Benchmark).distinct())
     else:
-        benchmark_names_filter = benchmark_names
+        benchmarks_filter = benchmark_names
 
-    for benchmark_name in benchmark_names_filter[:]:
+    for benchmark_name in benchmarks_filter[:]:
         bench = Benchmark.get(name=benchmark_name)
 
         if not bench:
-            benchmark_names_filter.remove(benchmark_name)
+            benchmarks_filter.remove(benchmark_name)
             logger.warning(f"benchmark does not exist: {repr(benchmark_name)}")
 
         elif not exists(r for r in Run if r.benchmark == bench
                       and r.system == system and r.compiler == compiler
                       and r.merge_strategy == merge_strategy):
-            benchmark_names_filter.remove(benchmark_name)
+            benchmarks_filter.remove(benchmark_name)
             logger.warning(f"benchmark does not exist for the provided settings: {repr(benchmark_name)}")
 
-    logger.debug(f"benchmarks used: {', '.join(benchmark_names_filter)}")
+    logger.debug(f"benchmarks used: {', '.join(benchmarks_filter)}")
 
-    # Select only the latest runs for a given benchmark
+    # Select only the latest runs for a each benchmark
     runs = select(
         r for r in Run
         if r.system == system and r.compiler == compiler and r.merge_strategy == merge_strategy
-        and r.benchmark.name in benchmark_names_filter
+        and r.benchmark.name in benchmarks_filter
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
             if r2.system == system and r2.compiler == compiler
             and r2.merge_strategy == merge_strategy and r2.benchmark == r.benchmark
-            and r2.version_limit == r.version_limit)))[:]
+            and r2.version_limit == r.version_limit))).order_by(Run.version_limit)
 
     logger.info(f"found {len(runs)} (only latest)")
 
+    # group runs by version
+    runs_groups = itertools.groupby(runs, key=lambda r: r.version_limit)
+
     # Format data in a pandas dataframe
     perf_attributes = select(e.event for e in PerfEvent if e.run in runs).distinct()[:]
-    attributes = [ "version_limit"]
 
-    all_attributes = [*attributes, *perf_attributes]
+    all_attributes = [*perf_attributes, 'typechecks']
 
     logger.info(f"attributes in analysis: {', '.join(all_attributes)}")
 
-    data_points = []
+    data_points = {}
 
-    for r in runs:
-        point = []
+    for version_limit, group in runs_groups:
+        data_points[version_limit] = [0] * len(all_attributes)
 
-        for attr in attributes:
-            point.append(getattr(r, attr))
+        group = list(group)
 
-        for perf_attr in perf_attributes:
-            point.append(PerfEvent.get(event=perf_attr, run=r).value)
+        for r in group:
+            for i, perf_attr in enumerate(perf_attributes):
+                data_points[version_limit][i] += PerfEvent.get(event=perf_attr, run=r).value
 
-        data_points.append(point)
+            i = all_attributes.index('typechecks')
 
-    df = pd.DataFrame(data_points, columns=all_attributes)
+            primitive_counts = select(p for p in PrimitiveCount if p.run in group)
 
-    correlation_matrix = df.corr(method='pearson')
+            for prim_count in primitive_counts:
+                if prim_count.is_typecheck:
+                    data_points[version_limit][i] += prim_count.count
+
+
+    df = pd.DataFrame(list(data_points.values()), columns=all_attributes)
+
+    print(df)
+
+    # Compute ratios based on the first non-zero occurence through versions
+    df_ratio = df.copy()
+    for col in df.columns:
+        for i, val in enumerate(df[col]):
+            if val != 0:
+                df_ratio[col] = df[col] / val
+                df_ratio.loc[:i-1, col] = np.nan
+                break
+            else:
+                df_ratio.loc[:, col] = np.nan
 
     # Plot
-    fig, ax = plt.subplots(figsize=(20, 15))
+    fig, ax = plt.subplots(figsize=(15, 5))
 
-    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap="coolwarm", linewidths=.5, vmin=-1, vmax=1, center=0)
+    vmin = max(np.nanmin(df_ratio.values), 0.5)
+    vmax = max(np.nanmax(df_ratio.values), 1.2)
 
-    plt.title(f"Correlation Matrix for {repr(merge_strategy)} strategy", fontsize=16, fontweight='bold')
+    sns.heatmap(df_ratio, cmap="coolwarm", linewidths=.5, vmin=vmin, vmax=vmax, center=1)
+
+    plt.title(f"Ratio for {repr(merge_strategy)} strategy", fontsize=16, fontweight='bold')
 
     ax.xaxis.tick_top()
     plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
     
-    ax.text(0.5, -0.03, f"benchmarks: {', '.join(benchmark_names_filter)}",
-            size=12, ha="center", transform=ax.transAxes)
+    text_size = 12 if len(benchmarks_filter) < 5 else 12 / (len(benchmarks_filter) / 15)
+    ax.text(0.5, -0.1, f"benchmarks: {', '.join(benchmarks_filter)}",
+            size=text_size, ha="center", transform=ax.transAxes)
 
     plt.tight_layout()
 
