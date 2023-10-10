@@ -601,8 +601,8 @@ def plot_data(data, output_path):
         return base, base * 10
 
     # Compute colors
-    n_perf_stats = max(len(p) for _, p, _ in data)
-    n_primitive_stats = max(len(p) for _, _, p in data)
+    n_perf_stats = max((len(p) for _, p, _ in data), default=0)
+    n_primitive_stats = max((len(p) for _, _, p in data), default=0)
     n_measurments = n_perf_stats + n_primitive_stats
 
     perf_colors = mpl.colormaps.get_cmap('viridis')(np.linspace(0.3, 0.8, n_perf_stats))
@@ -651,7 +651,7 @@ def plot_data(data, output_path):
     x = np.arange(len(versions))
     width = 18 / n_versions * (0.75 / (len(first_perf_events) + len(first_primitive_counts) + 1) ** 0.95) # it just looks good
     multiplier = 0
-    spacing_between_perf_and_primitives = width / 0.5
+    spacing_between_perf_and_primitives = width / 0.5 + 0.5
 
     # Plot
     fig, ax = plt.subplots(layout='constrained')
@@ -660,7 +660,7 @@ def plot_data(data, output_path):
                                                itertools.chain(perf_colors, primitive_colors)):
         offset = width * multiplier
         rects = ax.bar(x + offset, measurement, width, label=attribute, color=color)
-        multiplier += 1 + (last_perf_event in attribute) * spacing_between_perf_and_primitives
+        multiplier += 1 + (bool(last_perf_event) and last_perf_event in attribute) * spacing_between_perf_and_primitives
 
     ax.set_xticks(x + width * (n_measurments / 2 - 0.5), versions, rotation=45, rotation_mode="anchor", ha='right')
 
@@ -699,6 +699,32 @@ def choose_analysis_output_path(output, merge_strategy, system_name, compiler_na
     else:
         raise ValueError(f"output must be a folder of .png target, got {output}")
 
+
+def compute_ratio_dataframe(benchmark_runs, perf_attributes, replace_inf_by=5):
+    benchmark_runs = list(benchmark_runs)
+    rows = {}
+
+    all_attributes = perf_attributes + ['typechecks']
+
+    for run in benchmark_runs:
+        row = [np.nan] * len(all_attributes)
+        rows[run.version_limit] = row
+
+        for i, perf_attr in enumerate(perf_attributes):
+            row[i] = PerfEvent.get(event=perf_attr, run=run).value
+
+        primitive_counts = list(select(p for p in PrimitiveCount if p.run == run))
+
+        row[all_attributes.index('typechecks')] = sum(p.count for p in primitive_counts if p.is_typecheck)
+
+    df = pd.DataFrame(np.nan, index=range(max(rows) + 1), columns=all_attributes)
+
+    for i, row_data in rows.items():
+        df.loc[i] = row_data
+
+    # Compute ratios based on the first column
+    return df.div(df.iloc[0]).replace(np.inf, replace_inf_by).replace(-np.inf, -replace_inf_by)
+
 @db_session
 def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compiler_name, output):
     system = get_system_from_name_or_default(system_name)
@@ -731,7 +757,7 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     logger.debug(f"benchmarks used: {', '.join(benchmarks_filter)}")
 
     # Select only the latest runs for a each benchmark
-    runs = select(
+    runs = list(select(
         r for r in Run
         if r.system == system and r.compiler == compiler and r.merge_strategy == merge_strategy
         and r.benchmark.name in benchmarks_filter
@@ -739,64 +765,41 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
             r2.timestamp for r2 in Run
             if r2.system == system and r2.compiler == compiler
             and r2.merge_strategy == merge_strategy and r2.benchmark == r.benchmark
-            and r2.version_limit == r.version_limit))).order_by(Run.version_limit)
+            and r2.version_limit == r.version_limit))).order_by(Run.benchmark))
 
     logger.info(f"found {len(runs)} (only latest)")
 
-    # group runs by version
-    runs_groups = itertools.groupby(runs, key=lambda r: r.version_limit)
-
     # Format data in a pandas dataframe
-    perf_attributes = select(e.event for e in PerfEvent if e.run in runs).distinct()[:]
-
-    all_attributes = [*perf_attributes, 'typechecks']
-
-    logger.info(f"attributes in analysis: {', '.join(all_attributes)}")
+    perf_attributes = list(select(e.event for e in PerfEvent if e.run in runs).distinct())
+    logger.info(f"perf attributes in analysis: {', '.join(perf_attributes)}")
 
     data_points = {}
 
-    for version_limit, group in runs_groups:
-        data_points[version_limit] = [0] * len(all_attributes)
+    benchmarks_groups = itertools.groupby(runs, key=lambda r: r.benchmark.id)  # group runs by version
 
-        group = list(group)
+    ratio_dataframes = [compute_ratio_dataframe(group, perf_attributes) for _, group in benchmarks_groups]
 
-        for r in group:
-            for i, perf_attr in enumerate(perf_attributes):
-                data_points[version_limit][i] += PerfEvent.get(event=perf_attr, run=r).value
+    #arrays = np.stack([df.to_numpy() for df in ratio_dataframes], axis=2)
 
-            i = all_attributes.index('typechecks')
-
-            primitive_counts = select(p for p in PrimitiveCount if p.run in group)
-
-            for prim_count in primitive_counts:
-                if prim_count.is_typecheck:
-                    data_points[version_limit][i] += prim_count.count
-
-
-    df = pd.DataFrame(list(data_points.values()), columns=all_attributes)
-
-    print(df)
-
-    # Compute ratios based on the first non-zero occurence through versions
-    df_ratio = df.copy()
-    for col in df.columns:
-        for i, val in enumerate(df[col]):
-            if val != 0:
-                df_ratio[col] = df[col] / val
-                df_ratio.loc[:i-1, col] = np.nan
-                break
-            else:
-                df_ratio.loc[:, col] = np.nan
+    # Compute the mean along the third axis, ignoring NaN values
+    df_average_ratio = pd.DataFrame(np.nanmean([df.values for df in ratio_dataframes], axis=0),
+                                    columns=ratio_dataframes[0].columns)
 
     # Plot
     fig, ax = plt.subplots(figsize=(15, 5))
 
-    vmin = max(np.nanmin(df_ratio.values), 0.5)
-    vmax = max(np.nanmax(df_ratio.values), 1.2)
+    def clamp(x):
+        return min(2, max(0, x))
 
-    sns.heatmap(df_ratio, annot=True, fmt='.2f', cmap="coolwarm", linewidths=.5, vmin=vmin, vmax=vmax, center=1)
+    vmin = clamp(np.nanmin(df_average_ratio.values))
+    vmax = clamp(np.nanmax(df_average_ratio.values))
 
-    plt.title(f"Ratio for {repr(merge_strategy)} strategy", fontsize=16, fontweight='bold')
+    heatmap_ax = sns.heatmap(df_average_ratio, annot=True, fmt='.2g', cmap="coolwarm", linewidths=.5, vmin=vmin, vmax=vmax, center=1)
+
+    for text in heatmap_ax.texts:
+        text.set_size(7)
+
+    plt.title(f"Mean ratio for {repr(merge_strategy)} strategy", fontsize=16, fontweight='bold')
 
     ax.xaxis.tick_top()
     plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
