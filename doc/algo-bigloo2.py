@@ -31,7 +31,7 @@ def BBV(source, ctx0, VERSION_LIMIT):
         bv = bs.orig
 
         if need_merge(bv, VERSION_LIMIT):
-            block_merge(bv, wq)
+            block_merge_some(bv, wq)
 
         if not block_merged(bs):
             block_specialize(bs, wq)
@@ -40,7 +40,7 @@ def BBV(source, ctx0, VERSION_LIMIT):
 
 def new_version(bv, ctx, wq):
     if ctx in bv.versions:
-        return bv.versions[ctx]
+        return live_version(bv.versions[ctx])
     else:
         bs = new_BS()
     
@@ -50,29 +50,37 @@ def new_version(bv, ctx, wq):
         wq.push(bs)
 
         return bs
+
+def live_version(bv):
+    if (bv.merge):
+        return live_version(bv.merge)
+    else:
+        return bv
     
 def need_merge(bv, limit):
-    return bv.versions >= limit
+    return bbv_live_versions(bv) >= limit
 
+def bbv_live_versions(bv):
+    return bv.versions.filter(b => !b.merge)
+    
 def block_merged(bs):
     return bs.merge = null
 
-def block_merge(bv, wq):
-    bs1, bs2 = pick 2 BBs from bv.versions
+def block_merge_some(bv, wq):
+    bs1, bs2 = pick 2 BBs from bbv_live_versions(bv)
     ctx = union_with_widening(bs1.ctx, bs2.ctx)
 
     mbs = new_version(bv, ctx)
 
     if bs1 is mbs:
-        mark_merged(bs2)
+        block_merge(bs2)
     else if bs2 is mbs:
-        mark_merged(bs1)
+        block_merge(bs1)
     else:
-        mark_merged(bs1, mbs)
-        mark_merged(bs2, mbs)
-        wq.push(mbs)
+        block_merge(bs1, mbs)
+        block_merge(bs2, mbs)
 
-def mark_merged(obs, nbs):
+def block_merge(obs, nbs):
     obs.merge = nbs;
     # modify the preds and succs so that everyone points to mbs 
     replace_block(obs, mbs)
