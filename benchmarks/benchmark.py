@@ -8,6 +8,7 @@ import itertools
 import locale
 import logging
 import math
+import operator
 import os
 import pathlib
 import platform
@@ -152,6 +153,11 @@ class PerfEvent(db.Entity):
     value = Required(int, size=64)
     run = Required('Run')
 
+class OtherMeasure(db.Entity):
+    name = Required(str)
+    value = Required(int, size=64)
+    run = Required('Run')
+
 class Run(db.Entity):
     benchmark = Required('Benchmark', reverse='runs')
     system = Required('System', reverse='runs')
@@ -161,6 +167,7 @@ class Run(db.Entity):
     merge_strategy = Required(str)
     primitives = Set('PrimitiveCount', reverse='run')
     perf_events = Set('PerfEvent', reverse='run')
+    other_measures = Set('OtherMeasure', reverse='run')
     timestamp = Required(int, default=lambda: int(time.time()))
 
 
@@ -198,6 +205,7 @@ locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 class PrimitivesCountParser:
     DEFAULT_PRIMITIVE_COUNTER_MARKER = '***primitive-call-counter'
+    SIZE_IN_GVM_INSTRUCTIONS = "total-gvm-instructions"
     SIMILAR_PRIMITIVES = [['##fx+', '##fx+?'],
                           ['##fx-', '##fx-?'],
                           ['##fx*', '##fx*?']]
@@ -220,6 +228,9 @@ class PrimitivesCountParser:
         counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
         counts = re.findall("\(([^ ]+) (\d+)\)", counter_section)
         self.primitives = {k: int(v) for k, v in counts}
+
+        self.size_in_gvm_instructions = self.primitives.pop(self.SIZE_IN_GVM_INSTRUCTIONS)
+
         return self
 
     def __getitem__(self, name):
@@ -236,10 +247,6 @@ class PrimitivesCountParser:
 
     def __iter__(self):
         yield from self.primitives.keys()
-
-    @classmethod
-    def is_typecheck(cls, primitive):
-        return primitive in cls.typechecks
 
 
 class BenchResultParser:
@@ -426,8 +433,25 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
         for event, value in result.items():
             PerfEvent(event=event, value=int(value), run=run)
 
+        typechecks = 0
+
         for prim, count in primitive_count.items():
-            PrimitiveCount(name=prim, count=count, run=run)
+            p = PrimitiveCount(name=prim, count=count, run=run)
+            typechecks += p.is_typecheck * count
+
+        logger.debug(f"number of typechecks: {typechecks}")
+        OtherMeasure(name="typechecks", value=typechecks, run=run)
+
+        total_primitives = sum(primitive_count.values())
+        logger.debug(f"executed primitives: {total_primitives}")
+        OtherMeasure(name='primitives', value=total_primitives, run=run)
+
+        logger.debug(f"gvm instruction size: {primitive_count.size_in_gvm_instructions}")
+        OtherMeasure(name='gvm-size', value=primitive_count.size_in_gvm_instructions, run=run)
+
+        executable_size = os.path.getsize(executable)
+        logger.debug(f"executable size: {executable_size}")
+        OtherMeasure(name='executable-size', value=executable_size, run=run)
 
 ##############################################################################
 # Chart generation
@@ -498,7 +522,7 @@ def get_compiler_from_name(compiler_name):
 
 
 @db_session
-def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, primitive_names_or_amount, output):
+def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, primitive_names_or_amount, other_measure_names, output):
     system = get_system_from_name_or_default(system_name)
     compiler = get_compiler_from_name(compiler_name)
 
@@ -521,7 +545,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
     if primitive_names:
         logger.info(f"primitives to plot: {', '.join(primitive_names)}")
 
-    data = extract_data_from_runs(runs, perf_event_names, primitive_names)
+    data = extract_data_from_runs(runs, perf_event_names, primitive_names, other_measure_names)
     output_path = choose_barchart_output_path(output=output,
                                      system_name=system.name,
                                      compiler_name=compiler.name,
@@ -534,7 +558,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
     plot_data(data, output_path)
 
 
-def extract_data_from_runs(runs, perf_event_names, primitive_names):
+def extract_data_from_runs(runs, perf_event_names, primitive_names, other_measure_names):
     data = []
 
     for run in runs:
@@ -554,7 +578,14 @@ def extract_data_from_runs(runs, perf_event_names, primitive_names):
                 logger.debug(f"{name} primitive not found, defaulting to 0")
                 primitive_counts[name] = 0
 
-        data.append((run, perf_events, primitive_counts))
+        other_measures = {}
+
+        for name in other_measure_names:
+            if not (measure := OtherMeasure.get(run=run, name=name)):
+                raise ValueError(f'Cannot find {repr(name)}')
+            other_measures[name] = measure.value
+
+        data.append((run, perf_events, primitive_counts, other_measures))
 
     return data
 
@@ -590,9 +621,10 @@ def plot_data(data, output_path):
     def get_magnitude():
         values = set()
 
-        for _, perf, prim in data:
+        for _, perf, prim, other in data:
             values.update(perf.values())
             values.update(prim.values())
+            values.update(other.values())
 
         smallest = min(v for v in values if v > 0)
         highest = max(values)
@@ -601,12 +633,16 @@ def plot_data(data, output_path):
         return base, base * 10
 
     # Compute colors
-    n_perf_stats = max((len(p) for _, p, _ in data), default=0)
-    n_primitive_stats = max((len(p) for _, _, p in data), default=0)
-    n_measurments = n_perf_stats + n_primitive_stats
+    n_perf_stats = max((len(p) for _, p, _, _ in data), default=0)
+    n_primitive_stats = max((len(p) for _, _, p, _ in data), default=0)
+    n_other_measures = max((len(m) for _, _, _, m in data), default=0)
+    n_measurments = n_perf_stats + n_primitive_stats + n_other_measures
 
-    perf_colors = mpl.colormaps.get_cmap('viridis')(np.linspace(0.3, 0.8, n_perf_stats))
-    primitive_colors = mpl.colormaps.get_cmap('inferno')(np.linspace(0.3, 0.8, n_primitive_stats))
+    first = data[0]
+
+    perf_colors = mpl.colormaps.get_cmap('winter')(np.linspace(0.3, 0.8, n_perf_stats))
+    primitive_colors = mpl.colormaps.get_cmap('autumn')(np.linspace(0.3, 0.8, n_primitive_stats))
+    other_measure_colors = mpl.colormaps.get_cmap('summer')(np.linspace(0.3, 0.8, n_other_measures))
 
     # Format data for matplotlib
     data = sorted(data, key=lambda d: (d[0].version_limit, d[0].merge_strategy))
@@ -614,58 +650,53 @@ def plot_data(data, output_path):
     versions = [run_label(r) for r, *_ in data]
     measures = collections.defaultdict(list)
 
-    first = data[0]
-    first_perf_events = first[1]
-    first_primitive_counts = first[2]
-
-    def perf_key(p):
-        name = p[0]
-        if name == BenchResultParser.time_event:
-            return math.inf
-        else:
-            return first_perf_events[name]
-
-    sorted_first_perf_events = sorted(first_perf_events.items(), key=perf_key, reverse=True)
-    if len(first_perf_events) == 0:
-        last_perf_event = None
-    else:
-        last_perf_event = sorted_first_perf_events[-1][0]
-
-    for run, perf_events, primitive_counts in data:
-        perf_events = sorted(perf_events.items(), key=perf_key, reverse=True)
-        primitive_counts = sorted(primitive_counts.items(), key=lambda p: first_primitive_counts[p[0]], reverse=True)
-        for name, value in itertools.chain(perf_events, primitive_counts):
-            measures[name].append(value)
+    for run, *measure_sets in data:
+        for m in measure_sets:
+            for name, value in sorted(m.items(), key=operator.itemgetter(0)):
+                measures[name].append(value)
 
     # Adjust magnitude of data so they fit in a single graph
     target_range = get_magnitude()
     magnitude_shifts = {k: get_magnitude_shift(max(v), target_range) for k, v in measures.items()}
-    scaled_measures = {}
+    scaled_measures = [(add_scaling_to_label(name, magnitude_shifts),
+                       [v / (10 ** magnitude_shifts[name]) for v in measures[name]])
+                       for name in measures]
 
-    for name in measures:
-        name_with_scaling = add_scaling_to_label(name, magnitude_shifts)
-        scaled_measures[name_with_scaling] = [v / (10 ** magnitude_shifts[name]) for v in measures[name]]
+    def category_order(name):
+        for i, group in enumerate(first[1:]):
+            for datum_name in group.keys():
+                if name.startswith(datum_name):
+                    logger.debug(f"{name} goes into bar group {i}")
+                    return i
+        raise ValueError(f"could not order {name}")
+
+    scaled_measures.sort(key=lambda p: (-category_order(p[0]), p[1]), reverse=True)
 
     # Label location and bar width
     n_versions = len(versions)
     x = np.arange(len(versions))
-    width = 18 / n_versions * (0.75 / (len(first_perf_events) + len(first_primitive_counts) + 1) ** 0.95) # it just looks good
+    num_bars = n_versions * len(scaled_measures)
+
+    width = 0.3 / np.log(num_bars + 0.5 * n_versions)
+ 
     multiplier = 0
-    spacing_between_perf_and_primitives = width / 0.5 + 0.5
 
     # Plot
     fig, ax = plt.subplots(layout='constrained')
 
-    for (attribute, measurement), color in zip(scaled_measures.items(),
-                                               itertools.chain(perf_colors, primitive_colors)):
+    for (attribute, measurement), color in zip(scaled_measures,
+                                               itertools.chain(perf_colors, primitive_colors, other_measure_colors)):
         offset = width * multiplier
-        rects = ax.bar(x + offset, measurement, width, label=attribute, color=color)
-        multiplier += 1 + (bool(last_perf_event) and last_perf_event in attribute) * spacing_between_perf_and_primitives
+        rects = ax.bar(x + offset, measurement, width=width, label=attribute, color=color)
+        multiplier += 1
 
     ax.set_xticks(x + width * (n_measurments / 2 - 0.5), versions, rotation=45, rotation_mode="anchor", ha='right')
 
-    ax.legend(loc='upper right', ncols=2)
+    plt.legend(loc='lower center', bbox_to_anchor=(0.5, 1.1), ncol=3)
+
     plt.title(first[0].benchmark.name.title())
+
+    plt.tight_layout()
 
     ensure_directory_exists(output_path)
     plt.savefig(output_path)
@@ -700,24 +731,21 @@ def choose_analysis_output_path(output, merge_strategy, system_name, compiler_na
         raise ValueError(f"output must be a folder of .png target, got {output}")
 
 
-def compute_ratio_dataframe(benchmark_runs, perf_attributes, replace_inf_by=5):
+def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, replace_inf_by=5):
     benchmark_runs = list(benchmark_runs)
     rows = {}
 
-    all_attributes = perf_attributes + ['typechecks']
-
     for run in benchmark_runs:
-        row = [np.nan] * len(all_attributes)
+        row = []
         rows[run.version_limit] = row
 
-        for i, perf_attr in enumerate(perf_attributes):
-            row[i] = PerfEvent.get(event=perf_attr, run=run).value
+        for perf_attr in perf_attributes:
+            row.append(PerfEvent.get(event=perf_attr, run=run).value)
 
-        primitive_counts = list(select(p for p in PrimitiveCount if p.run == run))
+        for other_attr in other_attributes:
+            row.append(OtherMeasure.get(name=other_attr, run=run).value)
 
-        row[all_attributes.index('typechecks')] = sum(p.count for p in primitive_counts if p.is_typecheck)
-
-    df = pd.DataFrame(np.nan, index=range(max(rows) + 1), columns=all_attributes)
+    df = pd.DataFrame(np.nan, index=range(max(rows) + 1), columns=perf_attributes + other_attributes)
 
     for i, row_data in rows.items():
         df.loc[i] = row_data
@@ -773,11 +801,15 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     perf_attributes = list(select(e.event for e in PerfEvent if e.run in runs).distinct())
     logger.info(f"perf attributes in analysis: {', '.join(perf_attributes)}")
 
+    other_attributes = list(select(m.name for m in OtherMeasure if m.run in runs).distinct())
+    logger.info(f"other measures in analysis: {', '.join(perf_attributes)}")
+
     data_points = {}
 
     benchmarks_groups = itertools.groupby(runs, key=lambda r: r.benchmark.id)  # group runs by version
 
-    ratio_dataframes = [compute_ratio_dataframe(group, perf_attributes) for _, group in benchmarks_groups]
+    ratio_dataframes = [compute_ratio_dataframe(group, perf_attributes, other_attributes)
+                        for _, group in benchmarks_groups]
 
     #arrays = np.stack([df.to_numpy() for df in ratio_dataframes], axis=2)
 
@@ -930,6 +962,12 @@ if __name__ == "__main__":
                              dest="perf_event_names",
                              help="perf stat events to plot")
 
+    plot_parser.add_argument('-m', '--other-measures',
+                             nargs="+",
+                             default=(),
+                             dest="other_measure_names",
+                             help="other measures to plot")
+
     plot_parser.add_argument('-p', '--primitives',
                              nargs="+",
                              default=(),
@@ -990,6 +1028,7 @@ if __name__ == "__main__":
                         system_name=args.system_name,
                         perf_event_names=args.perf_event_names,
                         primitive_names_or_amount=args.primitive_names_or_amount,
+                        other_measure_names=args.other_measure_names,
                         output=args.output)
     elif args.command == 'analysis':
         analyze_merge_strategy(
