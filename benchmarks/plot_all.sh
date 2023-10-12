@@ -35,10 +35,10 @@ strategies=("linear"
 system=arctic
 
 for strat in ${strategies[@]}; do
-  python ./benchmark.py -d analysis -s ${system} -m ${strat} -o results/overall
+  python ./benchmark.py analysis -s ${system} -m ${strat} -o results/overall
   for file in ${files[@]}; do
-    python ./benchmark.py -d plot -b ${file} -s ${system} -p 8 -e task-clock -o results/individual
-    python ./benchmark.py -d plot -b ${file} -s ${system} -e task-clock instructions -o results/individual
+    python ./benchmark.py plot -b ${file} -s ${system} -p 8 -e task-clock -o results/individual
+    python ./benchmark.py plot -b ${file} -s ${system} -e task-clock instructions -o results/individual
   done
 done
 
