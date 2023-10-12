@@ -92,8 +92,12 @@ class System(db.Entity):
     runs = Set('Run')
 
     @staticmethod
-    def get_system_data():
-        name = platform.node()
+    def get_current_system_name():
+        return platform.node()
+
+    @classmethod
+    def get_system_data(cls):
+        name = cls.get_current_system_name()
         os_name = platform.system()
 
         if os_name != "Linux":
@@ -507,7 +511,7 @@ def get_system_from_name_or_default(system_name=None):
     system = System.get_current_system() if system_name is None else System.get(name=system_name)
 
     if not system:
-        raise ValueError(f"could not find system {repr(system_name) or ''}")
+        raise ValueError(f"could not find system {repr(system_name or System.get_current_system_name())}")
 
     return system
 
@@ -731,9 +735,11 @@ def choose_analysis_output_path(output, merge_strategy, system_name, compiler_na
         raise ValueError(f"output must be a folder of .png target, got {output}")
 
 
-def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, replace_inf_by=5):
+def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, pseudo_ratio_offset=1):
     benchmark_runs = list(benchmark_runs)
     rows = {}
+
+    logger.info(f"Computing ratios for {benchmark_runs[0].benchmark.name}")
 
     for run in benchmark_runs:
         row = []
@@ -750,8 +756,18 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, r
     for i, row_data in rows.items():
         df.loc[i] = row_data
 
+    if df.isna().any().any():
+        logger.warning(f"NaN found in dataframe, there seems to be missing data")
+
+    # Use pseudo ratio (d[i] + pseudo_ratio_offset) / (d[0] + pseudo_ratio_offset)
+    # for columns which contain a zero
+    cols_with_zero = df.columns[(df == 0).any()]
+    df[cols_with_zero] = df[cols_with_zero] + pseudo_ratio_offset
+
+    logger.info(f"Zero values found, using pseudo-ratio for the following columns: {', '.join(cols_with_zero)}")
+
     # Compute ratios based on the first column
-    return df.div(df.iloc[0]).replace(np.inf, replace_inf_by).replace(-np.inf, -replace_inf_by)
+    return df.div(df.iloc[0])
 
 @db_session
 def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compiler_name, output):
@@ -811,11 +827,9 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     ratio_dataframes = [compute_ratio_dataframe(group, perf_attributes, other_attributes)
                         for _, group in benchmarks_groups]
 
-    #arrays = np.stack([df.to_numpy() for df in ratio_dataframes], axis=2)
-
     # Compute the mean along the third axis, ignoring NaN values
-    df_average_ratio = pd.DataFrame(np.nanmean([df.values for df in ratio_dataframes], axis=0),
-                                    columns=ratio_dataframes[0].columns)
+    df_average_ratio = pd.DataFrame(np.prod([df.values for df in ratio_dataframes], axis=0),
+                                    columns=ratio_dataframes[0].columns) ** (1 / len(ratio_dataframes))
 
     # Plot
     fig, ax = plt.subplots(figsize=(15, 5))
