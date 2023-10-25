@@ -73,9 +73,9 @@ def block_merge_some(bv, wq):
     mbs = new_version(bv, ctx, wq)
 
     if bs1 is mbs:
-        block_merge(bs2)
+        block_merge(bs2, mbs)
     else if bs2 is mbs:
-        block_merge(bs1)
+        block_merge(bs1, mbs)
     else:
         block_merge(bs1, mbs)
         block_merge(bs2, mbs)
