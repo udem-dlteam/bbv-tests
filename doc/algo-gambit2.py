@@ -33,8 +33,8 @@ def BBV(source : CFG,
     root_version = reach(source.entry, initial_context, work_queue, VERSION_LIMIT, MERGE_HEURISTIC)
 
     while len(work_queue) > 0:
-        task = work_queue.pop()
-        task()
+        version = work_queue.pop()
+        walk(version, work_queue, VERSION_LIMIT, MERGE_HEURISTIC)
 
         if is_scheduled_GC():
             GC()
@@ -65,7 +65,7 @@ def reach(block: BasicBlock,
         return merge(block, work_queue, VERSION_LIMIT, MERGE_HEURISTIC)
     else:
         # Schedule traversal of the new found version
-        work_queue.add(lambda: walk(block, version, work_queue))
+        work_queue.add(version)
         return version
 
 
@@ -96,7 +96,7 @@ def merge(block: BasicBlock,
 
     if version not in versions_to_merge:  # TODO: I think Gambit does not do that check
         # Schedule the newly created version for traversal
-        work_queue.add(lambda: walk(version, work_queue, VERSION_LIMIT, MERGE_HEURISTIC))
+        work_queue.add(version)
 
     # Recompute reachability, some versions may have become unreachable after the merge
     schedule_GC()
