@@ -22,10 +22,6 @@ BBV is a function from a CFG to a CFG:
 BBV(source:CFG, ctx, VERSION_LIMIT:int) => CFG
 """
 
-# Things which are optimizations and should be removed from the core algo:
-# 1) all_versions
-# 2) GC scheduling
-
 # Things to improve: merge as late as possible, more information is better
 
 
@@ -154,7 +150,6 @@ def live_version(version: Version):
 
 # GC function
 def GC():
-    unschedule_GC()
     mark_all_versions_as_unreachable()
     traverse_versions_from_the_root_and_mark_them_as_reachable()
     remove_tasks_on_unreachable_versions_from_the_queue()
