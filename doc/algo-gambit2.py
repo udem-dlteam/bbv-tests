@@ -87,7 +87,7 @@ def merge(block: BasicBlock,
 
     version = new_version(block, new_context)
 
-    # Mark versions as previously merge, for aliasing
+    # Mark versions as previously merged, for aliasing
     for v in versions_to_merge:
         v.merge = version
 
