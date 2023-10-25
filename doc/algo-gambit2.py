@@ -26,7 +26,7 @@ BBV(source:CFG, ctx, VERSION_LIMIT:int) => CFG
 def BBV(source : CFG,
         initial_context: Context,
         VERSION_LIMIT: int,
-        MERGE_HEURISTIC: Callable[List[Version], List[Version]]):
+        MERGE_HEURISTIC: Function[List[Version], List[Version]]):
 
     work_queue = []
 
@@ -45,7 +45,7 @@ def reach(block: BasicBlock,
           ctx: Context,
           work_queue: Queue,
           VERSION_LIMIT: int,
-          MERGE_HEURISTIC: Callable[List[Version], List[Version]]) -> Version:
+          MERGE_HEURISTIC: Function[List[Version], List[Version]]) -> Version:
 
     if ctx in block.all_versions:
         # The version already exists
@@ -72,7 +72,7 @@ def reach(block: BasicBlock,
 def merge(block: BasicBlock,
           work_queue: Queue,
           VERSION_LIMIT: int,
-          MERGE_HEURISTIC: Callable[List[Version], List[Version]]):
+          MERGE_HEURISTIC: Function[List[Version], List[Version]]):
 
     # Too many version, identify versions to merge together
     versions_to_merge = MERGE_HEURISTIC(block.live_versions)
@@ -87,7 +87,7 @@ def merge(block: BasicBlock,
 
     version = new_version(block, new_context)
 
-    # Mark versions as previously merge, for aliasing
+    # Mark versions as previously merged, for aliasing
     for v in versions_to_merge:
         v.merge = version
 
@@ -107,7 +107,7 @@ def merge(block: BasicBlock,
 def walk(version: Version,
          work_queue: Queue,
          VERSION_LIMIT: int,
-         MERGE_HEURISTIC: Callable[List[Version], List[Version]]):
+         MERGE_HEURISTIC: Function[List[Version], List[Version]]):
 
     block = version.block
     context_before = version.context_before
