@@ -23,7 +23,7 @@ BBV(source:CFG, ctx, VERSION_LIMIT:int) => CFG
 """
 
 # Things to improve: merge as late as possible, more information is better
-
+# Do not be so specific about the fact that branch are last instr
 
 def BBV(source : CFG,
         initial_context: Context,
