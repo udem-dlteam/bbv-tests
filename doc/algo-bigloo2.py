@@ -80,8 +80,8 @@ def block_merge_some(bv, wq):
         block_merge(bs1, mbs)
         block_merge(bs2, mbs)
 
-def block_merge(obs, nbs):
-    obs.merge = nbs;
+def block_merge(obs, mbs):
+    obs.merge = mbs;
     # modify the preds and succs so that everyone points to mbs 
     replace_block(obs, mbs)
     
@@ -89,16 +89,15 @@ def block_specialize(bs, wq):
     bv = bs.orig
     ctx = bs.ctx
 
-    bs.instr = bv.instr.map(i => ins_specialize(i, ctx))
+    bs.instr = bv.instr.map(i => ins_specialize(i, ctx, wq))
 
-
-def ins_specialize(ins, ctx):
+def ins_specialize(ins, ctx, wq):
     if ins is ins_goto:
-        return ins_specialize_goto(ins, ctx)
+        return ins_specialize_goto(ins, ctx, wq)
     else:
         ...
 
-def ins_specialize_goto(ins, ctx):
+def ins_specialize_goto(ins, ctx, wq):
     nins = ins.dup();
-    nins.target = new_version(ins.target, ctx)
+    nins.target = new_version(ins.target, ctx, wq)
     return nins
