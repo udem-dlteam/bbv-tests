@@ -26,6 +26,8 @@ BBV(source:CFG, ctx, VERSION_LIMIT:int) => CFG
 # 1) all_versions
 # 2) GC scheduling
 
+# Things to improve: merge as late as possible, more information is better
+
 
 def BBV(source : CFG,
         initial_context: Context,
@@ -39,7 +41,6 @@ def BBV(source : CFG,
     while len(work_queue) > 0:
         version = work_queue.pop()
         walk(version, work_queue, VERSION_LIMIT, MERGE_HEURISTIC)
-
         GC() # Can be optimized and skiped sometimes
 
     return live_version(root_version)
@@ -119,8 +120,8 @@ def walk(version: Version,
     for instr in block.instructions:
         context_after, specialized_instruction = specialize_instruction(context_after, instr)
 
-        if instr:
-            specialized_instructions.append(instr)
+        if specialized_instruction:
+            specialized_instructions.append(specialized_instruction)
 
     version.instructions = specialized_instructions
 
