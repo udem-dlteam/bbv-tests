@@ -70,7 +70,7 @@ def block_merge_some(bv, wq):
     bs1, bs2 = pick 2 BBs from bbv_live_versions(bv)
     ctx = union_with_widening(bs1.ctx, bs2.ctx)
 
-    mbs = new_version(bv, ctx)
+    mbs = new_version(bv, ctx, wq)
 
     if bs1 is mbs:
         block_merge(bs2)
