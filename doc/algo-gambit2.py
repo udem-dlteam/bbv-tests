@@ -22,6 +22,10 @@ BBV is a function from a CFG to a CFG:
 BBV(source:CFG, ctx, VERSION_LIMIT:int) => CFG
 """
 
+# Things which are optimizations and should be removed from the core algo:
+# 1) all_versions
+# 2) GC scheduling
+
 
 def BBV(source : CFG,
         initial_context: Context,
@@ -36,8 +40,7 @@ def BBV(source : CFG,
         version = work_queue.pop()
         walk(version, work_queue, VERSION_LIMIT, MERGE_HEURISTIC)
 
-        if is_scheduled_GC():
-            GC()
+        GC() # Can be optimized and skiped sometimes
 
     return live_version(root_version)
 
@@ -98,9 +101,6 @@ def merge(block: BasicBlock,
         # Schedule the newly created version for traversal
         work_queue.add(version)
 
-    # Recompute reachability, some versions may have become unreachable after the merge
-    schedule_GC()
-
     return version
 
 
@@ -151,21 +151,7 @@ def live_version(version: Version):
     else:
         return version
 
-# GC functions
-
-GC_flag = False
-
-def schedule_GC():
-    global GC_flag
-    GC_flag = True
-
-def is_scheduled_GC():
-    return GC_flag
-
-def unschedule_GC():
-    global GC_flag
-    GC_flag = False
-
+# GC function
 def GC():
     unschedule_GC()
     mark_all_versions_as_unreachable()
