@@ -107,7 +107,7 @@ def merge(block: BasicBlock,
 
     # Too many version, identify versions to merge together
     # Typically two versions, but could be more
-    versions_to_merge = MERGE_HEURISTIC(block.live_versions)
+    versions_to_merge = MERGE_HEURISTIC(block.versions)
 
     # Remove the versions to merge
     for v in versions_to_merge:
