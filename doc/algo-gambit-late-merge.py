@@ -111,7 +111,7 @@ def merge(block: BasicBlock,
 
     # Remove the versions to merge
     for v in versions_to_merge:
-        block.live_versions.remove(v)
+        block.versions.remove(v)
 
     # Merge the versions by generating a new context from the union of their contexts
     ctxs = [version.context_before for version in versions_to_merge]
