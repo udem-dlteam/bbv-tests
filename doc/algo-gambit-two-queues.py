@@ -25,28 +25,32 @@ BBV(source:CFG, ctx, VERSION_LIMIT:int) => CFG
 # Things to improve: merge as late as possible, more information is better
 # Do not be so specific about the fact that branch are last instr
 
+walk_queue = []
+merge_queue = []
+
 def BBV(source : CFG,
         initial_context: Context,
         VERSION_LIMIT: int,
         MERGE_HEURISTIC: Function[List[Version], List[Version]]):
 
-    work_queue = []
+    root_version = reach(source.entry, initial_context, VERSION_LIMIT)
 
-    root_version = reach(source.entry, initial_context, work_queue, VERSION_LIMIT, MERGE_HEURISTIC)
+    while len(walk_queue) > 0 or len(merge_queue) > 0:
+        while len(walk_queue) > 0:
+            version = walk_queue.pop()
+            walk(version, VERSION_LIMIT)
 
-    while len(work_queue) > 0:
-        version = work_queue.pop()
-        walk(version, work_queue, VERSION_LIMIT, MERGE_HEURISTIC)
-        GC()
+        while len(merge_queue) > 0:
+            version = merge_queue.pop()
+            merge(version, VERSION_LIMIT, MERGE_HEURISTIC)
+            GC()
 
     return live_version(root_version)
 
 
 def reach(block: BasicBlock,
           ctx: Context,
-          work_queue: Queue,
-          VERSION_LIMIT: int,
-          MERGE_HEURISTIC: Function[List[Version], List[Version]]) -> Version:
+          VERSION_LIMIT: int) -> Version:
           
     if ctx in block.versions:
         return block.versions[ctx]
@@ -55,78 +59,75 @@ def reach(block: BasicBlock,
 
     block.versions.add(version)
 
-    work_queue.add(version)
+    if len(block.versions) > VERSION_LIMIT:
+        merge_queue.add(version)
+    else:
+        walk_queue.add(version)
 
     return version
 
 
 def walk(version: Version,
-         work_queue: Queue,
-         VERSION_LIMIT: int,
-         MERGE_HEURISTIC: Function[List[Version], List[Version]]):
+         VERSION_LIMIT: int):
 
     block = version.block
     context_before = version.context_before
 
-    if len(block.versions) > VERSION_LIMIT:
-        merge(block, work_queue, VERSION_LIMIT, MERGE_HEURISTIC)
-    else:
-        for instr in block.instructions:
-            specialized_instr, context_before = symbolic_execution(instr, context_before)
-            version.instructions.append(specialized_instr)
+    for instr in block.instructions:
+        specialized_instr, context_before = symbolic_execution(instr, context_before)
+        version.instructions.append(specialized_instr)
 
-        branch = block.last_instruction
+    branch = block.last_instruction
 
-        if branch.is_jump():
-            new_branch = Jump(target=reach(branch.target, context_before, work_queue, VERSION_LIMIT, MERGE_HEURISTIC))
-        elif branch.is_conditional_jump():
-            context_if_true, context_if_false = symbolic_execution_conditional(branch, context_before)
-            
-            if context_if_true is None: # Cannot be true
-                new_branch = Jump(target=reach(branch.target_if_false, context_if_false,
-                                  work_queue, VERSION_LIMIT, MERGE_HEURISTIC))
-            elif context_if_false is None: # Cannot be false
-                new_branch = Jump(target=reach(branch.target_if_true, context_if_true,
-                                  work_queue, VERSION_LIMIT, MERGE_HEURISTIC))
-            else: # Both branches still possible
-                new_branch = ConditionalJump(
-                    target_if_true=reach(branch.target_if_true, context_if_true,
-                                         work_queue, VERSION_LIMIT, MERGE_HEURISTIC),
-                    target_if_false=reach(branch.target_if_false, context_if_false,
-                                         work_queue, VERSION_LIMIT, MERGE_HEURISTIC))
+    if branch.is_jump():
+        new_branch = Jump(target=reach(branch.target, context_before, work_queue, VERSION_LIMIT))
+    elif branch.is_conditional_jump():
+        context_if_true, context_if_false = symbolic_execution_conditional(branch, context_before)
+        
+        if context_if_true is None: # Cannot be true
+            new_branch = Jump(target=reach(branch.target_if_false, context_if_false, VERSION_LIMIT))
+        elif context_if_false is None: # Cannot be false
+            new_branch = Jump(target=reach(branch.target_if_true, context_if_true, VERSION_LIMIT))
+        else: # Both branches still possible
+            new_branch = ConditionalJump(
+                target_if_true=reach(branch.target_if_true, context_if_true, VERSION_LIMIT),
+                target_if_false=reach(branch.target_if_false, context_if_false, VERSION_LIMIT))
 
-        version.last_instruction = new_branch
+    version.last_instruction = new_branch
 
 
-def merge(block: BasicBlock,
-          work_queue: Queue,
+def merge(version: Version,
           VERSION_LIMIT: int,
           MERGE_HEURISTIC: Function[List[Version], List[Version]]):
+    block = version.block
 
     # Too many version, identify versions to merge together
-    # Typically two versions, but could be more
-    versions_to_merge = MERGE_HEURISTIC(block.versions)
+    versions_to_merge = MERGE_HEURISTIC(block.versions, VERSION_LIMIT)
 
     # Remove the versions to merge
     for v in versions_to_merge:
-        block.versions.remove(v)
+        block.live_versions.remove(v)
 
     # Merge the versions by generating a new context from the union of their contexts
     ctxs = [version.context_before for version in versions_to_merge]
     new_context = union_with_widening(ctxs)
 
-    version = new_version(block, new_context)
+    merged_version = new_version(block, new_context)
 
     # Mark versions as previously merged, for aliasing
     for v in versions_to_merge:
-        v.merge = version
+        v.merge = merged_version
         fix_references_to(v)
 
-    block.versions.add(version)
+    block.versions.add(merged_version)
 
-    if version not in versions_to_merge:
+    if version in block.versions:
+        # Version triggered a merge, but it was not merged so we now need to traverse it
+        walk_queue.add(version)
+
+    if merged_version not in versions_to_merge:
         # Schedule the newly created version for traversal
-        work_queue.add(version)
+        walk_queue.add(version)
 
 
 def fix_references_to(old_version):
