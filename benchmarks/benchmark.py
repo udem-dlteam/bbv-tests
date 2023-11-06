@@ -681,7 +681,7 @@ def plot_data(data, output_path):
     x = np.arange(len(versions))
     num_bars = n_versions * len(scaled_measures)
 
-    width = 0.3 / np.log(num_bars + 0.5 * n_versions)
+    width = 18 / (num_bars + n_versions)
  
     multiplier = 0
 
