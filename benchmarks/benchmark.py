@@ -139,8 +139,10 @@ class Benchmark(db.Entity):
 
 class PrimitiveCount(db.Entity):
     name = Required(str)
-    count = Required(int, size=64)
+    value = Required(int, size=64)
+    variance = Optional(float)
     run = Required('Run')
+    dummy = Required(bool, default=False)
 
     @property
     def is_typecheck(self):
@@ -155,11 +157,14 @@ class PrimitiveCount(db.Entity):
 class PerfEvent(db.Entity):
     event = Required(str)
     value = Required(int, size=64)
+    repetitions = Required(int, size=64)
+    variance = Optional(float)
     run = Required('Run')
 
 class OtherMeasure(db.Entity):
     name = Required(str)
     value = Required(int, size=64)
+    variance = Optional(float)
     run = Required('Run')
 
 class Run(db.Entity):
@@ -314,26 +319,29 @@ class BenchResultParser:
 
     @staticmethod
     def _string_to_number(n):
+        if n is None:
+            return None
+
         try:
             return locale.atoi(n)
         except ValueError:
             return locale.atof(n)
 
     @classmethod
-    def _get_numbers_on_line_with(cls, perf_output, marker):
-        for line in perf_output.splitlines():
-            if marker in line:
-                numbers = re.findall(r"[\d\.,]+", line)
-                logger.debug(f"found perf stat event {marker} ({numbers})")
-                return [cls._string_to_number(n) for n in numbers]
-
-        logger.debug(f"could not find perf stat event {marker}")
-        return None
-
-    @classmethod
     def _get_value(cls, perf_output, name):
-        results = cls._get_numbers_on_line_with(perf_output, name)
-        return results[0] if results else None
+        for line in perf_output.splitlines():
+            if name in line:
+                # Capture event value (first number) and optional variance (number preceded by "( +-")
+                match = re.match(r"\s*([\d\.,]+)[^\(\n]+(?:\(\s*\+-\s+([\d\.,]+)\s*%)?", line)
+                if not match:
+                    break
+                
+                value, variance = match.groups()
+                logger.debug(f"found perf stat event {name} ({value} +- {variance})")
+                return (cls._string_to_number(value), cls._string_to_number(variance))
+
+        logger.debug(f"could not find perf stat event {name}")
+        return None
 
 
 ##############################################################################
@@ -434,14 +442,14 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
                   repetitions=repetitions,
                   merge_strategy=merge_strategy)
 
-        for event, value in result.items():
-            PerfEvent(event=event, value=int(value), run=run)
+        for event, (value, variance) in result.items():
+            PerfEvent(event=event, value=int(value), repetitions=repetitions, variance=variance, run=run)
 
         typechecks = 0
 
-        for prim, count in primitive_count.items():
-            p = PrimitiveCount(name=prim, count=count, run=run)
-            typechecks += p.is_typecheck * count
+        for prim, value in primitive_count.items():
+            p = PrimitiveCount(name=prim, value=value, run=run)
+            typechecks += p.is_typecheck * value
 
         logger.debug(f"number of typechecks: {typechecks}")
         OtherMeasure(name="typechecks", value=typechecks, run=run)
@@ -500,7 +508,7 @@ def choose_barchart_output_path(output, system_name, compiler_name, benchmark, p
 def select_primitives_names(runs, primitive_names_or_amount):
     if isinstance(primitive_names_or_amount, int):
         # Recover the most common primitives
-        primitives = select(prim for prim in PrimitiveCount if prim.run in runs).order_by(desc(PrimitiveCount.count))
+        primitives = select(prim for prim in PrimitiveCount if prim.run in runs).order_by(desc(PrimitiveCount.value))
         return list(select(prim.name for prim in primitives if prim.name !=
                       "##identity").distinct()[:primitive_names_or_amount])
     else:
@@ -571,23 +579,25 @@ def extract_data_from_runs(runs, perf_event_names, primitive_names, other_measur
         for name in perf_event_names:
             if not (event := PerfEvent.get(run=run, event=name)):
                 raise ValueError(f'Cannot find {repr(name)}')
-            perf_events[name] = event.value
+            perf_events[name] = event
 
         primitive_counts = {}
 
         for name in primitive_names:
             if prim := PrimitiveCount.get(run=run, name=name):
-                primitive_counts[name] = prim.count
+                primitive_counts[name] = prim
             else:
                 logger.debug(f"{name} primitive not found, defaulting to 0")
-                primitive_counts[name] = 0
+                # TODO: this adds it to the DB, maybe it's ok, maybe it's not..?
+                # I marked it as dummy so at least we can clean up later
+                primitive_counts[name] = PrimitiveCount(name=name, run=run, value=0, dummy=True)
 
         other_measures = {}
 
         for name in other_measure_names:
             if not (measure := OtherMeasure.get(run=run, name=name)):
                 raise ValueError(f'Cannot find {repr(name)}')
-            other_measures[name] = measure.value
+            other_measures[name] = measure
 
         data.append((run, perf_events, primitive_counts, other_measures))
 
@@ -626,9 +636,7 @@ def plot_data(data, output_path):
         values = set()
 
         for _, perf, prim, other in data:
-            values.update(perf.values())
-            values.update(prim.values())
-            values.update(other.values())
+            values.update(p.value for p in [*perf.values(), *prim.values(), *other.values()])
 
         smallest = min(v for v in values if v > 0)
         highest = max(values)
@@ -654,16 +662,24 @@ def plot_data(data, output_path):
     versions = [run_label(r) for r, *_ in data]
     measures = collections.defaultdict(list)
 
+    class Point:
+        def __init__(self, value, variance):
+            self.value = value
+            self.variance = variance or 0
+
+        def __repr__(self):
+            return f"Point({self.value}, {self.variance})"
+
     for run, *measure_sets in data:
         for m in measure_sets:
-            for name, value in sorted(m.items(), key=operator.itemgetter(0)):
-                measures[name].append(value)
+            for name, measure in sorted(m.items(), key=operator.itemgetter(0)):
+                measures[name].append(Point(measure.value, measure.variance))
 
     # Adjust magnitude of data so they fit in a single graph
     target_range = get_magnitude()
-    magnitude_shifts = {k: get_magnitude_shift(max(v), target_range) for k, v in measures.items()}
+    magnitude_shifts = {k: get_magnitude_shift(max(p.value for p in ms), target_range) for k, ms in measures.items()}
     scaled_measures = [(add_scaling_to_label(name, magnitude_shifts),
-                       [v / (10 ** magnitude_shifts[name]) for v in measures[name]])
+                       [Point(p.value / (10 ** magnitude_shifts[name]), p.variance) for p in measures[name]])
                        for name in measures]
 
     def category_order(name):
@@ -674,7 +690,7 @@ def plot_data(data, output_path):
                     return i
         raise ValueError(f"could not order {name}")
 
-    scaled_measures.sort(key=lambda p: (-category_order(p[0]), p[1]), reverse=True)
+    scaled_measures.sort(key=lambda p: (-category_order(p[0]), [x.value for x in p[1]]), reverse=True)
 
     # Label location and bar width
     n_versions = len(versions)
@@ -691,7 +707,10 @@ def plot_data(data, output_path):
     for (attribute, measurement), color in zip(scaled_measures,
                                                itertools.chain(perf_colors, primitive_colors, other_measure_colors)):
         offset = width * multiplier
-        rects = ax.bar(x + offset, measurement, width=width, label=attribute, color=color)
+        rects = ax.bar(x + offset, [m.value for m in measurement],
+                       width=width, label=attribute, color=color,
+                       yerr=[m.value * m.variance / 100 if m.variance else math.nan for m in measurement],
+                       capsize=width * 7)
         multiplier += 1
 
     ax.set_xticks(x + width * (n_measurments / 2 - 0.5), versions, rotation=45, rotation_mode="anchor", ha='right')
