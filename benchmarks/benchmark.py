@@ -400,7 +400,7 @@ def run_benchmark(executable, repeat):
 
     return other_parser
 
-NUMBER_OF_ITERATIONS = 50
+NUMBER_OF_ITERATIONS = 20
 
 @db_session
 def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge_strategy, force_execution=False, timeout=None):
