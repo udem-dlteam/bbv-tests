@@ -1,15 +1,25 @@
 # bbv-tests
+
 Collection of programs to test BBV
 
 ## To compile with Bigloo
 
   ./compile --bigloo tests/recursive/fib.scm
-  
-To compile with another Bigloo version:
+
+### To install Bigloo
+
+```
+mkdir -p bigloo/download
+mkdir -p bigloo/local
+wget http://www-sop.inria.fr/indes/fp/Bigloo/download/bigloo-unstable.tar.gz -O bigloo/download/bigloo-unstable.tar.gz
+(ROOT=$PWD; cd bigloo/download; tar xvfz bigloo-unstable.tar.gz; cd bigloo-unstable; ./configure --prefix=$ROOT/bigloo/local && make && make install)
+```
+
+### To compile with another Bigloo version:
 
   BIGLOODIR=$pdir ./compile --bigloo tests/recursive/fib.scm  
   
-To compile with statistics
+### To compile with statistics
 
   BIGLOOOPT="-copt -DSAW_BBV_STATS=1" ./compile --bigloo tests/recursive/fib.scm
   BIGLOODIR=$pdir BIGLOOOPT="-copt -DSAW_BBV_STATS=1" ./compile --bigloo tests/recursive/fib.scm
@@ -32,7 +42,7 @@ This generates an output such as:
 (mul/ov 0)
 ```
 
-To control the number of versions per basic block:
+### To control the number of versions per basic block:
 
   export BIGLOOBBVVERSIONLIMIT=num 
   

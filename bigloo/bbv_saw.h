@@ -3,7 +3,7 @@
 /*    -------------------------------------------------------------    */
 /*    Author      :  Manuel Serrano                                    */
 /*    Creation    :  Thu Mar 16 18:48:21 1995                          */
-/*    Last change :  Wed Nov  8 16:19:14 2023 (serrano)                */
+/*    Last change :  Wed Nov  8 17:10:57 2023 (serrano)                */
 /*    -------------------------------------------------------------    */
 /*    Bigloo's stuff                                                   */
 /*=====================================================================*/
@@ -26,7 +26,9 @@ static long saw_rem = 0;
 static long saw_addfx_ov = 0;
 static long saw_subfx_ov = 0;
 static long saw_mulfx_ov = 0;
-   
+static long saw_pairp = 0;
+static long saw_procedurep = 0;
+
 #  undef BGL_RTL_IFNE
 #  define BGL_RTL_IFNE(l,r) if (saw_ifne++, r) goto l
 
@@ -90,6 +92,21 @@ static long saw_mulfx_ov = 0;
 #  undef BGL_MULFX_SANS_OV
 #  define BGL_MULFX_SANS_OV(x, y) (saw_mul++, BINT(CINT(x) * CINT(y)))
 
+#  undef PAIRP
+#  if( defined( TAG_PAIR ) )
+#   if( TAG_PAIR != 0 )
+#      define PAIRP( c ) (saw_pairp++, (((long)c) & TAG_MASK) == TAG_PAIR)
+#   else
+#      define PAIRP( c ) (saw_pairp++, (c && ((((long)c) & TAG_MASK) == TAG_PAIR)))
+#   endif
+#  else
+#   define PAIRP( c ) (saw_pairp++, POINTERP( c ) && (TYPE( c ) == PAIR_TYPE))
+#  endif
+
+#  undef PROCEDUREP
+#  define PROCEDUREP(o) \
+     (saw_procedurep++, POINTERP(o) && (TYPE(o) == PROCEDURE_TYPE))
+
 int bbv_saw_statistics() {
    fprintf(stderr, "***primitive-call-counter\n");
    fprintf(stderr, "(ifne %ld)\n", saw_ifne + saw_ifeq);
@@ -104,6 +121,8 @@ int bbv_saw_statistics() {
    fprintf(stderr, "(add/ov %ld)\n", saw_addfx_ov);
    fprintf(stderr, "(sub/ov %ld)\n", saw_subfx_ov);
    fprintf(stderr, "(mul/ov %ld)\n", saw_mulfx_ov);
+   fprintf(stderr, "(pair? %ld)\n", saw_pairp);
+   fprintf(stderr, "(procedure? %ld)\n", saw_procedurep);
    return 0;
 }
 #else
