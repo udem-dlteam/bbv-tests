@@ -22,9 +22,9 @@ BBV is a function from a CFG to a CFG:
 BBV(source:CFG, ctx, VERSION_LIMIT:int) => CFG
 """
 
-def BBV(source, ctx0, VERSION_LIMIT):
+def BBV(bb0, ctx0, VERSION_LIMIT):
     wq = []
-    bs = new_version(source.entry, ctx0, wq)
+    bs = new_version(bb0.entry, ctx0, wq)
 
     while wq.length > 0:
         bs = wq.pop()
@@ -36,7 +36,7 @@ def BBV(source, ctx0, VERSION_LIMIT):
         if not block_merged(bs):
             block_specialize(bs, wq)
             
-    return fs
+    return bs
 
 def new_version(bv, ctx, wq):
     if ctx in bv.versions:
@@ -51,11 +51,11 @@ def new_version(bv, ctx, wq):
 
         return bs
 
-def live_version(bv):
-    if (bv.merge):
-        return live_version(bv.merge)
+def live_version(bs):
+    if (bs.merge):
+        return live_version(bs.merge)
     else:
-        return bv
+        return bs
     
 def need_merge(bv, limit):
     return bbv_live_versions(bv) >= limit

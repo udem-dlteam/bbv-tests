@@ -3,7 +3,7 @@
 /*    -------------------------------------------------------------    */
 /*    Author      :  Manuel Serrano                                    */
 /*    Creation    :  Thu Mar 16 18:48:21 1995                          */
-/*    Last change :  Wed Jul  5 11:15:36 2023 (serrano)                */
+/*    Last change :  Wed Nov  8 16:19:14 2023 (serrano)                */
 /*    -------------------------------------------------------------    */
 /*    Bigloo's stuff                                                   */
 /*=====================================================================*/
@@ -91,18 +91,19 @@ static long saw_mulfx_ov = 0;
 #  define BGL_MULFX_SANS_OV(x, y) (saw_mul++, BINT(CINT(x) * CINT(y)))
 
 int bbv_saw_statistics() {
-   fprintf(stderr, "ifne: %ld\n", saw_ifne + saw_ifeq);
-   fprintf(stderr, "eq: %ld\n", saw_eq);
-   fprintf(stderr, "le: %ld\n", saw_le);
-   fprintf(stderr, "gt: %ld\n", saw_gt);
-   fprintf(stderr, "lt: %ld\n", saw_lt);
-   fprintf(stderr, "add: %ld\n", saw_add);
-   fprintf(stderr, "sub: %ld\n", saw_sub);
-   fprintf(stderr, "mul: %ld\n", saw_mul);
-   fprintf(stderr, "div: %ld\n", saw_div);
-   fprintf(stderr, "add/ov: %ld\n", saw_addfx_ov);
-   fprintf(stderr, "sub/ov: %ld\n", saw_subfx_ov);
-   fprintf(stderr, "mul/ov: %ld\n", saw_mulfx_ov);
+   fprintf(stderr, "***primitive-call-counter\n");
+   fprintf(stderr, "(ifne %ld)\n", saw_ifne + saw_ifeq);
+   fprintf(stderr, "(eq %ld)\n", saw_eq);
+   fprintf(stderr, "(lefx %ld)\n", saw_le);
+   fprintf(stderr, "(gtfx %ld)\n", saw_gt);
+   fprintf(stderr, "(ltfx %ld)\n", saw_lt);
+   fprintf(stderr, "(addfx %ld)\n", saw_add);
+   fprintf(stderr, "(subfx %ld)\n", saw_sub);
+   fprintf(stderr, "(mulfx %ld)\n", saw_mul);
+   fprintf(stderr, "(div %ld)\n", saw_div);
+   fprintf(stderr, "(add/ov %ld)\n", saw_addfx_ov);
+   fprintf(stderr, "(sub/ov %ld)\n", saw_subfx_ov);
+   fprintf(stderr, "(mul/ov %ld)\n", saw_mulfx_ov);
    return 0;
 }
 #else
