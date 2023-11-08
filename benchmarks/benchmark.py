@@ -14,6 +14,7 @@ import pathlib
 import platform
 import re
 import shlex
+import statistics
 import string
 import subprocess
 import time
@@ -140,9 +141,7 @@ class Benchmark(db.Entity):
 class PrimitiveCount(db.Entity):
     name = Required(str)
     value = Required(int, size=64)
-    variance = Optional(float)
     run = Required('Run')
-    dummy = Required(bool, default=False)
 
     @property
     def is_typecheck(self):
@@ -157,14 +156,11 @@ class PrimitiveCount(db.Entity):
 class PerfEvent(db.Entity):
     event = Required(str)
     value = Required(int, size=64)
-    repetitions = Required(int, size=64)
-    variance = Optional(float)
     run = Required('Run')
 
 class OtherMeasure(db.Entity):
     name = Required(str)
     value = Required(int, size=64)
-    variance = Optional(float)
     run = Required('Run')
 
 class Run(db.Entity):
@@ -172,7 +168,6 @@ class Run(db.Entity):
     system = Required('System', reverse='runs')
     compiler = Required('Compiler', reverse='runs')
     version_limit = Required(int)
-    repetitions = Required(int)
     merge_strategy = Required(str)
     primitives = Set('PrimitiveCount', reverse='run')
     perf_events = Set('PerfEvent', reverse='run')
@@ -378,16 +373,16 @@ def compile(compilerdir, file, vlimit, merge_strategy, timeout=None):
     return executable, primitive_count
 
 
-def run_benchmark(executable, repetitions):
+def run_benchmark(executable):
     # Run program to measure time only
-    time_command = f"perf stat -e {BenchResultParser.time_event} -r {repetitions} {executable}"
+    time_command = f"perf stat -e {BenchResultParser.time_event} {executable}"
     logger.info(time_command)
     time_output = subprocess.run(time_command, shell=True, capture_output=True).stderr.decode()
     logger.debug(time_output)
 
     # Run program with all perf stat events on
     other_events = ' '.join(f"-e {e}" for e in BenchResultParser.event_names)
-    other_command = f"perf stat {other_events} -r {repetitions} {executable}"
+    other_command = f"perf stat {other_events} {executable}"
     logger.info(other_command)
     other_output = subprocess.run(other_command, shell=True, capture_output=True).stderr.decode()
     logger.debug(other_output)
@@ -424,7 +419,6 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
                                    system=system,
                                    compiler=compiler,
                                    version_limit=v,
-                                   repetitions=repetitions,
                                    merge_strategy=merge_strategy)
             if existing_run:
                 logger.info('benchmark has an existing run, skip it')
@@ -432,18 +426,17 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
             else:
                 logger.info('no run exists for this benchmark, execute it')
 
-        executable, primitive_count = compile(compilerdir, file, v, merge_strategy, timeout)
-        result = run_benchmark(executable, repetitions)
-
         run = Run(benchmark=benchmark,
                   system=system,
                   compiler=compiler,
                   version_limit=v,
-                  repetitions=repetitions,
                   merge_strategy=merge_strategy)
 
-        for event, (value, variance) in result.items():
-            PerfEvent(event=event, value=int(value), repetitions=repetitions, variance=variance, run=run)
+        executable, primitive_count = compile(compilerdir, file, v, merge_strategy, timeout)
+
+        for _ in range(repetitions):
+            for event, (value, variance) in run_benchmark(executable).items():
+                PerfEvent(event=event, value=int(value), run=run)
 
         typechecks = 0
 
@@ -468,6 +461,33 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
 ##############################################################################
 # Chart generation
 ##############################################################################
+
+class ChartValue:
+    def __init__(self, value, stdev=0):
+        self.value = value
+        self.stdev = stdev
+
+    def scale(self, ratio):
+        return ChartValue(self.name, self.value * ratio, self.stdev * ratio)
+
+    def __repr__(self):
+        return f"ChartValue(value={self.value}, stdev={self.stdev})"
+
+    def __truediv__(self, other):
+        if not isinstance(other, ChartValue):
+            return NotImplemented
+
+        new_value = self.value / other.value
+
+        # Convert standard deviation back to variance for calculation
+        variance_self = self.stdev ** 2
+        variance_other = other.stdev ** 2
+
+        # Calculate the variance of the quotient
+        new_variance = ((variance_self / (other.value ** 2)) +
+                        ((self.value ** 2) * variance_other) / (other.value ** 4))
+
+        return ChartValue(new_value, math.sqrt(new_variance))
 
 
 def sanitize_filename(filename, valid_chars="-_.()" + string.ascii_letters + string.digits):
@@ -570,6 +590,18 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
     plot_data(data, output_path)
 
 
+def get_perf_event_statistics(run, name):
+    events = select(e for e in PerfEvent if e.event == name and e.run == run)
+    values = [e.value for e in events]
+
+    if not values:
+        raise ValueError(f'Cannot find {repr(name)}')
+
+    mean = statistics.mean(values)
+    stdev = statistics.stdev(values) if len(values) > 1 else 0
+
+    return ChartValue(mean, stdev)
+
 def extract_data_from_runs(runs, perf_event_names, primitive_names, other_measure_names):
     data = []
 
@@ -577,27 +609,23 @@ def extract_data_from_runs(runs, perf_event_names, primitive_names, other_measur
         perf_events = {}
 
         for name in perf_event_names:
-            if not (event := PerfEvent.get(run=run, event=name)):
-                raise ValueError(f'Cannot find {repr(name)}')
-            perf_events[name] = event
+            perf_events[name] = get_perf_event_statistics(run, name)
 
         primitive_counts = {}
 
         for name in primitive_names:
             if prim := PrimitiveCount.get(run=run, name=name):
-                primitive_counts[name] = prim
+                primitive_counts[name] = ChartValue(prim.value)
             else:
                 logger.debug(f"{name} primitive not found, defaulting to 0")
-                # TODO: this adds it to the DB, maybe it's ok, maybe it's not..?
-                # I marked it as dummy so at least we can clean up later
-                primitive_counts[name] = PrimitiveCount(name=name, run=run, value=0, dummy=True)
+                primitive_counts[name] = ChartValue(0)
 
         other_measures = {}
 
         for name in other_measure_names:
             if not (measure := OtherMeasure.get(run=run, name=name)):
                 raise ValueError(f'Cannot find {repr(name)}')
-            other_measures[name] = measure
+            other_measures[name] = ChartValue(measure.value)
 
         data.append((run, perf_events, primitive_counts, other_measures))
 
@@ -605,52 +633,11 @@ def extract_data_from_runs(runs, perf_event_names, primitive_names, other_measur
 
 
 def plot_data(data, output_path):
-    def run_label(run):
-        return f"{run.merge_strategy} {run.version_limit}"
-
-    def get_magnitude_shift(number, target_range):
-        if number == 0:
-            return 0
-
-        if target_range[0] <= number <= target_range[1]:
-            return 0
-
-        # Find by how many magnitude (powers of ten) the number is bigger than the target_range
-        low = math.log10(target_range[0] / number)
-        high = math.log10(target_range[1] / number)
-        return -(math.ceil(low) if number < target_range[0] else math.floor(high))
-
-    def add_scaling_to_label(name, magnitude_shifts):
-        shift = magnitude_shifts[name]
-
-        unit = "msec" if name == BenchResultParser.time_event else ""
-
-        if shift == 0:
-            return f"{name} ({unit})" if unit else name
-        else:
-            superscript_translation = str.maketrans(string.digits, '⁰¹²³⁴⁵⁶⁷⁸⁹')
-            unit = f" {unit}" if unit else ""
-            return f"{name} (10{str(shift).translate(superscript_translation)}{unit})"
-
-    def get_magnitude():
-        values = set()
-
-        for _, perf, prim, other in data:
-            values.update(p.value for p in [*perf.values(), *prim.values(), *other.values()])
-
-        smallest = min(v for v in values if v > 0)
-        highest = max(values)
-        base = 10 ** math.floor(math.log10(smallest))
-
-        return base, base * 10
-
     # Compute colors
     n_perf_stats = max((len(p) for _, p, _, _ in data), default=0)
     n_primitive_stats = max((len(p) for _, _, p, _ in data), default=0)
     n_other_measures = max((len(m) for _, _, _, m in data), default=0)
     n_measurments = n_perf_stats + n_primitive_stats + n_other_measures
-
-    first = data[0]
 
     perf_colors = mpl.colormaps.get_cmap('winter')(np.linspace(0.3, 0.8, n_perf_stats))
     primitive_colors = mpl.colormaps.get_cmap('autumn')(np.linspace(0.3, 0.8, n_primitive_stats))
@@ -659,28 +646,15 @@ def plot_data(data, output_path):
     # Format data for matplotlib
     data = sorted(data, key=lambda d: (d[0].version_limit, d[0].merge_strategy))
 
-    versions = [run_label(r) for r, *_ in data]
+    first = data[0]
+
+    versions = [f"{r.merge_strategy} {r.version_limit}" for r, *_ in data]
     measures = collections.defaultdict(list)
-
-    class Point:
-        def __init__(self, value, variance):
-            self.value = value
-            self.variance = variance or 0
-
-        def __repr__(self):
-            return f"Point({self.value}, {self.variance})"
 
     for run, *measure_sets in data:
         for m in measure_sets:
             for name, measure in sorted(m.items(), key=operator.itemgetter(0)):
-                measures[name].append(Point(measure.value, measure.variance))
-
-    # Adjust magnitude of data so they fit in a single graph
-    target_range = get_magnitude()
-    magnitude_shifts = {k: get_magnitude_shift(max(p.value for p in ms), target_range) for k, ms in measures.items()}
-    scaled_measures = [(add_scaling_to_label(name, magnitude_shifts),
-                       [Point(p.value / (10 ** magnitude_shifts[name]), p.variance) for p in measures[name]])
-                       for name in measures]
+                measures[name].append(measure / first[1][name])
 
     def category_order(name):
         for i, group in enumerate(first[1:]):
@@ -690,12 +664,10 @@ def plot_data(data, output_path):
                     return i
         raise ValueError(f"could not order {name}")
 
-    scaled_measures.sort(key=lambda p: (-category_order(p[0]), [x.value for x in p[1]]), reverse=True)
-
     # Label location and bar width
     n_versions = len(versions)
     x = np.arange(len(versions))
-    num_bars = n_versions * len(scaled_measures)
+    num_bars = n_versions * len(measures)
 
     width = 18 / (num_bars + n_versions)
  
@@ -704,12 +676,12 @@ def plot_data(data, output_path):
     # Plot
     fig, ax = plt.subplots(layout='constrained')
 
-    for (attribute, measurement), color in zip(scaled_measures,
+    for (attribute, measurement), color in zip(measures.items(),
                                                itertools.chain(perf_colors, primitive_colors, other_measure_colors)):
         offset = width * multiplier
         rects = ax.bar(x + offset, [m.value for m in measurement],
                        width=width, label=attribute, color=color,
-                       yerr=[m.value * m.variance / 100 if m.variance else math.nan for m in measurement],
+                       yerr=[m.stdev or math.nan for m in measurement],
                        capsize=width * 7)
         multiplier += 1
 
@@ -765,7 +737,7 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, p
         rows[run.version_limit] = row
 
         for perf_attr in perf_attributes:
-            row.append(PerfEvent.get(event=perf_attr, run=run).value)
+            row.append(get_perf_event_statistics(run, perf_attr).value)
 
         for other_attr in other_attributes:
             row.append(OtherMeasure.get(name=other_attr, run=run).value)
@@ -834,6 +806,15 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
 
     # Format data in a pandas dataframe
     perf_attributes = list(select(e.event for e in PerfEvent if e.run in runs).distinct())
+
+    for name in perf_attributes.copy():
+        # Remove attributes that perf could not recover on all runs
+        for run in runs:
+            try:
+                get_perf_event_statistics(run, name)
+            except ValueError:
+                perf_attributes.remove(name)
+
     logger.info(f"perf attributes in analysis: {', '.join(perf_attributes)}")
 
     other_attributes = list(select(m.name for m in OtherMeasure if m.run in runs).distinct())
