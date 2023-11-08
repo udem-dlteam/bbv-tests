@@ -172,6 +172,7 @@ class Run(db.Entity):
     primitives = Set('PrimitiveCount', reverse='run')
     perf_events = Set('PerfEvent', reverse='run')
     other_measures = Set('OtherMeasure', reverse='run')
+    iterations = Required(int)
     timestamp = Required(int, default=lambda: int(time.time()))
 
 
@@ -373,16 +374,16 @@ def compile(compilerdir, file, vlimit, merge_strategy, timeout=None):
     return executable, primitive_count
 
 
-def run_benchmark(executable):
+def run_benchmark(executable, repeat):
     # Run program to measure time only
-    time_command = f"perf stat -e {BenchResultParser.time_event} {executable}"
+    time_command = f"perf stat -e {BenchResultParser.time_event} {executable} repeat: {repeat}"
     logger.info(time_command)
     time_output = subprocess.run(time_command, shell=True, capture_output=True).stderr.decode()
     logger.debug(time_output)
 
     # Run program with all perf stat events on
     other_events = ' '.join(f"-e {e}" for e in BenchResultParser.event_names)
-    other_command = f"perf stat {other_events} {executable}"
+    other_command = f"perf stat {other_events} {executable} repeat: {repeat}"
     logger.info(other_command)
     other_output = subprocess.run(other_command, shell=True, capture_output=True).stderr.decode()
     logger.debug(other_output)
@@ -398,6 +399,8 @@ def run_benchmark(executable):
             logger.warning(f"Could not find perf stat event {repr(event)} when running {executable}")
 
     return other_parser
+
+NUMBER_OF_ITERATIONS = 50
 
 @db_session
 def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge_strategy, force_execution=False, timeout=None):
@@ -430,12 +433,13 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
                   system=system,
                   compiler=compiler,
                   version_limit=v,
-                  merge_strategy=merge_strategy)
+                  merge_strategy=merge_strategy,
+                  iterations=NUMBER_OF_ITERATIONS)
 
         executable, primitive_count = compile(compilerdir, file, v, merge_strategy, timeout)
 
         for _ in range(repetitions):
-            for event, (value, variance) in run_benchmark(executable).items():
+            for event, (value, variance) in run_benchmark(executable, NUMBER_OF_ITERATIONS).items():
                 PerfEvent(event=event, value=int(value), run=run)
 
         typechecks = 0
@@ -500,17 +504,17 @@ def ensure_directory_exists(filepath):
         os.makedirs(dir_name)
 
 
-def choose_barchart_output_path(output, system_name, compiler_name, benchmark, perf_event_names, primitive_names):
+def choose_path(base, output, system_name, compiler_name,
+                valid_chars="-_.()" + string.ascii_letters + string.digits):
     path = pathlib.Path(output or '.').resolve()
     suffix = path.suffix
-    
+
     if not suffix:
         # No extension means the output is a folder where to output the plot
         logger.debug(f"output into folder {path}")
 
         # build default filename
-        primitive_segment = f"_{len(primitive_names)}primitives" if primitive_names else ""
-        filename = f"{benchmark}_{'_'.join(sorted(perf_event_names))}{primitive_segment}_{compiler_name}_{system_name}.png"
+        filename = f"{base}_{compiler_name}_{system_name}.png"
 
         # sanitize filename
         filename = sanitize_filename(filename)
@@ -523,6 +527,12 @@ def choose_barchart_output_path(output, system_name, compiler_name, benchmark, p
         return path
     else:
         raise ValueError(f"output must be a folder of .png target, got {output}")
+
+
+def choose_barchart_output_path(output, system_name, compiler_name, benchmark, perf_event_names, primitive_names):
+    primitive_segment = f"_{len(primitive_names)}primitives" if primitive_names else ""
+    base = f"{benchmark}_{'_'.join(sorted(perf_event_names))}{primitive_segment}"
+    return choose_path(base, output, system_name, compiler_name)
 
 
 def select_primitives_names(runs, primitive_names_or_amount):
@@ -701,29 +711,8 @@ def plot_data(data, output_path):
 # Correlation analysis
 ##############################################################################
 
-def choose_analysis_output_path(output, merge_strategy, system_name, compiler_name,
-                                valid_chars="-_.()" + string.ascii_letters + string.digits):
-    path = pathlib.Path(output or '.').resolve()
-    suffix = path.suffix
-
-    if not suffix:
-        # No extension means the output is a folder where to output the plot
-        logger.debug(f"output into folder {path}")
-
-        # build default filename
-        filename = f"analysis_{merge_strategy}_{compiler_name}_{system_name}.png"
-
-        # sanitize filename
-        filename = sanitize_filename(filename)
-
-        path = path / filename
-        logger.info(f"output to file {path}")
-        return path
-    elif suffix == ".png":
-        logger.info(f"output to file {path}")
-        return path
-    else:
-        raise ValueError(f"output must be a folder of .png target, got {output}")
+def choose_analysis_output_path(output, merge_strategy, system_name, compiler_name):
+    return choose_path(f'analysis_{merge_strategy}', output, system_name, compiler_name)
 
 
 def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, pseudo_ratio_offset=1):
@@ -859,6 +848,43 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     ensure_directory_exists(output_path)
     plt.savefig(output_path)
 
+
+##############################################################################
+# Perf data deistribution
+##############################################################################
+
+def choose_distribution_output_path(output, merge_strategy, system_name, compiler_name, benchmark, perf_event):
+    base = f"distribution_{benchmark}_{merge_strategy}_{perf_event}"
+    return choose_path(base, output, system_name, compiler_name)
+
+@db_session
+def perf_distribution(merge_strategy,
+                      system_name,
+                      compiler_name,
+                      benchmark_name,
+                      event,
+                      version_limit,
+                      output):
+    system = get_system_from_name_or_default(system_name)
+    compiler = get_compiler_from_name(compiler_name)
+
+    output_path = choose_distribution_output_path(output, merge_strategy, system.name,
+                                                  compiler.name, benchmark_name, event)
+
+    benchmark = Benchmark.get(name=benchmark_name)
+
+    run = Run.select(lambda r: r.system == system and
+                     r.compiler == compiler and
+                     r.benchmark == benchmark and
+                     r.version_limit == version_limit and
+                     r.merge_strategy == merge_strategy).order_by(desc(Run.timestamp)).first()
+
+    values = sorted([event.value for event in select(e for e in PerfEvent if e.event == event and e.run == run)])
+
+    plt.bar(range(len(values)), values)
+
+    plt.savefig(output_path)
+    
 
 ##############################################################################
 # Command line interface
@@ -1019,6 +1045,43 @@ if __name__ == "__main__":
                                 dest="output",
                                 help="where to output the chart (file or folder)")
 
+    perf_distribution_parser = subparsers.add_parser('perf_distribution', help='Plot perf distribution histogram')
+
+    perf_distribution_parser.add_argument('-m', '--merge-strategy',
+                                          dest="merge_strategy",
+                                          default='linear',
+                                          help="merge strategy to plot")
+
+    perf_distribution_parser.add_argument('-s', '--systen',
+                                          dest="system_name",
+                                          help="analyze benchmarks from this system")
+
+    perf_distribution_parser.add_argument('-c', '--compiler',
+                                          dest="compiler_name",
+                                          default="gambit",
+                                          help="analyze benchmarks of this compiler")
+
+    perf_distribution_parser.add_argument('-b', '--benchmark',
+                                          required=True,
+                                          dest="benchmark_name",
+                                          help="benchmark name or path")
+
+    perf_distribution_parser.add_argument('-e', '--event',
+                                          required=True,
+                                          dest="event",
+                                          help="perf stat event name")
+
+    perf_distribution_parser.add_argument('-l', '--limit',
+                                          dest="version_limit",
+                                          metavar="LIMIT",
+                                          default=0,
+                                          type=int,
+                                          help="BBV versions limit to plot")
+
+    perf_distribution_parser.add_argument('-o', '--output',
+                                          dest="output",
+                                          help="where to output the histogram (file or folder)")
+
 
     args = parser.parse_args()
 
@@ -1051,3 +1114,12 @@ if __name__ == "__main__":
             compiler_name=args.compiler_name,
             benchmark_names=args.benchmark_names,
             output=args.output)
+    elif args.command == 'perf_distribution':
+        perf_distribution(merge_strategy=args.merge_strategy,
+                          system_name=args.system_name,
+                          compiler_name=args.compiler_name,
+                          benchmark_name=args.benchmark_name,
+                          event=args.event,
+                          version_limit=args.version_limit,
+                          output=args.output)
+
