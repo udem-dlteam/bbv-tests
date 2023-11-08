@@ -11,8 +11,26 @@ To compile with another Bigloo version:
   
 To compile with statistics
 
-  BIGLOOOPT="-copt -DSAW_BBV_STATS=1" ./compile --bigloo tests/recursive/fib.scm  
+  BIGLOOOPT="-copt -DSAW_BBV_STATS=1" ./compile --bigloo tests/recursive/fib.scm
   BIGLOODIR=$pdir BIGLOOOPT="-copt -DSAW_BBV_STATS=1" ./compile --bigloo tests/recursive/fib.scm
+
+This generates an output such as:
+
+```
+***primitive-call-counter
+(ifne 44657499)
+(eq 16748604)
+(lefx 0)
+(gtfx 3)
+(ltfx 0)
+(addfx 5580144)
+(subfx 11164376)
+(mulfx 0)
+(div 0)
+(add/ov 0)
+(sub/ov 0)
+(mul/ov 0)
+```
 
 To control the number of versions per basic block:
 
