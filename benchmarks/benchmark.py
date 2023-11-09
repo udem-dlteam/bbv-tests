@@ -159,7 +159,7 @@ class PerfEvent(db.Entity):
 
 class OtherMeasure(db.Entity):
     name = Required(str)
-    value = Required(int, size=64)
+    value = Required(float)
     run = Required('Run')
 
 class Run(db.Entity):
@@ -253,7 +253,7 @@ class PrimitivesCountParser:
         yield from self.primitives.keys()
 
 
-class BenchResultParser:
+class PerfResultParser:
     time_event = 'task-clock'
     event_names = [
         time_event,
@@ -338,6 +338,31 @@ class BenchResultParser:
         logger.debug(f"could not find perf stat event {name}")
         return None
 
+class SchemeStatsParser:
+    def __init__(self, scheme_output):
+        self.stats = {}
+
+        for name, value in re.findall(r'\((\S+) ([\d\.]+)\)', scheme_output):
+            self.stats[f'scheme-{name}'] = value
+
+    def keys(self):
+        return self.stats.keys()
+
+    def values(self):
+        return self.stats.values()
+
+    def items(self):
+        return self.stats.items()
+
+    def update(self, other):
+        self.stats.update(other.stats)
+
+    def __getitem__(self, event_name):
+        return self.stats[event_name]
+
+    def __contains__(self, event_name):
+        return event_name in self.stats
+
 
 ##############################################################################
 # Benchmark execution
@@ -375,29 +400,35 @@ def compile(compilerdir, file, vlimit, merge_strategy, timeout=None):
 
 def run_benchmark(executable, arguments):
     # Run program to measure time only
-    time_command = f"perf stat -e {BenchResultParser.time_event} {executable} {arguments}"
+    time_command = f"perf stat -e {PerfResultParser.time_event} {executable} {arguments}"
     logger.info(time_command)
-    time_output = subprocess.run(time_command, shell=True, capture_output=True).stderr.decode()
-    logger.debug(time_output)
+    time_output = subprocess.run(time_command, shell=True, capture_output=True)
+    time_output_stderr = time_output.stderr.decode()
+    time_output_stdout = time_output.stdout.decode()
+    logger.debug(time_output_stderr)
+    logger.debug(time_output_stdout)
 
     # Run program with all perf stat events on
-    other_events = ' '.join(f"-e {e}" for e in BenchResultParser.event_names)
+    other_events = ' '.join(f"-e {e}" for e in PerfResultParser.event_names)
     other_command = f"perf stat {other_events} {executable} {arguments}"
     logger.info(other_command)
-    other_output = subprocess.run(other_command, shell=True, capture_output=True).stderr.decode()
-    logger.debug(other_output)
+    other_output = subprocess.run(other_command, shell=True, capture_output=True)
+    other_output_stderr = other_output.stderr.decode()
+    logger.debug(other_output_stderr)
 
     # parse and join outputs
-    time_parser = BenchResultParser(time_output)
-    other_parser = BenchResultParser(other_output)
+    time_parser = PerfResultParser(time_output_stderr)
+    other_perf_parser = PerfResultParser(other_output_stderr)
 
-    other_parser.update(time_parser)
+    other_perf_parser.update(time_parser)
 
-    for event in BenchResultParser.event_names:
-        if event not in other_parser:
-            logger.warning(f"Could not find perf stat event {repr(event)} when running {executable}")
+    for event in PerfResultParser.event_names:
+        if event not in other_perf_parser:
+            logger.info(f"Could not find perf stat event {repr(event)} when running {executable}")
 
-    return other_parser
+    scheme_parser = SchemeStatsParser(time_output_stdout)
+
+    return other_perf_parser, scheme_parser
 
 default_arguments = "repeat: 20"
 
@@ -496,8 +527,13 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
         align_stack_step = 3
         for rep in range(repetitions):
             arguments = f"{base_arguments} align-stack: {rep * align_stack_step}"
-            for event, (value, variance) in run_benchmark(executable, arguments).items():
+            perf_results, scheme_stats = run_benchmark(executable, arguments)
+            for event, (value, variance) in perf_results.items():
                 PerfEvent(event=event, value=int(value), run=run)
+
+            for name, value in scheme_stats.items():
+                logger.info(f"saving scheme stat {repr(name)}: {value}")
+                OtherMeasure(name=name, value=value, run=run)
 
         typechecks = 0
 
@@ -670,20 +706,33 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
 
 
 _sentinel = object()
-def get_perf_event_statistics(run, name, default=_sentinel):
-    events = select(e for e in PerfEvent if e.event == name and e.run == run)
-    values = [e.value for e in events]
-
+def sanitize_stats(name, values, default=_sentinel):
     if not values:
         if default is _sentinel:
             raise ValueError(f'Cannot find {repr(name)}')
         else:
             return default
 
+    percentage = 0
+    values.sort()
+    values = values[int(len(values) * percentage):int(len(values) * (1 - percentage))]
+
     mean = statistics.mean(values)
     stdev = statistics.stdev(values) if len(values) > 1 else 0
 
     return ChartValue(mean, stdev)
+
+def get_perf_event_statistics(run, name, default=_sentinel):
+    events = select(e for e in PerfEvent if e.event == name and e.run == run)
+    values = [e.value for e in events]
+    return sanitize_stats(name, values, default)
+
+
+def get_other_measure_statistics(run, name, default=_sentinel):
+    events = select(e for e in OtherMeasure if e.name == name and e.run == run)
+    values = [e.value for e in events]
+    return sanitize_stats(name, values, default)
+
 
 def extract_data_from_runs(runs, perf_event_names, primitive_names, other_measure_names):
     data = []
@@ -812,7 +861,7 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, p
             row.append(get_perf_event_statistics(run, perf_attr).value)
 
         for other_attr in other_attributes:
-            row.append(OtherMeasure.get(name=other_attr, run=run).value)
+            row.append(get_other_measure_statistics(run, other_attr).value)
 
     df = pd.DataFrame(np.nan, index=range(max(rows) + 1), columns=perf_attributes + other_attributes)
 
@@ -957,6 +1006,7 @@ def perf_distribution(merge_strategy,
                      r.version_limit == version_limit and
                      r.merge_strategy == merge_strategy).order_by(desc(Run.timestamp)).first()
 
+    # sorted = lambda x: x
     values = sorted([event.value for event in select(e for e in PerfEvent if e.event == event and e.run == run)])
 
     plt.bar(range(len(values)), values)
