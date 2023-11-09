@@ -449,21 +449,23 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
             else:
                 logger.info('no run exists for this benchmark, execute it')
 
-        arguments = benchmark_args.get(benchmark.name)
-        if arguments is None:
+        base_arguments = benchmark_args.get(benchmark.name)
+        if base_arguments is None:
             logger.warn(f"no CLI argument for {repr(benchmark.name)}")
-            arguments = default_arguments
+            base_arguments = default_arguments
 
         run = Run(benchmark=benchmark,
                   system=system,
                   compiler=compiler,
                   version_limit=v,
                   merge_strategy=merge_strategy,
-                  arguments=arguments)
+                  arguments=base_arguments)
 
         executable, primitive_count = compile(compilerdir, file, v, merge_strategy, timeout)
 
-        for _ in range(repetitions):
+        align_stack_step = 3
+        for rep in range(repetitions):
+            arguments = f"{base_arguments} align-stack: {rep * align_stack_step}"
             for event, (value, variance) in run_benchmark(executable, arguments).items():
                 PerfEvent(event=event, value=int(value), run=run)
 
@@ -896,8 +898,8 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
 # Perf data deistribution
 ##############################################################################
 
-def choose_distribution_output_path(output, merge_strategy, system_name, compiler_name, benchmark, perf_event):
-    base = f"distribution_{benchmark}_{merge_strategy}_{perf_event}"
+def choose_distribution_output_path(output, merge_strategy, system_name, compiler_name, benchmark, version_limit, perf_event):
+    base = f"distribution_{benchmark}_{merge_strategy}{version_limit}_{perf_event}"
     return choose_path(base, output, system_name, compiler_name)
 
 @db_session
@@ -912,7 +914,7 @@ def perf_distribution(merge_strategy,
     compiler = get_compiler_from_name(compiler_name)
 
     output_path = choose_distribution_output_path(output, merge_strategy, system.name,
-                                                  compiler.name, benchmark_name, event)
+                                                  compiler.name, benchmark_name, version_limit, event)
 
     benchmark = Benchmark.get(name=benchmark_name)
 
