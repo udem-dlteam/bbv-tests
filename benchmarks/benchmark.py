@@ -133,7 +133,6 @@ class System(db.Entity):
 
 class Benchmark(db.Entity):
     name = Required(str)
-    path = Required(str)
     content = Required(str)
     timestamp = Required(int)
     runs = Set('Run')
@@ -461,7 +460,7 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
     with open(file) as f:
         name = os.path.splitext(os.path.basename(file))[0]
         timestamp = int(os.path.getmtime(file))
-        benchmark, _ = Benchmark.get_or_create(name=name, path=str(file), content=f.read(), timestamp=timestamp)
+        benchmark, _ = Benchmark.get_or_create(name=name, content=f.read(), timestamp=timestamp)
 
     for v in version_limits:
         logger.info(f'- benchmark: {file}\n'
