@@ -172,7 +172,7 @@ class Run(db.Entity):
     primitives = Set('PrimitiveCount', reverse='run')
     perf_events = Set('PerfEvent', reverse='run')
     other_measures = Set('OtherMeasure', reverse='run')
-    iterations = Required(int)
+    arguments = Required(str)
     timestamp = Required(int, default=lambda: int(time.time()))
 
 
@@ -374,16 +374,16 @@ def compile(compilerdir, file, vlimit, merge_strategy, timeout=None):
     return executable, primitive_count
 
 
-def run_benchmark(executable, repeat):
+def run_benchmark(executable, arguments):
     # Run program to measure time only
-    time_command = f"perf stat -e {BenchResultParser.time_event} {executable} repeat: {repeat}"
+    time_command = f"perf stat -e {BenchResultParser.time_event} {executable} {arguments}"
     logger.info(time_command)
     time_output = subprocess.run(time_command, shell=True, capture_output=True).stderr.decode()
     logger.debug(time_output)
 
     # Run program with all perf stat events on
     other_events = ' '.join(f"-e {e}" for e in BenchResultParser.event_names)
-    other_command = f"perf stat {other_events} {executable} repeat: {repeat}"
+    other_command = f"perf stat {other_events} {executable} {arguments}"
     logger.info(other_command)
     other_output = subprocess.run(other_command, shell=True, capture_output=True).stderr.decode()
     logger.debug(other_output)
@@ -400,7 +400,27 @@ def run_benchmark(executable, repeat):
 
     return other_parser
 
-NUMBER_OF_ITERATIONS = 20
+default_arguments = "repeat: 20"
+
+benchmark_args = {
+    "ack": "repeat: 50 m: 3 n: 9",
+    "fib": "repeat: 5 n: 39",
+    "fibfp": "repeat: 2 n: 39.0",
+    "tak": "repeat: 10000 x: 18 y: 12 z: 6",
+    "takl": "repeat: 2000 x: 18 y: 12 z: 6",
+    "diviter": "repeat: 2000000 ",
+    "divrec": "repeat: 2000000 ",
+    "array1": "repeat: 5 n: 200000",
+    "browse": "repeat: 2000 ",
+    "mazefun": "repeat: 5000 n: 11 m: 11",
+    "nqueens": "repeat: 2 n: 13",
+    "puzzle": "repeat: 500 n: 511",
+    "quicksort": "repeat: 1000 ",
+    "sum": "repeat: 200000 n: 10000",
+    "sumfp": "repeat: 500 n: 1e6",
+    "triangl": "repeat: 50 i: 22 depth: 1",
+    "almabench": "repeat: 1 K: 36525",
+}
 
 @db_session
 def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge_strategy, force_execution=False, timeout=None):
@@ -429,17 +449,22 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
             else:
                 logger.info('no run exists for this benchmark, execute it')
 
+        arguments = benchmark_args.get(benchmark.name)
+        if arguments is None:
+            logger.warn(f"no CLI argument for {repr(benchmark.name)}")
+            arguments = default_arguments
+
         run = Run(benchmark=benchmark,
                   system=system,
                   compiler=compiler,
                   version_limit=v,
                   merge_strategy=merge_strategy,
-                  iterations=NUMBER_OF_ITERATIONS)
+                  arguments=arguments)
 
         executable, primitive_count = compile(compilerdir, file, v, merge_strategy, timeout)
 
         for _ in range(repetitions):
-            for event, (value, variance) in run_benchmark(executable, NUMBER_OF_ITERATIONS).items():
+            for event, (value, variance) in run_benchmark(executable, arguments).items():
                 PerfEvent(event=event, value=int(value), run=run)
 
         typechecks = 0
@@ -1122,4 +1147,6 @@ if __name__ == "__main__":
                           event=args.event,
                           version_limit=args.version_limit,
                           output=args.output)
+    else:
+        parser.print_help()
 
