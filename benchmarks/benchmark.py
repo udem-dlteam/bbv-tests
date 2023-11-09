@@ -422,6 +422,37 @@ benchmark_args = {
     "almabench": "repeat: 1 K: 36525",
 }
 
+
+def get_program_size(executable, benchmark, compiler):
+    if compiler.name == 'gambit':
+        objdump_command = f"objdump --disassemble {executable} | sed -e '/ <.*>:/!d'"
+        logger.info(objdump_command)
+        objdump_output = subprocess.run(objdump_command, shell=True, capture_output=True).stdout.decode()
+        logger.debug(objdump_output)
+        lines = objdump_output.splitlines()
+
+        start_marker = f"<___H_{benchmark.name}>"
+        end_marker = f"<___LNK_{benchmark.name}>"
+
+        logger.debug(f"looking for {start_marker} and {end_marker}")
+
+        def parse(marker, it):
+            for line in it:
+                if marker in line:
+                    return int(line.split()[0], 16)
+            return None
+
+        line_iterator = iter(objdump_output.splitlines())
+        start = parse(start_marker, line_iterator)
+        end = parse(end_marker, line_iterator)
+
+        if not (start and end):
+            return None
+
+        return end - start
+    else:
+        raise NotImplemented
+
 @db_session
 def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge_strategy, force_execution=False, timeout=None):
     system, _ = System.get_or_create_current_system()
@@ -485,9 +516,12 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
         logger.debug(f"gvm instruction size: {primitive_count.size_in_gvm_instructions}")
         OtherMeasure(name='gvm-size', value=primitive_count.size_in_gvm_instructions, run=run)
 
-        executable_size = os.path.getsize(executable)
-        logger.debug(f"executable size: {executable_size}")
-        OtherMeasure(name='executable-size', value=executable_size, run=run)
+        size = get_program_size(executable, benchmark, compiler)
+        if size:
+            logger.debug(f"program size: {size}")
+            OtherMeasure(name='program-size', value=size, run=run)
+        else:
+            logger.warning(f"could not resolve size of {repr(executable)}")
 
 ##############################################################################
 # Chart generation
