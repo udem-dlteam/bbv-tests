@@ -499,12 +499,21 @@ class ChartValue:
     def scale(self, ratio):
         return ChartValue(self.name, self.value * ratio, self.stdev * ratio)
 
+    @classmethod
+    @property
+    def zero(cls):
+        return cls(0)
+
     def __repr__(self):
         return f"ChartValue(value={self.value}, stdev={self.stdev})"
 
     def __truediv__(self, other):
         if not isinstance(other, ChartValue):
             return NotImplemented
+
+        if other.value == 0:
+            # Use pseudo-ratio
+            return ChartValue(self.value + 1, self.stdev) / ChartValue(1, other.stdev)
 
         new_value = self.value / other.value
 
@@ -625,12 +634,16 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
     plot_data(data, output_path)
 
 
-def get_perf_event_statistics(run, name):
+_sentinel = object()
+def get_perf_event_statistics(run, name, default=_sentinel):
     events = select(e for e in PerfEvent if e.event == name and e.run == run)
     values = [e.value for e in events]
 
     if not values:
-        raise ValueError(f'Cannot find {repr(name)}')
+        if default is _sentinel:
+            raise ValueError(f'Cannot find {repr(name)}')
+        else:
+            return default
 
     mean = statistics.mean(values)
     stdev = statistics.stdev(values) if len(values) > 1 else 0
@@ -679,17 +692,27 @@ def plot_data(data, output_path):
     other_measure_colors = mpl.colormaps.get_cmap('summer')(np.linspace(0.3, 0.8, n_other_measures))
 
     # Format data for matplotlib
-    data = sorted(data, key=lambda d: (d[0].version_limit, d[0].merge_strategy))
+    data_no_bbv = [d for d in data if d[0].version_limit == 0][:1] # only keep one execution
+    data_with_bbv = [d for d in data if d[0].version_limit > 0]
+    data_with_bbv.sort(key=lambda d: (d[0].version_limit, d[0].merge_strategy))
 
-    first = data[0]
+    data = data_no_bbv + data_with_bbv
 
-    versions = [f"{r.merge_strategy} {r.version_limit}" for r, *_ in data]
+    versions = ["No BBV"] + [f"{r.merge_strategy} {r.version_limit}" for r, *_ in data_with_bbv]
     measures = collections.defaultdict(list)
+
+    first = data_no_bbv[0]
+
+    def get_first_point(name):
+        for measures in first[1:]:
+            if measure := measures.get(name):
+                return measure
+        return ChartValue.zero
 
     for run, *measure_sets in data:
         for m in measure_sets:
             for name, measure in sorted(m.items(), key=operator.itemgetter(0)):
-                measures[name].append(measure / first[1][name])
+                measures[name].append(measure / get_first_point(name))
 
     def category_order(name):
         for i, group in enumerate(first[1:]):
@@ -821,13 +844,8 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     # Format data in a pandas dataframe
     perf_attributes = list(select(e.event for e in PerfEvent if e.run in runs).distinct())
 
-    for name in perf_attributes.copy():
-        # Remove attributes that perf could not recover on all runs
-        for run in runs:
-            try:
-                get_perf_event_statistics(run, name)
-            except ValueError:
-                perf_attributes.remove(name)
+    # Remove attributes that perf could not recover on all runs
+    perf_attributes = [p for p in perf_attributes if all(get_perf_event_statistics(run, p, None) for run in runs)]
 
     logger.info(f"perf attributes in analysis: {', '.join(perf_attributes)}")
 
