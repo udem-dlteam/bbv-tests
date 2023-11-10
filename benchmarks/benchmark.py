@@ -144,12 +144,16 @@ class PrimitiveCount(db.Entity):
 
     @property
     def is_typecheck(self):
-        typechecks = ("##fixnum?", '##flonum?', "##vector?", "##pair?", "##box?", "##procedure?",
+        typechecks = (
+                # Gambit
+                "##fixnum?", '##flonum?', "##vector?", "##pair?", "##box?", "##procedure?",
                 "##bignum?", "##ratnum?", "##boolean?", "##string?", "##char?",
                 "##bytevector?", "##u8vector?", "##u16vector?", "##u32vector?",
                 "##u64vector?", "##s8vector?", "##s16vector?", "##s32vector?",
                 "##s64vector?", "##f8vector?", "##f16vector?", "##f32vector?",
                 "##f64vector?", "##null?")
+        typechecks = typechecks + tuple(n.replace("##", "") for n in typechecks) + \
+            tuple(n.replace("##", "$") for n in typechecks)
         return self.name in typechecks
 
 class PerfEvent(db.Entity):
@@ -182,11 +186,15 @@ db.generate_mapping(create_tables=True)
 # Utils
 ##############################################################################
 
-def run_command(command, timeout, env):
+def run_command(command, timeout, env=None):
     logger.info(command)
+
+    env = env = os.environ.copy() if env is None else env
 
     if timeout is not None:
         logger.info(f"(with timeout: {timeout}s)")
+
+    process = None
 
     try:
         process = subprocess.Popen(shlex.split(command),
@@ -197,7 +205,7 @@ def run_command(command, timeout, env):
         logger.debug(output)
         return output.decode()
     finally:
-        if process.poll() is None:
+        if process and process.poll() is None:
             logger.info("killing process")
             process.kill()
 
@@ -233,7 +241,7 @@ class PrimitivesCountParser:
         counts = re.findall("\(([^ ]+) (\d+)\)", counter_section)
         self.primitives = {k: int(v) for k, v in counts}
 
-        self.size_in_gvm_instructions = self.primitives.pop(self.SIZE_IN_GVM_INSTRUCTIONS)
+        self.size_in_gvm_instructions = self.primitives.pop(self.SIZE_IN_GVM_INSTRUCTIONS, None)
 
         return self
 
@@ -375,12 +383,12 @@ def extract_executable_from_compiler_output(content):
     return re.search(r"\*\*\*executable: (.+)", content).group(1)
 
 
-def compile(compilerdir, file, vlimit, merge_strategy, timeout=None):
+def compile_gambit(gambitdir, file, vlimit, merge_strategy, timeout=None):
+    env = os.environ.copy()
+
+    env["GAMBITDIR"] = gambitdir
 
     command = f"{COMPILE_SCRIPT} -g -V {vlimit} -M {merge_strategy} -P {file}"
-
-    env = os.environ.copy()
-    env["GAMBITDIR"] = compilerdir
 
     output = run_command(command, timeout, env)
 
@@ -396,6 +404,50 @@ def compile(compilerdir, file, vlimit, merge_strategy, timeout=None):
         logger.debug(f"Primitive count: {dict(primitive_count)}")
 
     return executable, primitive_count
+
+
+def compile_bigloo(file, vlimit, merge_strategy, timeout=None):
+    def get_command(primitive_count):
+        primitive_count_flag = '-P' if primitive_count else ''
+        return f"{COMPILE_SCRIPT} -b -V {vlimit} -M {merge_strategy} {primitive_count_flag} {file}"
+
+    # First execution with primitive count
+    command_with_primitives = get_command(True)
+
+    output = run_command(command_with_primitives, timeout)
+
+    executable = extract_executable_from_compiler_output(output)
+
+    executable_output = run_command(executable, timeout)
+
+    primitive_count = PrimitivesCountParser(executable_output)
+
+    # Second execution without primitive count
+    command = get_command(False)
+
+    output = run_command(command, timeout)
+
+    executable = extract_executable_from_compiler_output(output)
+
+    logger.info(f"executable created at: {executable}")
+
+    if not primitive_count:
+        logger.warning("Failed to parse primitive count")
+    else:
+        logger.debug(f"Primitive count: {dict(primitive_count)}")
+
+    return executable, primitive_count
+
+def compile(compiler_execution_data, file, vlimit, merge_strategy, timeout=None):
+    gambitdir = compiler_execution_data.get('gambitdir')
+    use_bigloo = compiler_execution_data.get('use_bigloo')
+
+    if use_bigloo:
+        return compile_bigloo(file, vlimit, merge_strategy, timeout)
+    elif gambitdir:
+        return compile_gambit(gambitdir, file, vlimit, merge_strategy, timeout)
+    else:
+        raise NotImplementedError
 
 
 def run_benchmark(executable, arguments):
@@ -434,21 +486,22 @@ default_arguments = "repeat: 20"
 
 benchmark_args = {
     "ack": "repeat: 50 m: 3 n: 9",
-    "fib": "repeat: 5 n: 39",
+    "bague": "repeat: 1",
+    "fib": "repeat: 3 n: 39",
     "fibfp": "repeat: 2 n: 39.0",
-    "tak": "repeat: 10000 x: 18 y: 12 z: 6",
-    "takl": "repeat: 2000 x: 18 y: 12 z: 6",
-    "diviter": "repeat: 2000000 ",
-    "divrec": "repeat: 2000000 ",
+    "tak": "repeat: 5000 x: 18 y: 12 z: 6",
+    "takl": "repeat: 1000 x: 18 y: 12 z: 6",
+    "diviter": "repeat: 100000 ",
+    "divrec": "repeat: 100000 ",
     "array1": "repeat: 5 n: 200000",
-    "browse": "repeat: 2000 ",
-    "mazefun": "repeat: 5000 n: 11 m: 11",
+    "browse": "repeat: 1000 ",
+    "mazefun": "repeat: 2000 n: 11 m: 11",
     "nqueens": "repeat: 2 n: 13",
-    "puzzle": "repeat: 500 n: 511",
-    "quicksort": "repeat: 1000 ",
-    "sum": "repeat: 200000 n: 10000",
-    "sumfp": "repeat: 500 n: 1e6",
-    "triangl": "repeat: 50 i: 22 depth: 1",
+    "puzzle": "repeat: 200 n: 511",
+    "quicksort": "repeat: 500 ",
+    "sum": "repeat: 10000 n: 10000",
+    "sumfp": "repeat: 200 n: 1e6",
+    "triangl": "repeat: 20 i: 22 depth: 1",
     "almabench": "repeat: 1 K: 36525",
 }
 
@@ -481,12 +534,29 @@ def get_program_size(executable, benchmark, compiler):
 
         return end - start
     else:
-        raise NotImplemented
+        return None
+
+def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
+    if gambitdir:
+        compiler, _ = Compiler.get_or_create_compiler(gambitdir)
+        return compiler
+    
+    if use_bigloo:
+        compiler, _ = Compiler.get_or_create(name='bigloo',
+                                             commit_sha='?',
+                                             commit_description='?',
+                                             commit_author='?',
+                                             commit_timestamp=int(time.time()))
+        return compiler
+
+    raise NotImplementedError
 
 @db_session
-def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge_strategy, force_execution=False, timeout=None):
+def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetitions, merge_strategy, force_execution=False, timeout=None):
     system, _ = System.get_or_create_current_system()
-    compiler, _ = Compiler.get_or_create_compiler(compilerdir)
+    compiler = get_or_create_bigloo_or_gambit(gambitdir, use_bigloo)
+
+    compiler_execution_data = {'gambitdir': gambitdir, 'use_bigloo': use_bigloo, 'compiler': compiler}
 
     with open(file) as f:
         name = os.path.splitext(os.path.basename(file))[0]
@@ -522,7 +592,7 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
                   merge_strategy=merge_strategy,
                   arguments=base_arguments)
 
-        executable, primitive_count = compile(compilerdir, file, v, merge_strategy, timeout)
+        executable, primitive_count = compile(compiler_execution_data, file, v, merge_strategy, timeout)
 
         align_stack_step = 3
         for rep in range(repetitions):
@@ -548,8 +618,11 @@ def run_and_save_benchmark(compilerdir, file, version_limits, repetitions, merge
         logger.debug(f"executed primitives: {total_primitives}")
         OtherMeasure(name='primitives', value=total_primitives, run=run)
 
-        logger.debug(f"gvm instruction size: {primitive_count.size_in_gvm_instructions}")
-        OtherMeasure(name='gvm-size', value=primitive_count.size_in_gvm_instructions, run=run)
+        if primitive_count.size_in_gvm_instructions:
+            logger.debug(f"gvm instruction size: {primitive_count.size_in_gvm_instructions}")
+            OtherMeasure(name='gvm-size', value=primitive_count.size_in_gvm_instructions, run=run)
+        else:
+            logger.debug("Did not find count for total GVM instructions")
 
         size = get_program_size(executable, benchmark, compiler)
         if size:
@@ -685,7 +758,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
             and r2.merge_strategy == r.merge_strategy)))\
         .order_by(Run.merge_strategy).order_by(Run.version_limit)
 
-    logger.info(f"found {len(runs)} (only latest)")
+    logger.debug(f"found {len(runs)} (only latest)")
 
     primitive_names = select_primitives_names(runs, primitive_names_or_amount)
 
@@ -713,9 +786,11 @@ def sanitize_stats(name, values, default=_sentinel):
         else:
             return default
 
-    percentage = 0
+    percentage = 0.1
+    logger.debug(f"trimming {int(percentage * 100)}% of outliers for {name}")
+
     values.sort()
-    values = values[int(len(values) * percentage):int(len(values) * (1 - percentage))]
+    values = values[math.floor(len(values) * percentage):math.ceil(len(values) * (1 - percentage)) + 1]
 
     mean = statistics.mean(values)
     stdev = statistics.stdev(values) if len(values) > 1 else 0
@@ -811,7 +886,10 @@ def plot_data(data, output_path):
     x = np.arange(len(versions))
     num_bars = n_versions * len(measures)
 
-    width = 18 / (num_bars + n_versions)
+    if (num_bars + n_versions) < 30:
+        width = 0.2
+    else:
+        width = 18 / (num_bars + n_versions)
  
     multiplier = 0
 
@@ -977,7 +1055,7 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
 
 
 ##############################################################################
-# Perf data deistribution
+# Perf data distribution
 ##############################################################################
 
 def choose_distribution_output_path(output, merge_strategy, system_name, compiler_name, benchmark, version_limit, perf_event):
@@ -1025,7 +1103,7 @@ if __name__ == "__main__":
     def directory_path(value):
         path = pathlib.Path(value)
         if path.is_dir():
-            return path
+            return path.resolve()
         else:
             raise NotADirectoryError(f"{value} is not a valid directory")
 
@@ -1068,12 +1146,18 @@ if __name__ == "__main__":
 
     benchmark_parser.add_argument('file', type=file_path)
 
-    benchmark_parser.add_argument('-g', '--gambit-dir',
-                                  dest='compilerdir',
-                                  type=directory_path,
-                                  metavar='PATH',
-                                  required=True,
-                                  help='Gambit root')
+    compiler_parser_group = benchmark_parser.add_mutually_exclusive_group(required=True)
+
+    compiler_parser_group.add_argument('-g', '--gambit-dir',
+                                       dest='gambitdir',
+                                       type=directory_path,
+                                       metavar='PATH',
+                                       help='Gambit root')
+
+    compiler_parser_group.add_argument('-b', '--bigloo',
+                                       dest='use_bigloo',
+                                       action='store_true',
+                                       help='Use Bigloo')
 
     benchmark_parser.add_argument('-l', '--limit',
                                   dest="version_limits",
@@ -1097,9 +1181,9 @@ if __name__ == "__main__":
                                   help="Compilation timeout (in secondes)")
 
     benchmark_parser.add_argument('-m', '--merge-strategy',
+                                  required=True,
                                   metavar="STRATEGY",
                                   dest='merge_strategy',
-                                  default='linear',
                                   help='BBV merge strategies')
 
     benchmark_parser.add_argument('-f', '--force-execution',
@@ -1220,8 +1304,9 @@ if __name__ == "__main__":
     logger.debug(args)
 
     if args.command == 'benchmark':
-        run_and_save_benchmark(compilerdir=args.compilerdir.resolve(),
-                               file=args.file.resolve(),
+        run_and_save_benchmark(gambitdir=args.gambitdir,
+                               use_bigloo=args.use_bigloo,
+                               file=args.file,
                                version_limits=args.version_limits,
                                repetitions=args.repetitions,
                                merge_strategy=args.merge_strategy,

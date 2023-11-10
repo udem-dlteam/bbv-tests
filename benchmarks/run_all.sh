@@ -1,8 +1,8 @@
 #!/bin/bash
 #set -euxo pipefail
 
-files=("recursive/ack"
-       "recursive/fib"
+files=("recursive/fib"
+       "recursive/ack"
        "recursive/fibfp"
        "recursive/tak"
        "recursive/takl"
@@ -36,7 +36,7 @@ gambit=../../gambit
 
 for file in ${files[@]}; do
   for strat in ${strategies[@]}; do
-    python ./benchmark.py -v benchmark ../tests/${file}.scm -g ${gambit} -r 100 -m ${strat} -f
+    python ./benchmark.py -v benchmark ../tests/${file}.scm -g ${gambit} -l 0 1 2 3 -r 3 -m ${strat} -f
   done
 done
 
