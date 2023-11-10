@@ -436,19 +436,19 @@ benchmark_args = {
     "ack": "repeat: 50 m: 3 n: 9",
     "fib": "repeat: 5 n: 39",
     "fibfp": "repeat: 2 n: 39.0",
-    "tak": "repeat: 10000 x: 18 y: 12 z: 6",
-    "takl": "repeat: 2000 x: 18 y: 12 z: 6",
-    "diviter": "repeat: 2000000 ",
-    "divrec": "repeat: 2000000 ",
+    "tak": "repeat: 5000 x: 18 y: 12 z: 6",
+    "takl": "repeat: 1000 x: 18 y: 12 z: 6",
+    "diviter": "repeat: 100000 ",
+    "divrec": "repeat: 100000 ",
     "array1": "repeat: 5 n: 200000",
-    "browse": "repeat: 2000 ",
-    "mazefun": "repeat: 5000 n: 11 m: 11",
+    "browse": "repeat: 1000 ",
+    "mazefun": "repeat: 2000 n: 11 m: 11",
     "nqueens": "repeat: 2 n: 13",
-    "puzzle": "repeat: 500 n: 511",
-    "quicksort": "repeat: 1000 ",
-    "sum": "repeat: 200000 n: 10000",
-    "sumfp": "repeat: 500 n: 1e6",
-    "triangl": "repeat: 50 i: 22 depth: 1",
+    "puzzle": "repeat: 200 n: 511",
+    "quicksort": "repeat: 500 ",
+    "sum": "repeat: 10000 n: 10000",
+    "sumfp": "repeat: 200 n: 1e6",
+    "triangl": "repeat: 20 i: 22 depth: 1",
     "almabench": "repeat: 1 K: 36525",
 }
 
@@ -685,7 +685,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
             and r2.merge_strategy == r.merge_strategy)))\
         .order_by(Run.merge_strategy).order_by(Run.version_limit)
 
-    logger.info(f"found {len(runs)} (only latest)")
+    logger.debug(f"found {len(runs)} (only latest)")
 
     primitive_names = select_primitives_names(runs, primitive_names_or_amount)
 
@@ -713,9 +713,11 @@ def sanitize_stats(name, values, default=_sentinel):
         else:
             return default
 
-    percentage = 0
+    percentage = 0.1
+    logger.debug(f"trimming {int(percentage * 100)}% of outliers for {name}")
+
     values.sort()
-    values = values[int(len(values) * percentage):int(len(values) * (1 - percentage))]
+    values = values[math.floor(len(values) * percentage):math.ceil(len(values) * (1 - percentage)) + 1]
 
     mean = statistics.mean(values)
     stdev = statistics.stdev(values) if len(values) > 1 else 0
