@@ -28,6 +28,7 @@ SYSTEM=gambit
 VIEW=no
 TESTS=""          # empty to compile all tests in tests directory
 
+OPTIMIZE_BEFORE=0
 ARITHMETIC=G      # generic (G) or specialized (S) arithmetic?
 VERSION_LIMIT=4   # version limit (0 to disable BBV)
 INLINING_LIMIT=0  # 0 for no function inlining
@@ -85,6 +86,9 @@ while [ "$#" != "0" ]; do
         exit 1
       fi
       INLINING_LIMIT="$1"
+      ;;
+    -O) # optimize before
+      OPTIMIZE_BEFORE=1
       ;;
     -P) # primitive counts
       PRIMITIVE_COUNT=1
@@ -168,7 +172,11 @@ for file in $FILES ; do
   case "$SYSTEM" in
 
     gambit)
-      DECL="(declare (version-limit $VERSION_LIMIT) (inlining-limit $INLINING_LIMIT)) (define-macro (%%%) (eval '(define arithmetic '$ARITHMETIC))) (%%%) (define-macro (npnull? x) (quasiquote (let ((x ,x)) (and (not (##pair? x)) (##null? x)))))"
+      DECL_OPTIM=""
+      if [ "$OPTIMIZE_BEFORE" = "0" ]; then
+        DECL_OPTIM="(not constant-fold)"
+      fi
+      DECL="(declare $DECL_OPTIM (version-limit $VERSION_LIMIT) (inlining-limit $INLINING_LIMIT)) (define-macro (%%%) (eval '(define arithmetic '$ARITHMETIC))) (%%%) (define-macro (npnull? x) (quasiquote (let ((x ,x)) (and (not (##pair? x)) (##null? x)))))"
       base="$filenoext.gambit.$INLINING_LIMIT$ARITHMETIC$MERGE_STRATEGY$VERSION_LIMIT"
       exe=$base.exe
       echo "$OUTPUT_INCLUDED_CODE"
