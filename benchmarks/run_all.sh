@@ -1,8 +1,8 @@
 #!/bin/bash
 #set -euxo pipefail
 
-files=("recursive/ack"
-       "recursive/fib"
+files=("recursive/fib"
+       "recursive/ack"
        "recursive/fibfp"
        "recursive/tak"
        "recursive/takl"
