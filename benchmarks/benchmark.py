@@ -551,7 +551,7 @@ def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
                                              commit_sha='?',
                                              commit_description='?',
                                              commit_author='?',
-                                             commit_timestamp=int(time.time()))
+                                             commit_timestamp=-1)
         return compiler
 
     raise NotImplementedError
@@ -871,12 +871,14 @@ def plot_data(data, output_path):
 
     def pick_version_name(run):
         if run.version_limit == 0:
-            if run.compiler_optimizations:
-                return "No BBV/optim"
-            else:
-                return "No BBV"
+            base = "No BBV"
         else:
-            return f"{run.merge_strategy} {run.version_limit}"
+            base = f"{run.merge_strategy} {run.version_limit}"
+
+        if run.compiler_optimizations:
+            base += "/optim"
+
+        return base
 
     versions = [pick_version_name(r) for r, *_ in data]
     measures = collections.defaultdict(list)
@@ -1025,7 +1027,6 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
         if not bench:
             benchmarks_filter.remove(benchmark_name)
             logger.warning(f"benchmark does not exist: {repr(benchmark_name)}")
-
         elif not exists(r for r in Run if r.benchmark == bench
                       and r.system == system and r.compiler == compiler
                       and r.merge_strategy == merge_strategy):
