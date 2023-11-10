@@ -33,7 +33,7 @@
    ((eq? kind 'FX)
     `(PRIMop ,(symbol-append 'fx op) ,@args))
    ((or (eq? kind 'GEN) (eq? arithmetic 'G)) ;; force generic?
-    `(,op ,@args))
+    `(,(symbol-append 'BBV op) ,@args))
    ((eq? kind 'SFL)
     `(,(symbol-append 'FL op) ,@args))
    ((eq? kind 'SFX)
