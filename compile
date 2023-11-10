@@ -216,7 +216,7 @@ for file in $FILES ; do
       if [ "$PRIMITIVE_COUNT" = "1" ]; then
         BIGLOOOPT="$BIGLOOOPT -copt -DSAW_BBV_STATS=1"
       fi
-      echo "cd $SCRIPT_DIR/bigloo; BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe"
+      echo "cd $SCRIPT_DIR/bigloo; BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -O -fno-user-inlining -o $exe"
       (cd $SCRIPT_DIR/bigloo && \
 	 BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe)
 
