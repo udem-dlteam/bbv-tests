@@ -386,8 +386,6 @@ def extract_executable_from_compiler_output(content):
 def compile_gambit(gambitdir, file, vlimit, merge_strategy, timeout=None):
     env = os.environ.copy()
 
-    gambitdir = compiler_execution_data.get('gambitdir')
-
     env["GAMBITDIR"] = gambitdir
 
     command = f"{COMPILE_SCRIPT} -g -V {vlimit} -M {merge_strategy} -P {file}"
