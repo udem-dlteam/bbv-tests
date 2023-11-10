@@ -170,6 +170,7 @@ class Run(db.Entity):
     benchmark = Required('Benchmark', reverse='runs')
     system = Required('System', reverse='runs')
     compiler = Required('Compiler', reverse='runs')
+    compiler_optimizations = Required(bool)
     version_limit = Required(int)
     merge_strategy = Required(str)
     primitives = Set('PrimitiveCount', reverse='run')
@@ -383,12 +384,14 @@ def extract_executable_from_compiler_output(content):
     return re.search(r"\*\*\*executable: (.+)", content).group(1)
 
 
-def compile_gambit(gambitdir, file, vlimit, merge_strategy, timeout=None):
+def compile_gambit(gambitdir, file, vlimit, merge_strategy, compiler_optimizations, timeout=None):
     env = os.environ.copy()
 
     env["GAMBITDIR"] = gambitdir
 
-    command = f"{COMPILE_SCRIPT} -g -V {vlimit} -M {merge_strategy} -P {file}"
+    optimization_flag = "-O" if compiler_optimizations else ""
+
+    command = f"{COMPILE_SCRIPT} -g -V {vlimit} -M {merge_strategy} {optimization_flag} -P {file}"
 
     output = run_command(command, timeout, env)
 
@@ -406,7 +409,8 @@ def compile_gambit(gambitdir, file, vlimit, merge_strategy, timeout=None):
     return executable, primitive_count
 
 
-def compile_bigloo(file, vlimit, merge_strategy, timeout=None):
+def compile_bigloo(file, vlimit, merge_strategy, compiler_optimizations, timeout=None):
+    # TODO: USE compiler_optimizations
     def get_command(primitive_count):
         primitive_count_flag = '-P' if primitive_count else ''
         return f"{COMPILE_SCRIPT} -b -V {vlimit} -M {merge_strategy} {primitive_count_flag} {file}"
@@ -438,14 +442,15 @@ def compile_bigloo(file, vlimit, merge_strategy, timeout=None):
 
     return executable, primitive_count
 
-def compile(compiler_execution_data, file, vlimit, merge_strategy, timeout=None):
+
+def compile(compiler_execution_data, file, vlimit, merge_strategy, compiler_optimizations, timeout=None):
     gambitdir = compiler_execution_data.get('gambitdir')
     use_bigloo = compiler_execution_data.get('use_bigloo')
 
     if use_bigloo:
-        return compile_bigloo(file, vlimit, merge_strategy, timeout)
+        return compile_bigloo(file, vlimit, merge_strategy, compiler_optimizations, timeout)
     elif gambitdir:
-        return compile_gambit(gambitdir, file, vlimit, merge_strategy, timeout)
+        return compile_gambit(gambitdir, file, vlimit, merge_strategy, compiler_optimizations, timeout)
     else:
         raise NotImplementedError
 
@@ -552,7 +557,7 @@ def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
     raise NotImplementedError
 
 @db_session
-def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetitions, merge_strategy, force_execution=False, timeout=None):
+def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetitions, merge_strategy, compiler_optimizations, force_execution=False, timeout=None):
     system, _ = System.get_or_create_current_system()
     compiler = get_or_create_bigloo_or_gambit(gambitdir, use_bigloo)
 
@@ -568,31 +573,34 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetiti
                     f'- merge strategy:{merge_strategy}\n'
                     f'- version limit:{v}')
 
+        base_arguments = benchmark_args.get(benchmark.name)
+        if base_arguments is None:
+            logger.warn(f"no CLI argument for {repr(benchmark.name)}")
+            base_arguments = default_arguments
+
         if not force_execution:
             existing_run = Run.get(benchmark=benchmark,
                                    system=system,
                                    compiler=compiler,
                                    version_limit=v,
-                                   merge_strategy=merge_strategy)
+                                   merge_strategy=merge_strategy,
+                                   compiler_optimizations=compiler_optimizations,
+                                   arguments=base_arguments)
             if existing_run:
                 logger.info('benchmark has an existing run, skip it')
                 continue
             else:
                 logger.info('no run exists for this benchmark, execute it')
 
-        base_arguments = benchmark_args.get(benchmark.name)
-        if base_arguments is None:
-            logger.warn(f"no CLI argument for {repr(benchmark.name)}")
-            base_arguments = default_arguments
-
         run = Run(benchmark=benchmark,
                   system=system,
                   compiler=compiler,
                   version_limit=v,
                   merge_strategy=merge_strategy,
+                  compiler_optimizations=compiler_optimizations,
                   arguments=base_arguments)
 
-        executable, primitive_count = compile(compiler_execution_data, file, v, merge_strategy, timeout)
+        executable, primitive_count = compile(compiler_execution_data, file, v, merge_strategy, compiler_optimizations, timeout)
 
         align_stack_step = 3
         for rep in range(repetitions):
@@ -755,7 +763,8 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
             if r2.system == system and r2.compiler == compiler
             and r2.benchmark.name == benchmark
             and r2.version_limit == r.version_limit
-            and r2.merge_strategy == r.merge_strategy)))\
+            and r2.merge_strategy == r.merge_strategy
+            and r2.compiler_optimizations == r.compiler_optimizations)))\
         .order_by(Run.merge_strategy).order_by(Run.version_limit)
 
     logger.debug(f"found {len(runs)} (only latest)")
@@ -851,16 +860,28 @@ def plot_data(data, output_path):
     other_measure_colors = mpl.colormaps.get_cmap('summer')(np.linspace(0.3, 0.8, n_other_measures))
 
     # Format data for matplotlib
-    data_no_bbv = [d for d in data if d[0].version_limit == 0][:1] # only keep one execution
+    data_no_bbv_no_optim = [d for d in data if d[0].version_limit == 0
+                                               and not d[0].compiler_optimizations][:1]
+    data_no_bbv_optim = [d for d in data if d[0].version_limit == 0
+                                            and d[0].compiler_optimizations][:1]
     data_with_bbv = [d for d in data if d[0].version_limit > 0]
     data_with_bbv.sort(key=lambda d: (d[0].version_limit, d[0].merge_strategy))
 
-    data = data_no_bbv + data_with_bbv
+    data = data_no_bbv_no_optim + data_no_bbv_optim + data_with_bbv
 
-    versions = ["No BBV"] + [f"{r.merge_strategy} {r.version_limit}" for r, *_ in data_with_bbv]
+    def pick_version_name(run):
+        if run.version_limit == 0:
+            if run.compiler_optimizations:
+                return "No BBV/optim"
+            else:
+                return "No BBV"
+        else:
+            return f"{run.merge_strategy} {run.version_limit}"
+
+    versions = [pick_version_name(r) for r, *_ in data]
     measures = collections.defaultdict(list)
 
-    first = data_no_bbv[0]
+    first = data[0]
 
     def get_first_point(name):
         for measures in first[1:]:
@@ -888,6 +909,8 @@ def plot_data(data, output_path):
 
     if (num_bars + n_versions) < 30:
         width = 0.2
+    elif (num_bars + n_versions) < 60:
+        width = 0.23
     else:
         width = 18 / (num_bars + n_versions)
  
@@ -931,9 +954,22 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, p
 
     logger.info(f"Computing ratios for {benchmark_runs[0].benchmark.name}")
 
+    def get_row_name(run):
+        base = ""
+
+        if (limit := run.version_limit) == 0:
+            base += "0"
+        else:
+            base += str(limit)
+
+        if run.compiler_optimizations:
+            base += "+"
+
+        return base
+
     for run in benchmark_runs:
         row = []
-        rows[run.version_limit] = row
+        rows[get_row_name(run)] = row
 
         for perf_attr in perf_attributes:
             row.append(get_perf_event_statistics(run, perf_attr).value)
@@ -941,7 +977,15 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, p
         for other_attr in other_attributes:
             row.append(get_other_measure_statistics(run, other_attr).value)
 
-    df = pd.DataFrame(np.nan, index=range(max(rows) + 1), columns=perf_attributes + other_attributes)
+    def key(name):
+        if name.endswith("+"):
+            return int(name[:-1]), True
+        else:
+            return int(name), False
+
+    rows = {k: rows[k] for k in sorted(rows, key=key)}
+
+    df = pd.DataFrame(np.nan, index=rows.keys(), columns=perf_attributes + other_attributes)
 
     for i, row_data in rows.items():
         df.loc[i] = row_data
@@ -993,13 +1037,16 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     # Select only the latest runs for a each benchmark
     runs = list(select(
         r for r in Run
-        if r.system == system and r.compiler == compiler and r.merge_strategy == merge_strategy
+        if r.system == system and r.compiler == compiler
+        and (r.merge_strategy == merge_strategy or r.version_limit == 0)
         and r.benchmark.name in benchmarks_filter
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
             if r2.system == system and r2.compiler == compiler
-            and r2.merge_strategy == merge_strategy and r2.benchmark == r.benchmark
-            and r2.version_limit == r.version_limit))).order_by(Run.benchmark))
+            and (r2.merge_strategy == merge_strategy or r2.version_limit == 0)
+            and r2.benchmark == r.benchmark
+            and r2.version_limit == r.version_limit
+            and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
 
     logger.info(f"found {len(runs)} (only latest)")
 
@@ -1012,6 +1059,9 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     logger.info(f"perf attributes in analysis: {', '.join(perf_attributes)}")
 
     other_attributes = list(select(m.name for m in OtherMeasure if m.run in runs).distinct())
+
+    other_attributes = [o for o in other_attributes if not o.startswith('scheme')]
+
     logger.info(f"other measures in analysis: {', '.join(perf_attributes)}")
 
     data_points = {}
@@ -1024,6 +1074,7 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     # Compute the mean along the third axis, ignoring NaN values
     df_average_ratio = pd.DataFrame(np.prod([df.values for df in ratio_dataframes], axis=0),
                                     columns=ratio_dataframes[0].columns) ** (1 / len(ratio_dataframes))
+    df_average_ratio.index = ratio_dataframes[0].index
 
     # Plot
     fig, ax = plt.subplots(figsize=(15, 5))
@@ -1186,6 +1237,12 @@ if __name__ == "__main__":
                                   dest='merge_strategy',
                                   help='BBV merge strategies')
 
+    benchmark_parser.add_argument('-O', '--compiler-optimizations',
+                                  dest='compiler_optimizations',
+                                  action='store_true',
+                                  default=False,
+                                  help='Compile benchmark with compiler optimizations')
+
     benchmark_parser.add_argument('-f', '--force-execution',
                                   dest='force_execution',
                                   action='store_true',
@@ -1310,6 +1367,7 @@ if __name__ == "__main__":
                                version_limits=args.version_limits,
                                repetitions=args.repetitions,
                                merge_strategy=args.merge_strategy,
+                               compiler_optimizations=args.compiler_optimizations,
                                force_execution=args.force_execution,
                                timeout=args.timeout)
     elif args.command == 'plot':
