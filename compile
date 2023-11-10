@@ -197,11 +197,16 @@ for file in $FILES ; do
       ;;
 
     bigloo)
-      base="$filenoext.bigloo.$INLINING_LIMIT$ARITHMETIC$VERSION_LIMIT"
+      base="$filenoext.bigloo.$INLINING_LIMIT$ARITHMETIC$MERGE_STRATEGY$VERSION_LIMIT"
       exe=$base.exe
       PATH="$BIGLOODIR/bin:$PATH"
       SAWBBV=-fsaw-bbv
       BIGLOOBBVSTRATEGY="$MERGE_STRATEGY"
+      if [ "$OPTIMIZE_BEFORE" = "0" ]; then
+        BIGLOOOPT="$BIGLOOOPT -fno-user-inlining"
+      else
+        BIGLOOOPT="$BIGLOOOPT -O3"
+      fi
       if [ "$VERSION_LIMIT " = "1 " ]; then
 	      SAWBBV=
       fi
