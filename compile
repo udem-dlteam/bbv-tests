@@ -200,15 +200,11 @@ for file in $FILES ; do
       base="$filenoext.bigloo.$INLINING_LIMIT$ARITHMETIC$MERGE_STRATEGY$VERSION_LIMIT"
       exe=$base.exe
       PATH="$BIGLOODIR/bin:$PATH"
-      SAWBBV=-fsaw-bbv
       BIGLOOBBVSTRATEGY="$MERGE_STRATEGY"
       if [ "$OPTIMIZE_BEFORE" = "0" ]; then
-        BIGLOOOPT="$BIGLOOOPT -fno-user-inlining"
+        BIGLOOOPT="$BIGLOOOPT -O -fno-user-inlining"
       else
-        BIGLOOOPT="$BIGLOOOPT -O3"
-      fi
-      if [ "$VERSION_LIMIT " = "1 " ]; then
-	      SAWBBV=
+        BIGLOOOPT="$BIGLOOOPT -Obench"
       fi
       if [ "$INLINING_LIMIT " = "0 " ]; then
 	      BIGLOOOPT="$BIGLOOOPT -fno-user-inlining"
@@ -216,9 +212,9 @@ for file in $FILES ; do
       if [ "$PRIMITIVE_COUNT" = "1" ]; then
         BIGLOOOPT="$BIGLOOOPT -copt -DSAW_BBV_STATS=1"
       fi
-      echo "cd $SCRIPT_DIR/bigloo; BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -O -fno-user-inlining -o $exe"
+      echo "cd $SCRIPT_DIR/bigloo; BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe"
       (cd $SCRIPT_DIR/bigloo && \
-	 BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe)
+	 BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe)
 
       if [ -f $base-program.bbv.cfg ]; then
         (cd $SCRIPT_DIR/bigloo && \
