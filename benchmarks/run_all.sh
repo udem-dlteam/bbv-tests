@@ -36,7 +36,7 @@ gambit=../../gambit
 
 for file in ${files[@]}; do
   for strat in ${strategies[@]}; do
-    python ./benchmark.py -v benchmark ../tests/${file}.scm -g ${gambit} -r 5 -m ${strat} -f
+    python ./benchmark.py -v benchmark ../tests/${file}.scm -g ${gambit} -l 0 1 2 3 -r 3 -m ${strat} -f
   done
 done
 
