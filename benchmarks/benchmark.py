@@ -434,7 +434,7 @@ default_arguments = "repeat: 20"
 
 benchmark_args = {
     "ack": "repeat: 50 m: 3 n: 9",
-    "fib": "repeat: 5 n: 39",
+    "fib": "repeat: 3 n: 39",
     "fibfp": "repeat: 2 n: 39.0",
     "tak": "repeat: 5000 x: 18 y: 12 z: 6",
     "takl": "repeat: 1000 x: 18 y: 12 z: 6",
