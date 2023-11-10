@@ -193,6 +193,7 @@ for file in $FILES ; do
       exe=$base.exe
       PATH="$BIGLOODIR/bin:$PATH"
       SAWBBV=-fsaw-bbv
+      BIGLOOBBVSTRATEGY="$MERGE_STRATEGY"
       if [ "$VERSION_LIMIT " = "1 " ]; then
 	      SAWBBV=
       fi
@@ -202,9 +203,9 @@ for file in $FILES ; do
       if [ "$PRIMITIVE_COUNT" = "1" ]; then
         BIGLOOOPT="$BIGLOOOPT -copt -DSAW_BBV_STATS=1"
       fi
-      echo "cd $SCRIPT_DIR/bigloo; BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -O3 -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe"
+      echo "cd $SCRIPT_DIR/bigloo; BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe"
       (cd $SCRIPT_DIR/bigloo && \
-	 BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -O3 -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe)
+	 BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -t1 -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe)
 
       if [ -f $base-program.bbv.cfg ]; then
         (cd $SCRIPT_DIR/bigloo && \
