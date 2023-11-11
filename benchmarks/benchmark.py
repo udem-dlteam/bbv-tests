@@ -410,10 +410,10 @@ def compile_gambit(gambitdir, file, vlimit, merge_strategy, compiler_optimizatio
 
 
 def compile_bigloo(file, vlimit, merge_strategy, compiler_optimizations, timeout=None):
-    # TODO: USE compiler_optimizations
     def get_command(primitive_count):
+        optimization_flag = "-O" if compiler_optimizations else ""
         primitive_count_flag = '-P' if primitive_count else ''
-        return f"{COMPILE_SCRIPT} -b -V {vlimit} -M {merge_strategy} {primitive_count_flag} {file}"
+        return f"{COMPILE_SCRIPT} -b -V {vlimit} -M {merge_strategy} {optimization_flag} {primitive_count_flag} {file}"
 
     # First execution with primitive count
     command_with_primitives = get_command(True)
