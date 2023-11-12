@@ -344,7 +344,7 @@ class PerfResultParser:
                 logger.debug(f"found perf stat event {name} ({value} +- {variance})")
                 return (cls._string_to_number(value), cls._string_to_number(variance))
 
-        logger.debug(f"could not find perf stat event {name}")
+        #logger.debug(f"could not find perf stat event {name}")
         return None
 
 class SchemeStatsParser:
@@ -510,36 +510,62 @@ benchmark_args = {
     "almabench": "repeat: 1 K: 36525",
 }
 
+def get_gambit_program_size(executable, benchmark):
+    objdump_command = f"objdump --disassemble {executable} | sed -e '/ <.*>:/!d'"
+    logger.info(objdump_command)
+    objdump_output = subprocess.run(objdump_command, shell=True, capture_output=True).stdout.decode()
+    logger.debug(objdump_output)
+    lines = objdump_output.splitlines()
+
+    start_marker = f"<___H_{benchmark.name}>"
+    end_marker = f"<___LNK_{benchmark.name}>"
+
+    logger.debug(f"looking for {start_marker} and {end_marker}")
+
+    def parse(marker, it):
+        for line in it:
+            if marker in line:
+                return int(line.split()[0], 16)
+        return None
+
+    line_iterator = iter(objdump_output.splitlines())
+    start = parse(start_marker, line_iterator)
+    end = parse(end_marker, line_iterator)
+
+    if not (start and end):
+        return None
+
+    return end - start
+
+def get_bigloo_program_size(executable):
+    o_file_path = os.path.abspath(os.path.join(os.getcwd(), "../bigloo/bbv.o"))
+
+    if not os.path.exists(o_file_path):
+        raise FileNotFoundError(f"could not find {o_file_path}")
+
+    objdump_command = f"objdump --disassemble {o_file_path} | sed -e '/ <.*>:/!d'"
+    logger.info(objdump_command)
+    objdump_output = subprocess.run(objdump_command, shell=True, capture_output=True).stdout.decode()
+    logger.debug(objdump_output)
+    
+    marker = "<bigloo_abort>"
+
+    print(fr"([0-9a-fA-F]+)\s+{marker}")
+
+    match = re.search(fr"([0-9a-fA-F]+)\s+{marker}", objdump_output)
+
+    if not match:
+        raise ValueError(f"could not find {repr(marker)} label in {o_file_path}")
+
+    logger.info(f"found size from marker: {match.group(0)}")
+
+    return int(match.group(1), 16)
 
 def get_program_size(executable, benchmark, compiler):
     if compiler.name == 'gambit':
-        objdump_command = f"objdump --disassemble {executable} | sed -e '/ <.*>:/!d'"
-        logger.info(objdump_command)
-        objdump_output = subprocess.run(objdump_command, shell=True, capture_output=True).stdout.decode()
-        logger.debug(objdump_output)
-        lines = objdump_output.splitlines()
-
-        start_marker = f"<___H_{benchmark.name}>"
-        end_marker = f"<___LNK_{benchmark.name}>"
-
-        logger.debug(f"looking for {start_marker} and {end_marker}")
-
-        def parse(marker, it):
-            for line in it:
-                if marker in line:
-                    return int(line.split()[0], 16)
-            return None
-
-        line_iterator = iter(objdump_output.splitlines())
-        start = parse(start_marker, line_iterator)
-        end = parse(end_marker, line_iterator)
-
-        if not (start and end):
-            return None
-
-        return end - start
+        return get_gambit_program_size(executable, benchmark)
     else:
-        return None
+        return get_bigloo_program_size(executable)
 
 def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
     if gambitdir:
@@ -758,6 +784,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
     runs = select(
         r for r in Run
         if r.system == system and r.compiler == compiler and r.benchmark.name == benchmark
+           and (not r.compiler_optimizations or r.version_limit == 0)
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
             if r2.system == system and r2.compiler == compiler
@@ -788,7 +815,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
 
 
 _sentinel = object()
-def sanitize_stats(name, values, default=_sentinel):
+def sanitize_stats(name, values, default=_sentinel, _logged=[False]):
     if not values:
         if default is _sentinel:
             raise ValueError(f'Cannot find {repr(name)}')
@@ -796,7 +823,10 @@ def sanitize_stats(name, values, default=_sentinel):
             return default
 
     percentage = 0.1
-    logger.debug(f"trimming {int(percentage * 100)}% of outliers for {name}")
+
+    if not _logged[0]:
+        logger.debug(f"trimming {int(percentage * 100)}% of outliers")
+        _logged[0]= True
 
     values.sort()
     values = values[math.floor(len(values) * percentage):math.ceil(len(values) * (1 - percentage)) + 1]
@@ -1041,6 +1071,7 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
         if r.system == system and r.compiler == compiler
         and (r.merge_strategy == merge_strategy or r.version_limit == 0)
         and r.benchmark.name in benchmarks_filter
+        #and (not r.compiler_optimizations or r.version_limit == 0)
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
             if r2.system == system and r2.compiler == compiler
