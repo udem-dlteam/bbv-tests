@@ -550,8 +550,6 @@ def get_bigloo_program_size(executable):
     
     marker = "<bigloo_abort>"
 
-    print(fr"([0-9a-fA-F]+)\s+{marker}")
-
     match = re.search(fr"([0-9a-fA-F]+)\s+{marker}", objdump_output)
 
     if not match:
@@ -980,24 +978,33 @@ def choose_analysis_output_path(output, merge_strategy, system_name, compiler_na
     return choose_path(f'analysis_{merge_strategy}', output, system_name, compiler_name)
 
 
+def choose_specific_metric_output_path(output, metric, merge_strategy, system_name, compiler_name):
+    return choose_path(f'{metric}_analysis_{merge_strategy}', output, system_name, compiler_name)
+
+def get_row_name(run):
+    base = ""
+
+    if (limit := run.version_limit) == 0:
+        base += "0"
+    else:
+        base += str(limit)
+
+    if run.compiler_optimizations:
+        base += "+"
+
+    return base
+
+def row_name_key(name):
+    if name.endswith("+"):
+        return int(name[:-1]), True
+    else:
+        return int(name), False
+
 def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, pseudo_ratio_offset=1):
     benchmark_runs = list(benchmark_runs)
     rows = {}
 
     logger.info(f"Computing ratios for {benchmark_runs[0].benchmark.name}")
-
-    def get_row_name(run):
-        base = ""
-
-        if (limit := run.version_limit) == 0:
-            base += "0"
-        else:
-            base += str(limit)
-
-        if run.compiler_optimizations:
-            base += "+"
-
-        return base
 
     for run in benchmark_runs:
         row = []
@@ -1009,13 +1016,7 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, p
         for other_attr in other_attributes:
             row.append(get_other_measure_statistics(run, other_attr).value)
 
-    def key(name):
-        if name.endswith("+"):
-            return int(name[:-1]), True
-        else:
-            return int(name), False
-
-    rows = {k: rows[k] for k in sorted(rows, key=key)}
+    rows = {k: rows[k] for k in sorted(rows, key=row_name_key)}
 
     df = pd.DataFrame(np.nan, index=rows.keys(), columns=perf_attributes + other_attributes)
 
@@ -1034,6 +1035,94 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, p
 
     # Compute ratios based on the first column
     return df.div(df.iloc[0])
+
+
+def analyze_specific_metric(output, merge_strategy, system, compiler, runs, perf_attributes, other_attributes):
+    def _get_result(run, attr, kind):
+        if kind is PerfEvent:
+            events = select(p for p in PerfEvent if p.event == attr and p.run == run)[:]
+        elif kind is OtherMeasure:
+            events = select(p for p in OtherMeasure if p.name == attr and p.run == run)[:]
+        else:
+            raise NotImplementedError
+
+        mean = statistics.mean(e.value for e in events)
+        stdev = statistics.stdev(e.value for e in events) if len(events) > 2 else 0
+        return ChartValue(mean, stdev)
+    
+    for event, get_result in [(p, lambda run, attr: _get_result(run, attr, PerfEvent)) for p in perf_attributes] + \
+                 [(p, lambda run, attr: _get_result(run, attr, OtherMeasure)) for p in other_attributes]:
+        output_path = choose_specific_metric_output_path(output=output,
+                                                         metric=event,
+                                                         merge_strategy=merge_strategy,
+                                                         system_name=system.name,
+                                                         compiler_name=compiler.name)
+
+        benchmarks = list(set(r.benchmark.name for r in runs))
+
+        def get_bench_index(benchmark_name):
+            return benchmarks.index(benchmark_name)
+
+        def get_mean_index():
+            return -1
+
+        def pseudo_ratio(x, y):
+            return (x + 1) / (y + 1)
+
+        def geometric_mean(values):
+            return math.prod(values) ** (1 / len(values))
+
+        rows = collections.defaultdict(lambda: [None] * (len(benchmarks) + 1))
+
+        for benchmark_name in benchmarks:
+            benchmark_runs = sorted([r for r in runs if r.benchmark.name == benchmark_name],
+                                    key=lambda r: (r.version_limit, r.compiler_optimizations))
+            bench_index = get_bench_index(benchmark_name)
+
+            first_result = get_result(benchmark_runs[0], event)
+
+            for run in benchmark_runs:
+                result = get_result(run, event)
+                row_name = get_row_name(run)
+                rows[row_name][bench_index] = pseudo_ratio(result.value, first_result.value)
+
+        for row in rows.values():
+            row[get_mean_index()] = geometric_mean(row[:-1])
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(15, 5))
+
+        def clamp(x):
+            return min(2, max(0, x))
+
+        vmin = clamp(min(value for value in row for row in rows.values()))
+        vmax = clamp(max(value for value in row for row in rows.values()))
+
+        sorted_row_names = sorted(rows.keys(), key=row_name_key)
+        table = [rows[k] for k in sorted_row_names]
+
+        table = pd.DataFrame(table, columns=[*benchmarks, "Geometric mean"], index=sorted_row_names)
+
+        heatmap_ax = sns.heatmap(table, annot=True, fmt='.2g', cmap="coolwarm",
+                                 linewidths=.5, vmin=vmin, vmax=vmax, center=1)
+
+        for text in heatmap_ax.texts:
+            text.set_size(7)
+
+        plt.title(f"Mean ratio for {repr(event)} with {repr(merge_strategy)} strategy", fontsize=16, fontweight='bold')
+
+        ax.xaxis.tick_top()
+        plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
+
+        text_size = 12 if len(benchmarks) < 5 else 12 / (len(benchmarks) / 8)
+        ax.text(0.5, -0.1, f"benchmarks: {', '.join(benchmarks)}",
+                size=text_size, ha="center", transform=ax.transAxes)
+
+        plt.tight_layout()
+
+        ensure_directory_exists(output_path)
+        plt.savefig(output_path)
+
 
 @db_session
 def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compiler_name, output):
@@ -1080,6 +1169,10 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
             and r2.version_limit == r.version_limit
             and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
 
+    runs = [r for r in runs if r.benchmark.name not in ("mbrot", "array1", "sumfp", "sum")]
+
+    found_benchmark_names = sorted(set(r.benchmark.name for r in runs))
+
     logger.info(f"found {len(runs)} (only latest)")
 
     # Format data in a pandas dataframe
@@ -1095,6 +1188,8 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     other_attributes = [o for o in other_attributes if not o.startswith('scheme')]
 
     logger.info(f"other measures in analysis: {', '.join(perf_attributes)}")
+
+    analyze_specific_metric(output, merge_strategy, system, compiler, runs, perf_attributes, other_attributes)
 
     data_points = {}
 
@@ -1127,8 +1222,8 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     ax.xaxis.tick_top()
     plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
     
-    text_size = 12 if len(benchmarks_filter) < 5 else 12 / (len(benchmarks_filter) / 15)
-    ax.text(0.5, -0.1, f"benchmarks: {', '.join(benchmarks_filter)}",
+    text_size = 12 if len(found_benchmark_names) < 5 else 12 / (len(found_benchmark_names) / 5)
+    ax.text(0.5, -0.1, f"benchmarks: {', '.join(found_benchmark_names)}",
             size=text_size, ha="center", transform=ax.transAxes)
 
     plt.tight_layout()
