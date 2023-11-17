@@ -19,6 +19,7 @@ files=("recursive/ack"
        "gabriel/triangl"
        "bglstone/bague"
        "bglstone/almabench"
+       "gambit/fft"
        # Uses default repeat: 20 in benchmarks.py
        # So run them last in case one of them takes forever
        "recursive/primes"
