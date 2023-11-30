@@ -341,8 +341,8 @@
     (list (cons x y)))
   (let ((one (Sassq x (Scdr table))))
     (if one
-        (set-Scdr! one (cons (cons y value) (Scdr one)))
-        (set-Scdr! table (cons (cons x (make-singleton-table y value))
+        (Sset-cdr! one (cons (cons y value) (Scdr one)))
+        (Sset-cdr! table (cons (cons x (make-singleton-table y value))
                               (Scdr table))))))
 
 ;; MEET/JOIN 
@@ -446,7 +446,7 @@
 
 (define (check result)
   (equal? (map (lambda (s)
-                     (Slist->string (map Schar-downcase (Sstring->list s))))
+                     (Slist->string (map char-downcase (Sstring->list s))))
                    result)
               '("(((b v d) ^ a) v c)"
                 "(c ^ d)"
