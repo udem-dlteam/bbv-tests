@@ -17,7 +17,7 @@ wget http://www-sop.inria.fr/indes/fp/Bigloo/download/bigloo-unstable.tar.gz -O 
 
 ### To compile with another Bigloo version:
 
-  BIGLOODIR=$pdir ./compile --bigloo tests/recursive/fib.scm  
+  BIGLOODIR=$pdir ./compile --bigloo tests/recursive/fib.scm
   
 ### To compile with statistics
 
