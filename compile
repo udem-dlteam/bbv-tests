@@ -44,7 +44,7 @@ fi
 GAMBITCOMP="$GAMBITDIR/gsc/gsc -:=$GAMBITDIR"
 
 # Uncomment this line to compile with interpreter in debug mode
-# GAMBITCOMP="$GAMBITDIR/gsi/gsi -:d,=$GAMBITDIR $GAMBITDIR/gsc/igsc"
+GAMBITCOMP="$GAMBITDIR/gsi/gsi -:d,=$GAMBITDIR $GAMBITDIR/gsc/igsc"
 
 # for bigloo
 if [ "$BIGLOODIR " = " " ]; then
@@ -97,7 +97,7 @@ while [ "$#" != "0" ]; do
     -P) # primitive counts
       PRIMITIVE_COUNT=1
       ;;
-    -G) # primitive counts
+    -CFG) # primitive counts
       GENERATE_CFG=1
       ;;
     -X) # output the code with bbv inbclusions

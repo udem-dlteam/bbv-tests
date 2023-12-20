@@ -25,8 +25,8 @@
       (let* ((mid (GENquotient (GEN+ a b) 2))
              (gpq1 (ch-split a mid))    ;<<<<====
              (gpq2 (ch-split mid b))    ;<<<<====
-             (g1 (car gpq1)) (p1 (cadr gpq1)) (q1 (caddr gpq1))
-             (g2 (car gpq2)) (p2 (cadr gpq2)) (q2 (caddr gpq2)))
+             (g1 (Scar gpq1)) (p1 (Scadr gpq1)) (q1 (Scaddr gpq1))
+             (g2 (Scar gpq2)) (p2 (Scadr gpq2)) (q2 (Scaddr gpq2)))
         (list (GEN* g1 g2)
               (GEN* p1 p2)
               (GEN+ (GEN* q1 p2)
@@ -36,7 +36,7 @@
   (let* ((num-terms (inexact->exact (floor (GEN+ 2 (GEN/ digits 14.181647462)))))
          (sqrt-C (integer-sqrt (GEN* ch-C (GENexpt 100 digits)))))
     (let* ((gpq (ch-split 0 num-terms))
-           (g (car gpq)) (p (cadr gpq)) (q (caddr gpq)))
+           (g (Scar gpq)) (p (Scadr gpq)) (q (Scaddr gpq)))
       (GENquotient (GEN* p (GEN* ch-C sqrt-C))
                        (GEN* ch-D (GEN+ q (GEN* p ch-A)))))))
 
