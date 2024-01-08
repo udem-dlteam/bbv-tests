@@ -263,50 +263,6 @@
        (PRIMop atan ,a ,b))))
 
 (define-macro (Scar x)
-;$$$$$$$$$$$$$$$$$$$$$$$$$$$:@$WWk#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-;$$$$$$$$$$$$$$$$$$$$$$$$$Rb$RR$*!!!"*RR$$$$$$$$$$$$$$$$$$$$$$$$$
-;$$$$$$$$$$$$$$$$$$$$$$$$#d$?R!!~!~         '"$$$$$$$$$$$$$$$$$$$
-;$$$$$$$$$$$$$$$$$$$$$$@RMTM4!~!~          '*$$$$$$$$$$$$$$$$$$$$
-;$$$$$$$$$$$$$$$$$$$$$$\?!!` ~               ^$$$$$$$$$$$$$$$$$$$
-;$$$$$$$$$$$$$$$$$$$$#!H!                      "$$$$$$$$$$$$$$$$$
-;$$$$$$$$$$$$$$$$$$$#zR"`     x@&!/             `2*$$$$$$$$$$$$$$
-;$$$$$$$$$$$$$$$$$*.WRM!:u   d$$$X              'R$$$$$$$$$$$$$$$
-;$$$$$$$$$$$$$$$$)W$MQW$$$N $$$$B~                *$$$$$$$$$$$$$$
-;$$$$$$$$$$$$$$$`$!  R$$$$F@$$$$F <!           `X%!cX?$$$$$$$$$$$
-;$$$$$$$$$$$$$$R~@L   "$$$$$$$$F .!!>           !!!!?$W#$$$$$$$$$
-;$$$$$$$$$$$$$* !!!   :"?$$$$#F  ...   X!:      `` :x`M!$$$$$$$$$
-;$$$$$$$$$$$)$$ !~~! '  4$$$$k  =**~ . XX?>     ':!~>.!3$$$$$$$$$
-;$$$$$$$$$$$X$R ~>`   " @$$$$>  .:.!?!.!!X~`     ~~< !<$$$$$$$$$$
-;$$$$$$$$$$$$MF.   zM+ d$$$RX.   ~!.\!!!!!>      '  !  $$$$$$$$$$
-;$$$$$$$$$$$$$    '9!d$$$$$$t~     `~.>~~<<      </~   9$$$$$$$$$
-;$$$$$$$$$$$$$'    "@$$$$$N#` - &u   ~` .  L           `$$$$$$$$$
-;$$$$$$$$$$$$"      ^#$$R"     dRF  -    ' M           X$$$$$$$$$
-;$$$$$$$$$$$$-      .  `  .+ u$R*"         '           t$$$$$$$$$
-;$$$$$$$$$$$E      '6ic  sFu@$$$T .                    ?$$$$$$$$$
-;$$$$$$$$$$$"       "$$L4$$$$$$T# $                    `$$$$$$$$$
-;$$$$$$$$$$F         "$$'$$$$$$$R:K                     ?$$$$$$$$
-;$$$$$$$$$R           '   "*$$$$FdE                      R$$$$$$$
-;$$$$$$$$$ >           sBNeL ^##.$F                      '$$$$$$$
-;$$$$$$$$F~           d$$$$$$WWW$$k                       ~$$$$$$
-;$$$$$$$$' ~         f9$$$$$$$$$$$"                         #$$$$
-;$$$$$$$F:<          4$$$$$$$$$*"                            #$$$
-;$$$$$$F<!           9#$$$$$F~                               u?$$
-;$$$$$"XX!~          9 $$$$#                                 $$J$
-;$$$$\@X!!           @'$$$F                                  9$$$
-;$$$)M)H!!-          ' $$$                                   M$$$
-;$$!WhM@!`             `$E                                   9$$$
-;$"$#8B!!<              ?>                                  .$$$$
-;F$$d$RX!~                                      ~<          @$$$$
-;W$%$8S!(.                               <  .~~:<`         s$$$$$
-;$$!X$MX!                            -`:'::!!::<~!!       :$$$$$$
-;$E\$$!!~                            <<'<!!<X!!XX!!!     '$$$$$$$
-;$E<R5X!>                        ~~<<!!!!!!!!Xt!XXMX      #$$$$$$
-;$R?M!!!                     :< /!!!!XH!XMMXMR7HNSXNX      $$$$$$
-;$$`!!!.                  .:!!<<!!!XtXXM9MXB$@WRM$$!k      9$$$$$
-;$$:!!~~'               x!!HX:!!?XtTM@$M&B$WB$$$$$$$$.     t$$$$$
-;$$k!(~               x!!69!!RMXURMW$RE$$$B$$$$$$$$$BE     @$$$$$
-;$$$`~:~             XM@9XX$$9&B$@$$$$$$$$$$$$$$$$$$$$   .@$$$$$$
-;R$*%~~             '"*"#*##"**#**#**##**#******#**#*#   ********
   (let ((a (gensym)))
     `(let ((,a ,x))
        ,(if (eq? arithmetic 'S)
@@ -350,9 +306,9 @@
 (define-macro (Scddr x) `(Scdr (Scdr ,x)))
 
 (define-macro (Sstring->symbol x) `(string->symbol ,x))
-(define-macro (Sstring->list x) `(string->list ,x))
 (define-macro (Ssymbol->string x) `(symbol->string ,x))
 (define-macro (SFXnumber->string x) `(number->string ,x))
+(define-macro (Sstring->number x) `(string->number ,x))
 (define-macro (Slength lst) `(length ,lst))
 (define-macro (Sappend lst1 lst2) `(append ,lst1 ,lst2))
 (define-macro (Sassq x lst) `(assq ,x ,lst))
@@ -368,6 +324,7 @@
 (define-macro (Slist->vector lst) `(list->vector ,lst))
 (define-macro (Svector->list vect) `(vector->list ,vect))
 (define-macro (Slist->string lst) `(list->string ,lst))
+(define-macro (Sstring->list str) `(string->list ,str))
 
 (define-macro (Smake-vector1 n)
   (let ((a (gensym)))
@@ -422,6 +379,26 @@
                  (PRIMop vector-length ,a)
                  (DEAD-END "vector-length type error"))))))
 
+(define-macro (Smake-string1 n)
+  (let ((a (gensym)))
+    `(let ((,a ,n))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop make-string ,a)
+            `(if (and (FIXNUM? ,a) (FX>= ,a 0))
+                 (PRIMop make-string ,a)
+                 (DEAD-END "make-string type error"))))))
+
+(define-macro (Smake-string2 n init)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,n)
+           (,b ,init))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop make-string ,a ,b)
+            `(if (and (FIXNUM? ,a) (FX>= ,a 0) (char? ,b))
+                 (PRIMop make-string ,a ,b)
+                 (DEAD-END "make-string type error"))))))
+
 (define-macro (Sstring-ref s i)
   (let ((a (gensym))
         (b (gensym)))
@@ -457,5 +434,71 @@
 
 (define-macro (Sstring-append . args) `(string-append ,@args))
 
+(define-macro (Ssubstring . args) `(substring ,@args))
+
+(define-macro (fatal-error msg)
+  `(PRIMop dead-end))
+
 (define-macro (DEAD-END msg)
   `(PRIMop dead-end))
+
+
+(define-macro (Schar->integer x) `(char->integer ,x))
+(define-macro (Sinteger->char x) `(integer->char ,x))
+
+(define-macro (Schar<? x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char<? ,a ,b)
+            `(if (and (char? ,a) (char? ,b))
+                 (PRIMop char<? ,a ,b)
+                 (DEAD-END "char<? type error"))))))
+
+(define-macro (Schar>? x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char>? ,a ,b)
+            `(if (and (char? ,a) (char? ,b))
+                 (PRIMop char>? ,a ,b)
+                 (DEAD-END "char>? type error"))))))
+
+
+(define-macro (Schar<=? x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char<=? ,a ,b)
+            `(if (and (char? ,a) (char? ,b))
+                 (PRIMop char<=? ,a ,b)
+                 (DEAD-END "char<=? type error"))))))
+
+(define-macro (Schar>=? x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char>=? ,a ,b)
+            `(if (and (char? ,a) (char? ,b))
+                 (PRIMop char>=? ,a ,b)
+                 (DEAD-END "char>=? type error"))))))
+
+(define-macro (Schar=? x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char=? ,a ,b)
+            `(if (and (char? ,a) (char? ,b))
+                 (PRIMop char=? ,a ,b)
+                 (DEAD-END "char=? type error"))))))
+
