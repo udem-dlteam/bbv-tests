@@ -15,9 +15,14 @@ wget http://www-sop.inria.fr/indes/fp/Bigloo/download/bigloo-unstable.tar.gz -O 
 (ROOT=$PWD; cd bigloo/download; tar xvfz bigloo-unstable.tar.gz; cd bigloo-unstable; ./configure --prefix=$ROOT/bigloo/local && make && make install)
 ```
 
+On M2 macOS, it might be needed to disable the unistring support with:
+
+(cd bigloo-unstable; ./configure --prefix=$ROOT/bigloo/local --disable-unistring && make && make install)
+
+
 ### To compile with another Bigloo version:
 
-  BIGLOODIR=$pdir ./compile --bigloo tests/recursive/fib.scm  
+  BIGLOODIR=$pdir ./compile --bigloo tests/recursive/fib.scm
   
 ### To compile with statistics
 
