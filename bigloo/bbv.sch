@@ -352,6 +352,7 @@
 (define-macro (Slist->string x) `(list->string ,x))
 (define-macro (Sstring->list x) `(string->list ,x))
 (define-macro (SFXnumber->string x) `(number->string ,x))
+(define-macro (Sstring->number x) `(string->number ,x))
 (define-macro (Slength lst) `(length ,lst))
 (define-macro (Sappend lst1 lst2) `(append ,lst1 ,lst2))
 (define-macro (Sassq x lst) `(assq ,x ,lst))
@@ -464,6 +465,36 @@
 		    (PRIMop vector-length ,a)
 		    (DEAD-END "vector-length type error"))))))
 
+(define-macro (Smake-string1 n)
+   (define arithmetic
+      (cond-expand
+	 (arithmeticG 'G)
+	 (arithmeticS 'S)
+	 (else 'G)))
+  (let ((a (gensym)))
+    `(let ((,a ,n))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop make-string ,a)
+            `(if (and (FIXNUM? ,a) (FX>= ,a 0))
+                 (PRIMop make-string ,a)
+                 (DEAD-END "make-string type error"))))))
+
+(define-macro (Smake-string2 n init)
+   (define arithmetic
+      (cond-expand
+	 (arithmeticG 'G)
+	 (arithmeticS 'S)
+	 (else 'G)))
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,n)
+           (,b ,init))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop make-string ,a ,b)
+            `(if (and (FIXNUM? ,a) (FX>= ,a 0) (char? ,b))
+                 (PRIMop make-string ,a ,b)
+                 (DEAD-END "make-string type error"))))))
+
 (define-macro (Sstring-ref s i)
    (define arithmetic
       (cond-expand
@@ -511,6 +542,94 @@
             `(if (string? ,a)
                  (PRIMop string-length ,a)
                  (DEAD-END "string-length type error"))))))
+
+(define-macro (Sstring-append . args) `(string-append ,@args))
+
+(define-macro (Ssubstring . args) `(substring ,@args))
+
+(define-macro (Schar->integer x) `(char->integer ,x))
+(define-macro (Sinteger->char x) `(integer->char ,x))
+
+(define-macro (Schar<? x y)
+   (define arithmetic
+      (cond-expand
+	 (arithmeticG 'G)
+	 (arithmeticS 'S)
+	 (else 'G)))
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char<? ,a ,b)
+            `(if (and (char? ,a) (char? ,b))
+                 (PRIMop char<? ,a ,b)
+                 (DEAD-END "char<? type error"))))))
+
+(define-macro (Schar>? x y)
+   (define arithmetic
+      (cond-expand
+	 (arithmeticG 'G)
+	 (arithmeticS 'S)
+	 (else 'G)))
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char>? ,a ,b)
+            `(if (and (char? ,a) (char? ,b))
+                 (PRIMop char>? ,a ,b)
+                 (DEAD-END "char>? type error"))))))
+
+
+(define-macro (Schar<=? x y)
+   (define arithmetic
+      (cond-expand
+	 (arithmeticG 'G)
+	 (arithmeticS 'S)
+	 (else 'G)))
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char<=? ,a ,b)
+            `(if (and (char? ,a) (char? ,b))
+                 (PRIMop char<=? ,a ,b)
+                 (DEAD-END "char<=? type error"))))))
+
+(define-macro (Schar>=? x y)
+   (define arithmetic
+      (cond-expand
+	 (arithmeticG 'G)
+	 (arithmeticS 'S)
+	 (else 'G)))
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char>=? ,a ,b)
+            `(if (and (char? ,a) (char? ,b))
+                 (PRIMop char>=? ,a ,b)
+                 (DEAD-END "char>=? type error"))))))
+
+(define-macro (Schar=? x y)
+   (define arithmetic
+      (cond-expand
+	 (arithmeticG 'G)
+	 (arithmeticS 'S)
+	 (else 'G)))
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char=? ,a ,b)
+            `(if (and (char? ,a) (char? ,b))
+                 (PRIMop char=? ,a ,b)
+                 (DEAD-END "char=? type error"))))))
 
 (define-macro (DEAD-END msg)
   `(error "bbv" "error" ,msg))

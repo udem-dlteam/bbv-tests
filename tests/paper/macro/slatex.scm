@@ -111,7 +111,7 @@
                (loop (Scdr lst)))
            #f))))
 
-(define-maro (Zappend lst1 lst2)
+(define-macro (Zappend lst1 lst2)
   `(let ((lst1 ,lst1) (lst2 ,lst2))
      (let loop ((lst1 lst1))
        (if (pair? lst1)
