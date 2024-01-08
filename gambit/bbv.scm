@@ -17,10 +17,7 @@
 (define-macro (FXop op . args)   `(,(symbol-append '|##fx| op) ,@args))
 (define-macro (PRIMop op . args) `(let () (declare (not inline-primitives)) (,(symbol-append '|##| op) ,@args)))
 
-(define-macro (unknown x . rest)
-  (if (eq? compilation-mode 'gvm-interpret)
-      `(PRIMop first-argument ,(if (null? rest) x (car rest)))
-      `(PRIMop first-argument ,x)))
+(define-macro (unknown . args) `(PRIMop first-argument ,@args))
 
 (define-macro (MAPop kind op . args)
   (cond
@@ -353,12 +350,14 @@
 (define-macro (Scddr x) `(Scdr (Scdr ,x)))
 
 (define-macro (Sstring->symbol x) `(string->symbol ,x))
+(define-macro (Sstring->list x) `(string->list ,x))
 (define-macro (Ssymbol->string x) `(symbol->string ,x))
 (define-macro (SFXnumber->string x) `(number->string ,x))
 (define-macro (Slength lst) `(length ,lst))
 (define-macro (Sappend lst1 lst2) `(append ,lst1 ,lst2))
 (define-macro (Sassq x lst) `(assq ,x ,lst))
 (define-macro (Smember x lst) `(member ,x ,lst))
+(define-macro (Smemq x lst) `(memq ,x ,lst))
 (define-macro (Smap2 f lst) `(map ,f ,lst))
 
 (define-macro (SFLexact x) `(exact ,x))
@@ -368,6 +367,7 @@
 (define-macro (Scall-with-current-continuation f) `(call-with-current-continuation ,f))
 (define-macro (Slist->vector lst) `(list->vector ,lst))
 (define-macro (Svector->list vect) `(vector->list ,vect))
+(define-macro (Slist->string lst) `(list->string ,lst))
 
 (define-macro (Smake-vector1 n)
   (let ((a (gensym)))
@@ -454,6 +454,8 @@
             `(if (string? ,a)
                  (PRIMop string-length ,a)
                  (DEAD-END "string-length type error"))))))
+
+(define-macro (Sstring-append . args) `(string-append ,@args))
 
 (define-macro (DEAD-END msg)
   `(PRIMop dead-end))

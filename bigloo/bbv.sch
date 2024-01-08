@@ -348,12 +348,16 @@
 
 (define-macro (Sstring->symbol x) `(string->symbol ,x))
 (define-macro (Ssymbol->string x) `(symbol->string ,x))
+(define-macro (Sstring-append x . y) `(string-append ,x ,@y))
+(define-macro (Slist->string x) `(list->string ,x))
+(define-macro (Sstring->list x) `(string->list ,x))
 (define-macro (SFXnumber->string x) `(number->string ,x))
 (define-macro (Slength lst) `(length ,lst))
 (define-macro (Sappend lst1 lst2) `(append ,lst1 ,lst2))
 (define-macro (Sassq x lst) `(assq ,x ,lst))
 (define-macro (Smember x lst) `(member ,x ,lst))
 (define-macro (Smap2 f lst) `(map ,f ,lst))
+(define-macro (Smemq o lst) `(memq ,o ,lst))
 
 (define-macro (SFLexact x) `(exact ,x))
 (define-macro (SFXinexact x) `(inexact ,x))
@@ -510,5 +514,8 @@
 
 (define-macro (DEAD-END msg)
   `(error "bbv" "error" ,msg))
+
+(define-macro (fatal-error msg . obj)
+   `(DEAD-END ,msg))
 
 (register-exit-function! (lambda (status) (bbv-saw-statistics) status))

@@ -1,4 +1,4 @@
-(define (run #!key (n (unknown 39 20)))
+(define (run #!key (n (unknown 39 10)))
    
   (define (fib n)
     (if (SFX< n 2)

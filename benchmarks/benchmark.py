@@ -508,6 +508,8 @@ benchmark_args = {
     "sumfp": "repeat: 200 n: 1e6",
     "triangl": "repeat: 20 i: 22 depth: 1",
     "almabench": "repeat: 1 K: 36525",
+    "fft": "repeat: 1 n: 1048576",
+    "boyer": "repeat: 50",
 }
 
 def get_gambit_program_size(executable, benchmark):
