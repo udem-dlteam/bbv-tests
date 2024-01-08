@@ -419,7 +419,7 @@
            (,c ,x))
        ,(if (eq? arithmetic 'S)
             `(PRIMop string-set! ,a ,b ,c)
-            `(if (and (string? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop string-length ,a)))
+            `(if (and (string? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop string-length ,a)) (char? ,c))
                  (PRIMop string-set! ,a ,b ,c)
                  (DEAD-END "string-set! type error"))))))
 
@@ -443,8 +443,23 @@
   `(PRIMop dead-end))
 
 
-(define-macro (Schar->integer x) `(char->integer ,x))
-(define-macro (Sinteger->char x) `(integer->char ,x))
+(define-macro (Schar->integer x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop char->integer ,a)
+            `(if (char? ,a)
+                 (PRIMop char->integer ,a)
+                 (DEAD-END "char->integer type error"))))))
+
+(define-macro (Sinteger->char x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       ,(if (eq? arithmetic 'S)
+            `(PRIMop integer->char ,a)
+            `(if (and (FIXNUM? ,a) (FX>= ,a 0) (FX< ,a #x110000))
+                 (PRIMop integer->char ,a)
+                 (DEAD-END "integer->char type error"))))))
 
 (define-macro (Schar<? x y)
   (let ((a (gensym))
