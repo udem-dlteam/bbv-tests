@@ -44,7 +44,7 @@ fi
 GAMBITCOMP="$GAMBITDIR/gsc/gsc -:=$GAMBITDIR"
 
 # Uncomment this line to compile with interpreter in debug mode
-GAMBITCOMP="$GAMBITDIR/gsi/gsi -:d,=$GAMBITDIR $GAMBITDIR/gsc/igsc"
+# GAMBITCOMP="$GAMBITDIR/gsi/gsi -:d,=$GAMBITDIR $GAMBITDIR/gsc/igsc"
 
 # for bigloo
 if [ "$BIGLOODIR " = " " ]; then
