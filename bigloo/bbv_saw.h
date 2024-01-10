@@ -3,7 +3,7 @@
 /*    -------------------------------------------------------------    */
 /*    Author      :  Manuel Serrano                                    */
 /*    Creation    :  Thu Mar 16 18:48:21 1995                          */
-/*    Last change :  Fri Nov 10 23:20:57 2023 (serrano)                */
+/*    Last change :  Wed Jan 10 07:11:42 2024 (serrano)                */
 /*    -------------------------------------------------------------    */
 /*    Bigloo's stuff                                                   */
 /*=====================================================================*/
@@ -30,6 +30,8 @@ static long saw_pairp = 0;
 static long saw_procedurep = 0;
 static long saw_fixnump = 0;
 static long saw_flonump = 0;
+static long saw_stringlength = 0;
+static long saw_vectorlength = 0;
 
 #  undef BGL_RTL_IFNE
 #  define BGL_RTL_IFNE(l,r) if (saw_ifne++, r) goto l
@@ -95,14 +97,14 @@ static long saw_flonump = 0;
 #  define BGL_MULFX_SANS_OV(x, y) (saw_mul++, (((long)(x)) * (y)))
 
 #  undef PAIRP
-#  if( defined( TAG_PAIR ) )
-#   if( TAG_PAIR != 0 )
-#      define PAIRP( c ) (saw_pairp++, (((long)c) & TAG_MASK) == TAG_PAIR)
+#  if(defined(TAG_PAIR))
+#   if(TAG_PAIR != 0)
+#      define PAIRP(c) (saw_pairp++, (((long)c) & TAG_MASK) == TAG_PAIR)
 #   else
-#      define PAIRP( c ) (saw_pairp++, (c && ((((long)c) & TAG_MASK) == TAG_PAIR)))
+#      define PAIRP(c) (saw_pairp++, (c && ((((long)c) & TAG_MASK) == TAG_PAIR)))
 #   endif
 #  else
-#   define PAIRP( c ) (saw_pairp++, POINTERP( c ) && (TYPE( c ) == PAIR_TYPE))
+#   define PAIRP(c) (saw_pairp++, POINTERP(c) && (TYPE(c) == PAIR_TYPE))
 #  endif
 
 #  undef PROCEDUREP
@@ -110,10 +112,19 @@ static long saw_flonump = 0;
      (saw_procedurep++, POINTERP(o) && (TYPE(o) == PROCEDURE_TYPE))
 
 #  undef INTEGERP
-#  define INTEGERP( o ) (saw_fixnump++, ((((long)o) & TAG_MASK) == TAG_INT))
+#  define INTEGERP(o) (saw_fixnump++, ((((long)o) & TAG_MASK) == TAG_INT))
 
 #  undef FLONUMP
-#  define FLONUMP( c ) (saw_flonump++, ((c && ((((long)c)&TAG_MASK) == TAG_REAL))))
+#  define FLONUMP(c) (saw_flonump++, ((c && ((((long)c)&TAG_MASK) == TAG_REAL))))
+
+#  undef STRING_LENGTH
+#  define STRING_LENGTH(s) (saw_stringlength++, (STRING(s).length))
+
+#  undef STRING_LENGTH
+#  define STRING_LENGTH(s) (saw_stringlength++, (STRING(s).length))
+
+#  undef VECTOR_LENGTH
+#  define VECTOR_LENGTH(v) (saw_vectorlength++, BGL_VLENGTH(v))
 
 int bbv_saw_statistics() {
    fprintf(stderr, "***primitive-call-counter\n");
@@ -133,6 +144,8 @@ int bbv_saw_statistics() {
    fprintf(stderr, "(procedure? %ld)\n", saw_procedurep);
    fprintf(stderr, "(fixnum? %ld)\n", saw_fixnump);
    fprintf(stderr, "(flonum? %ld)\n", saw_flonump);
+   fprintf(stderr, "(string-length %ld)\n", saw_stringlength);
+   fprintf(stderr, "(vector-length %ld)\n", saw_vectorlength);
    return 0;
 }
 #else
