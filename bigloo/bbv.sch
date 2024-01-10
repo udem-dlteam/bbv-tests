@@ -426,7 +426,10 @@
 		   (,b ,i))
 		,(if (eq? arithmetic 'S)
 		     `(PRIMop vector-ref ,a ,b)
-		     `(if (and (vector? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop vector-length ,a)))
+		     `(if (and (vector? ,a)
+			       (FIXNUM? ,b)
+			       (FX>= ,b 0)
+			       (FX< ,b (PRIMop vector-length ,a)))
 			  (PRIMop vector-ref ,a ,b)
 			  (DEAD-END (format "type-error (vector-ref ~a ~a):~a"
 				       (typeof ,a) (typeof ,b)
@@ -449,7 +452,9 @@
 	       `(PRIMop vector-set! ,a ,b ,c)
 	       `(if (and (vector? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop vector-length ,a)))
 		    (PRIMop vector-set! ,a ,b ,c)
-		    (DEAD-END (format "vector-set! type error ~a" ,b)))))))
+		    (DEAD-END (format "type-error (vector-set! ~a ~a ~a):~a"
+				       (typeof ,a) ,b (typeof ,c) 
+				       ',(if (epair? x) (cer x) x))))))))
 
 (define-macro (Svector-length v)
    (define arithmetic

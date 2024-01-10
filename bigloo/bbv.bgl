@@ -6,6 +6,16 @@
    (include "./bbv.sch")
    (main main))
 
+(define _LOG_ 0)
+
+(define-expander log
+   (lambda (x e)
+      (e `(begin
+	     ;(set! _LOG_ (+fx _LOG_ 1))
+	     '(tprint _LOG_ ": " ,@(cdr x))
+	     #unspecified)
+	 e)))
+
 (define (main args)
    (let ((c (cdr args)))
       (let loop ((cmdargs (map (lambda (s) (call-with-input-string s read)) c))
