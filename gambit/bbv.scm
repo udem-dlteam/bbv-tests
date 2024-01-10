@@ -1,7 +1,7 @@
 (declare
   (standard-bindings)
   (extended-bindings)
-  (not safe)
+  (not safe)  ;; TODO: is is strange to default to unsafe code because it means procedures not handled by the various macros defined below will not have type checking
   (block)
 )
 
@@ -33,7 +33,7 @@
     `(,(symbol-append 'FX op) ,@args))))
 
 (define-macro (GEN+ x y)         `(MAPop GEN + ,x ,y))
-(define-macro (GEN- x y)         `(MAPop GEN - ,x ,y))
+(define-macro (GEN- x . rest)    `(MAPop GEN - ,x ,@rest))
 (define-macro (GEN* x y)         `(MAPop GEN * ,x ,y))
 (define-macro (GEN/ x y)         `(MAPop GEN / ,x ,y))
 (define-macro (GENquotient x y)  `(MAPop GEN quotient ,x ,y))
@@ -51,7 +51,7 @@
 (define-macro (GENatan2 x y)     `(MAPop GEN atan2 ,x ,y))
 
 (define-macro (SFL+ x y)         `(MAPop SFL + ,x ,y))
-(define-macro (SFL- x y)         `(MAPop SFL - ,x ,y))
+(define-macro (SFL- x . rest)    `(MAPop SFL - ,x ,@rest))
 (define-macro (SFL* x y)         `(MAPop SFL * ,x ,y))
 (define-macro (SFL/ x y)         `(MAPop SFL / ,x ,y))
 (define-macro (SFLquotient x y)  `(MAPop SFL quotient ,x ,y))
@@ -69,7 +69,7 @@
 (define-macro (SFLatan2 x y)     `(MAPop SFL atan2 ,x ,y))
 
 (define-macro (SFX+ x y)         `(MAPop SFX + ,x ,y))
-(define-macro (SFX- x y)         `(MAPop SFX - ,x ,y))
+(define-macro (SFX- x . rest)    `(MAPop SFX - ,x ,@rest))
 (define-macro (SFX* x y)         `(MAPop SFX * ,x ,y))
 (define-macro (SFXquotient x y)  `(MAPop SFX quotient ,x ,y))
 (define-macro (SFXremainder x y) `(MAPop SFX remainder ,x ,y))
@@ -84,7 +84,7 @@
 (define-macro (SFXeven? x)       `(MAPop SFX even? ,x))
 
 (define-macro (FL+ x y)         `(FLop + ,x ,y))
-(define-macro (FL- x y)         `(FLop - ,x ,y))
+(define-macro (FL- x . rest)    `(FLop - ,x ,@rest))
 (define-macro (FL* x y)         `(FLop * ,x ,y))
 (define-macro (FL/ x y)         `(FLop / ,x ,y))
 (define-macro (FLquotient x y)  `(FLop quotient ,x ,y))
@@ -102,7 +102,7 @@
 (define-macro (FLatan2 x y)     `(FLop atan2 ,x ,y))
 
 (define-macro (FX+ x y)         `(FXop + ,x ,y))
-(define-macro (FX- x y)         `(FXop - ,x ,y))
+(define-macro (FX- x . rest)    `(FXop - ,x ,@rest))
 (define-macro (FX* x y)         `(FXop * ,x ,y))
 (define-macro (FXquotient x y)  `(FXop quotient ,x ,y))
 (define-macro (FXremainder x y) `(FXop remainder ,x ,y))
@@ -119,38 +119,51 @@
 (define-macro (FLONUM? x) `(PRIMop flonum? ,x))
 (define-macro (FIXNUM? x) `(PRIMop fixnum? ,x))
 
-(define-macro (BBVop op x y)
-  (cond
-   ((flonum? x)
-    (let ((b (gensym)))
-      `(let ((,b ,y))
-         (cond
-          ((FLONUM? ,b)
-           (FLop ,op ,x ,b))
-          (else
-           (PRIMop ,op ,x ,b))))))
-   ((flonum? y)
-    (let ((a (gensym)))
-      `(let ((,a ,x))
-         (cond
-          ((FLONUM? ,a)
-           (FLop ,op ,a ,y))
-          (else
-           (PRIMop ,op ,a ,y))))))
-   (else
-    (let ((a (gensym))
-          (b (gensym))
-          (c (gensym)))
-      `(let ((,a ,x)
-             (,b ,y))
-         (cond
-          ((and (FIXNUM? ,a) (FIXNUM? ,b))
-           (let ((,c (,(symbol-append '|##fx| op '?) ,a ,b)))
-             (if ,c ,c (PRIMop ,op ,a ,b))))
-          ((and (FLONUM? ,a) (FLONUM? ,b))
-           (FLop ,op ,a ,b))
-          (else
-           (PRIMop ,op ,a ,b))))))))
+(define-macro (BBVop op x . rest)
+  (if (pair? rest)
+      (let ((y (car rest)))
+        (cond
+         ((flonum? x)
+          (let ((b (gensym)))
+            `(let ((,b ,y))
+               (cond
+                ((FLONUM? ,b)
+                 (FLop ,op ,x ,b))
+                (else
+                 (PRIMop ,op ,x ,b))))))
+         ((flonum? y)
+          (let ((a (gensym)))
+            `(let ((,a ,x))
+               (cond
+                ((FLONUM? ,a)
+                 (FLop ,op ,a ,y))
+                (else
+                 (PRIMop ,op ,a ,y))))))
+         (else
+          (let ((a (gensym))
+                (b (gensym))
+                (c (gensym)))
+            `(let ((,a ,x)
+                   (,b ,y))
+               (cond
+                ((and (FIXNUM? ,a) (FIXNUM? ,b))
+                 (let ((,c (,(symbol-append '|##fx| op '?) ,a ,b)))
+                   (if ,c ,c (PRIMop ,op ,a ,b))))
+                ((and (FLONUM? ,a) (FLONUM? ,b))
+                 (FLop ,op ,a ,b))
+                (else
+                 (PRIMop ,op ,a ,b))))))))
+      (let ((a (gensym))
+            (c (gensym)))
+        `(let ((,a ,x))
+           (cond
+            ((FIXNUM? ,a)
+             (let ((,c (,(symbol-append '|##fx| op '?) ,a)))
+               (if ,c ,c (PRIMop ,op ,a))))
+            ((FLONUM? ,a)
+             (FLop ,op ,a))
+            (else
+             (PRIMop ,op ,a)))))))
 
 (define-macro (BBVcmp op x y)
   (let ((a (gensym))
@@ -166,7 +179,7 @@
          (PRIMop ,op ,a ,b))))))
 
 (define-macro (BBV+ x y) `(BBVop + ,x ,y))
-(define-macro (BBV- x y) `(BBVop - ,x ,y))
+(define-macro (BBV- x . rest) `(BBVop - ,x ,@rest))
 (define-macro (BBV* x y) `(BBVop * ,x ,y))
 
 (define-macro (BBV/ x y)
@@ -205,6 +218,19 @@
          (FLremainder ,a ,b))
         (else
          (PRIMop remainder ,a ,b))))))
+
+(define-macro (BBVmodulo x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       (cond
+        ((and (FIXNUM? ,a) (FIXNUM? ,b))
+         (FXmodulo ,a ,b))
+        ((and (FLONUM? ,a) (FLONUM? ,b))
+         (FLmodulo ,a ,b))
+        (else
+         (PRIMop modulo ,a ,b))))))
 
 (define-macro (BBV= x y) `(BBVcmp = ,x ,y))
 (define-macro (BBV< x y) `(BBVcmp < ,x ,y))
@@ -302,13 +328,20 @@
                  (PRIMop set-cdr! ,a ,b)
                  (DEAD-END "set-cdr! type error"))))))
 
+(define-macro (Scaar x) `(Scar (Scar ,x)))
 (define-macro (Scadr x) `(Scar (Scdr ,x)))
+(define-macro (Scdar x) `(Scdr (Scar ,x)))
 (define-macro (Scddr x) `(Scdr (Scdr ,x)))
+(define-macro (Scdddr x) `(Scdr (Scdr (Scdr ,x))))
+(define-macro (Scaddr x) `(Scar (Scdr (Scdr ,x))))
+(define-macro (Scdadr x) `(Scdr (Scar (Scdr ,x))))
+(define-macro (Scadddr x) `(Scar (Scdr (Scdr (Scdr ,x)))))
 
 (define-macro (Sstring->symbol x) `(string->symbol ,x))
 (define-macro (Ssymbol->string x) `(symbol->string ,x))
 (define-macro (SFXnumber->string x) `(number->string ,x))
 (define-macro (Sstring->number x) `(string->number ,x))
+(define-macro (Sstring->number2 x base) `(string->number ,x ,base))
 (define-macro (Slength lst) `(length ,lst))
 (define-macro (Sappend lst1 lst2) `(append ,lst1 ,lst2))
 (define-macro (Sassq x lst) `(assq ,x ,lst))
@@ -436,7 +469,7 @@
 
 (define-macro (Ssubstring . args) `(substring ,@args))
 
-(define-macro (fatal-error msg)
+(define-macro (fatal-error msg . rest)
   `(PRIMop dead-end))
 
 (define-macro (DEAD-END msg)
