@@ -2674,8 +2674,8 @@
          (not-macro v env (source-code v)))))
 (define (combination-expr? source)
   (let ((my-length (proper-length (source-code source))))
-    (if length
-        (or (SFX> length 0) (pt-syntax-error source "Ill-formed procedure call"))
+    (if my-length
+        (or (SFX> my-length 0) (pt-syntax-error source "Ill-formed procedure call"))
         (pt-syntax-error source "Ill-terminated procedure call"))))
 (define (delay-expr? source env)
   (and (not (eq? (scheme-dialect (env-declarations env)) ieee-scheme-sym))

@@ -78,7 +78,8 @@
 (define-macro (SFLatan x)        `(MAPop SFL atan ,x))
 
 (define-macro (SFX+ x y)         `(MAPop SFX + ,x ,y))
-(define-macro (SFX- x y)         `(MAPop SFX - ,x ,y))
+(define-macro (SFX2- x y)        `(MAPop SFX - ,x ,y))
+(define-macro (SFX- x . rest)    (if (null? rest) `(MAPop SFX - 0 ,x) `(SFX2- ,x ,@rest)))
 (define-macro (SFX* x y)         `(MAPop SFX * ,x ,y))
 (define-macro (SFXquotient x y)  `(MAPop SFX quotient ,x ,y))
 (define-macro (SFXremainder x y) `(MAPop SFX remainder ,x ,y))
@@ -214,6 +215,19 @@
         (else
          (PRIMop remainder ,a ,b))))))
 
+(define-macro (BBVmodulo x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       (cond
+        ((and (FIXNUM? ,a) (FIXNUM? ,b))
+         (FXmodulo ,a ,b))
+        ((and (FLONUM? ,a) (FLONUM? ,b))
+         (FLmodulo ,a ,b))
+        (else
+         (PRIMop modulo ,a ,b))))))
+
 (define-macro (BBV= x y) `(BBVcmp = ,x ,y))
 (define-macro (BBV< x y) `(BBVcmp < ,x ,y))
 (define-macro (BBV<= x y) `(BBVcmp <= ,x ,y))
@@ -343,8 +357,14 @@
                  (PRIMop set-cdr! ,a ,b)
                  (DEAD-END "set-cdr! type error"))))))
 
+(define-macro (Scaar x) `(Scar (Scar ,x)))
 (define-macro (Scadr x) `(Scar (Scdr ,x)))
+(define-macro (Scdar x) `(Scdr (Scar ,x)))
 (define-macro (Scddr x) `(Scdr (Scdr ,x)))
+(define-macro (Scdadr x) `(Scdr (Scar (Scdr ,x))))
+(define-macro (Scaddr x) `(Scar (Scdr (Scdr ,x))))
+(define-macro (Scdddr x) `(Scdr (Scdr (Scdr ,x))))
+(define-macro (Scadddr x) `(Scar (Scdr (Scdr (Scdr ,x)))))
 
 (define-macro (Sstring->symbol x) `(string->symbol ,x))
 (define-macro (Ssymbol->string x) `(symbol->string ,x))
@@ -353,6 +373,7 @@
 (define-macro (Sstring->list x) `(string->list ,x))
 (define-macro (SFXnumber->string x) `(number->string ,x))
 (define-macro (Sstring->number x) `(string->number ,x))
+(define-macro (Sstring->number2 x base) `(string->number ,x ,base))
 (define-macro (Slength lst) `(length ,lst))
 (define-macro (Sappend lst1 lst2) `(append ,lst1 ,lst2))
 (define-macro (Sassq x lst) `(assq ,x ,lst))
@@ -495,7 +516,41 @@
                  (PRIMop make-string ,a ,b)
                  (DEAD-END "make-string type error"))))))
 
-(define-macro (Sstring-ref s i)
+(define-expander Sstring-ref
+   (lambda (x e)
+      (define arithmetic
+	 (cond-expand
+	    (arithmeticG 'G)
+	    (arithmeticS 'S)
+	    (else 'G)))
+      (match-case x
+	 ((Sstring-ref ?s ?i)
+	  (let ((a (gensym))
+		(b (gensym)))
+	     (e `(let ((,a ,s)
+		       (,b ,i))
+		    ,(if (eq? arithmetic 'S)
+			 `(PRIMop string-ref ,a ,b)
+			 `(if (not (string? ,a))
+			      (DEAD-END
+				 (format "type-error, string not a string (string-ref ~a ~a):~a"
+				    (typeof ,a) (typeof ,b)
+				    ',(if (epair? x) (cer x) x)))
+			      (if (not (FIXNUM? ,b))
+				  (DEAD-END
+				     (format "type-error, index not a fixnum (string-ref ~a ~a):~a"
+					(typeof ,a) (typeof ,b)
+					',(if (epair? x) (cer x) x)))
+				  (if (and (FX>= ,b 0) (FX< ,b (PRIMop string-length ,a)))
+				      (PRIMop string-ref ,a ,b)
+				      (DEAD-END
+					 (format "type-error index out of bounds [~a/~a](string-ref ~a ~a):~a"
+					    ,b (string-length ,a)
+					    (typeof ,a) (typeof ,b)
+					    ',(if (epair? x) (cer x) x))))))))
+		e))))))
+
+(define-macro (Sstring-ref.orig s i)
    (define arithmetic
       (cond-expand
 	 (arithmeticG 'G)
@@ -509,7 +564,7 @@
             `(PRIMop string-ref ,a ,b)
             `(if (and (string? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop string-length ,a)))
                  (PRIMop string-ref ,a ,b)
-                 (DEAD-END "string-ref type error"))))))
+                 (DEAD-END (format "string-ref type error (~s, ~s)" ,a ,b)))))))
 
 (define-macro (Sstring-set! s i x)
    (define arithmetic
@@ -615,7 +670,30 @@
                  (PRIMop char>=? ,a ,b)
                  (DEAD-END "char>=? type error"))))))
 
-(define-macro (Schar=? x y)
+(define-expander Schar=?
+   (lambda (x e)
+      (define arithmetic
+	 (cond-expand
+	    (arithmeticG 'G)
+	    (arithmeticS 'S)
+	    (else 'G)))
+	 (match-case x
+	    ((Schar=? ?x ?y)
+	     (let ((a (gensym))
+		   (b (gensym)))
+		(e `(let ((,a ,x)
+			  (,b ,y))
+		       ,(if (eq? arithmetic 'S)
+			    `(PRIMop char=? ,a ,b)
+			    `(if (and (char? ,a) (char? ,b))
+				 (PRIMop char=? ,a ,b)
+				 (DEAD-END
+				    (format "type-error (char=? ~a ~a):~a"
+				       (typeof ,a) (typeof ,b)
+				       ',(if (epair? x) (cer x) x))))))
+		   e))))))
+
+(define-macro (Schar=?.orig x y)
    (define arithmetic
       (cond-expand
 	 (arithmeticG 'G)
@@ -638,3 +716,40 @@
    `(DEAD-END ,msg))
 
 (register-exit-function! (lambda (status) (bbv-saw-statistics) status))
+
+(define (Sequal? x y)
+   (cond
+      ((eq? x y) #t)
+      ((pair? x)
+       (and (pair? y)
+	    (Sequal? (Scar x) (Scar y))
+	    (Sequal? (Scdr x) (Scdr y))))
+      ((pair? y) #f)
+      ((FLONUM? x)
+       (and (FLONUM? y) (SFL= x y)))
+      ((FLONUM? y)
+       #f)
+      ((vector? x)
+       (and (vector? y)
+	    (SFX= (vector-length x) (vector-length y))
+	    (let loop ((i (SFX- (vector-length x) 1)))
+	       (if (SFX>= i 0)
+		   (if (Sequal? (Svector-ref x i) (Svector-ref y i))
+		       (loop (SFX- i 1))
+		       #f)
+		   #t))))
+      (else
+       (equal? x y))))
+
+(define-inline (odd?fx x)
+   (oddfx? x))
+
+(define-inline (even?fx x)
+   (evenfx? x))
+
+(define-inline (modulofl x y)
+   (error "modulofl" "not implemented" #f))
+
+(define-inline (quotientfl x y)
+   (error "modulofl" "not implemented" #f))
+
