@@ -345,6 +345,8 @@
 
 (define-macro (Scadr x) `(Scar (Scdr ,x)))
 (define-macro (Scddr x) `(Scdr (Scdr ,x)))
+(define-macro (Scaddr x) `(Scar (Scdr (Scdr ,x))))
+(define-macro (Scadddr x) `(Scar (Scdr (Scdr (Scdr ,x)))))
 
 (define-macro (Sstring->symbol x) `(string->symbol ,x))
 (define-macro (Ssymbol->string x) `(symbol->string ,x))
@@ -495,7 +497,41 @@
                  (PRIMop make-string ,a ,b)
                  (DEAD-END "make-string type error"))))))
 
-(define-macro (Sstring-ref s i)
+(define-expander Sstring-ref
+   (lambda (x e)
+      (define arithmetic
+	 (cond-expand
+	    (arithmeticG 'G)
+	    (arithmeticS 'S)
+	    (else 'G)))
+      (match-case x
+	 ((Sstring-ref ?s ?i)
+	  (let ((a (gensym))
+		(b (gensym)))
+	     (e `(let ((,a ,s)
+		       (,b ,i))
+		    ,(if (eq? arithmetic 'S)
+			 `(PRIMop string-ref ,a ,b)
+			 `(if (not (string? ,a))
+			      (DEAD-END
+				 (format "type-error, string not a string (string-ref ~a ~a):~a"
+				    (typeof ,a) (typeof ,b)
+				    ',(if (epair? x) (cer x) x)))
+			      (if (not (FIXNUM? ,b))
+				  (DEAD-END
+				     (format "type-error, index not a fixnum (string-ref ~a ~a):~a"
+					(typeof ,a) (typeof ,b)
+					',(if (epair? x) (cer x) x)))
+				  (if (and (FX>= ,b 0) (FX< ,b (PRIMop string-length ,a)))
+				      (PRIMop string-ref ,a ,b)
+				      (DEAD-END
+					 (format "type-error index out of bounds [~a/~a](string-ref ~a ~a):~a"
+					    ,b (string-length ,a)
+					    (typeof ,a) (typeof ,b)
+					    ',(if (epair? x) (cer x) x))))))))
+		e))))))
+
+(define-macro (Sstring-ref.orig s i)
    (define arithmetic
       (cond-expand
 	 (arithmeticG 'G)
@@ -509,7 +545,7 @@
             `(PRIMop string-ref ,a ,b)
             `(if (and (string? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop string-length ,a)))
                  (PRIMop string-ref ,a ,b)
-                 (DEAD-END "string-ref type error"))))))
+                 (DEAD-END (format "string-ref type error (~s, ~s)" ,a ,b)))))))
 
 (define-macro (Sstring-set! s i x)
    (define arithmetic
@@ -615,7 +651,30 @@
                  (PRIMop char>=? ,a ,b)
                  (DEAD-END "char>=? type error"))))))
 
-(define-macro (Schar=? x y)
+(define-expander Schar=?
+   (lambda (x e)
+      (define arithmetic
+	 (cond-expand
+	    (arithmeticG 'G)
+	    (arithmeticS 'S)
+	    (else 'G)))
+	 (match-case x
+	    ((Schar=? ?x ?y)
+	     (let ((a (gensym))
+		   (b (gensym)))
+		(e `(let ((,a ,x)
+			  (,b ,y))
+		       ,(if (eq? arithmetic 'S)
+			    `(PRIMop char=? ,a ,b)
+			    `(if (and (char? ,a) (char? ,b))
+				 (PRIMop char=? ,a ,b)
+				 (DEAD-END
+				    (format "type-error (char=? ~a ~a):~a"
+				       (typeof ,a) (typeof ,b)
+				       ',(if (epair? x) (cer x) x))))))
+		   e))))))
+
+(define-macro (Schar=?.orig x y)
    (define arithmetic
       (cond-expand
 	 (arithmeticG 'G)
