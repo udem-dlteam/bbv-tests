@@ -697,3 +697,27 @@
    `(DEAD-END ,msg))
 
 (register-exit-function! (lambda (status) (bbv-saw-statistics) status))
+
+(define (Sequal? x y)
+   (cond
+      ((eq? x y) #t)
+      ((pair? x)
+       (and (pair? y)
+	    (Sequal? (Scar x) (Scar y))
+	    (Sequal? (Scdr x) (Scdr y))))
+      ((pair? y) #f)
+      ((FLONUM? x)
+       (and (FLONUM? y) (SFL= x y)))
+      ((FLONUM? y)
+       #f)
+      ((vector? x)
+       (and (vector? y)
+	    (SFX= (vector-length x) (vector-length y))
+	    (let loop ((i (SFX- (vector-length x) 1)))
+	       (if (SFX>= i 0)
+		   (if (Sequal? (Svector-ref x i) (Svector-ref y i))
+		       (loop (SFX- i 1))
+		       #f)
+		   #t))))
+      (else
+       (equal? x y))))
