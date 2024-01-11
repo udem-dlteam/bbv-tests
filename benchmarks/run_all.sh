@@ -1,7 +1,20 @@
 #!/bin/bash
 #set -euxo pipefail
 
-files=$(find ../tests/paper -type f -name "*.scm")
+files=("../tests/paper/micro/rev.scm"
+       "../tests/paper/micro/fibfp.scm"
+       "../tests/paper/micro/tak.scm"
+       "../tests/paper/micro/ack.scm"
+       "../tests/paper/micro/vlen.scm"
+       "../tests/paper/micro/vec.scm"
+       "../tests/paper/micro/primes.scm"
+       "../tests/paper/micro/nqueens.scm"
+       "../tests/paper/macro/conform.scm"
+       "../tests/paper/macro/slatex.scm"
+       "../tests/paper/macro/almabench.scm")
+
+
+#$(find ../tests/paper -type f -name "*.scm")
 
 gambit_strategies=("linear")
 
