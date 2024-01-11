@@ -78,7 +78,8 @@
 (define-macro (SFLatan x)        `(MAPop SFL atan ,x))
 
 (define-macro (SFX+ x y)         `(MAPop SFX + ,x ,y))
-(define-macro (SFX- x y)         `(MAPop SFX - ,x ,y))
+(define-macro (SFX2- x y)        `(MAPop SFX - ,x ,y))
+(define-macro (SFX- x . rest)    (if (null? rest) `(MAPop SFX - 0 ,x) `(SFX2- ,x ,@rest)))
 (define-macro (SFX* x y)         `(MAPop SFX * ,x ,y))
 (define-macro (SFXquotient x y)  `(MAPop SFX quotient ,x ,y))
 (define-macro (SFXremainder x y) `(MAPop SFX remainder ,x ,y))
@@ -214,6 +215,19 @@
         (else
          (PRIMop remainder ,a ,b))))))
 
+(define-macro (BBVmodulo x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       (cond
+        ((and (FIXNUM? ,a) (FIXNUM? ,b))
+         (FXmodulo ,a ,b))
+        ((and (FLONUM? ,a) (FLONUM? ,b))
+         (FLmodulo ,a ,b))
+        (else
+         (PRIMop modulo ,a ,b))))))
+
 (define-macro (BBV= x y) `(BBVcmp = ,x ,y))
 (define-macro (BBV< x y) `(BBVcmp < ,x ,y))
 (define-macro (BBV<= x y) `(BBVcmp <= ,x ,y))
@@ -343,9 +357,13 @@
                  (PRIMop set-cdr! ,a ,b)
                  (DEAD-END "set-cdr! type error"))))))
 
+(define-macro (Scaar x) `(Scar (Scar ,x)))
 (define-macro (Scadr x) `(Scar (Scdr ,x)))
+(define-macro (Scdar x) `(Scdr (Scar ,x)))
 (define-macro (Scddr x) `(Scdr (Scdr ,x)))
+(define-macro (Scdadr x) `(Scdr (Scar (Scdr ,x))))
 (define-macro (Scaddr x) `(Scar (Scdr (Scdr ,x))))
+(define-macro (Scdddr x) `(Scdr (Scdr (Scdr ,x))))
 (define-macro (Scadddr x) `(Scar (Scdr (Scdr (Scdr ,x)))))
 
 (define-macro (Sstring->symbol x) `(string->symbol ,x))
@@ -355,6 +373,7 @@
 (define-macro (Sstring->list x) `(string->list ,x))
 (define-macro (SFXnumber->string x) `(number->string ,x))
 (define-macro (Sstring->number x) `(string->number ,x))
+(define-macro (Sstring->number2 x base) `(string->number ,x ,base))
 (define-macro (Slength lst) `(length ,lst))
 (define-macro (Sappend lst1 lst2) `(append ,lst1 ,lst2))
 (define-macro (Sassq x lst) `(assq ,x ,lst))
@@ -721,3 +740,16 @@
 		   #t))))
       (else
        (equal? x y))))
+
+(define-inline (odd?fx x)
+   (oddfx? x))
+
+(define-inline (even?fx x)
+   (evenfx? x))
+
+(define-inline (modulofl x y)
+   (error "modulofl" "not implemented" #f))
+
+(define-inline (quotientfl x y)
+   (error "modulofl" "not implemented" #f))
+
