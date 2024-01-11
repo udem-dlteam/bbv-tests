@@ -16,7 +16,7 @@
   (let loop ((lst filesystem))
     (if (pair? lst)
         (let ((x (Scar lst)))
-          (if (Zstring=? (Scar x) path)
+          (if (Sstring=? (Scar x) path)
               (proc (cons (Scdr x) 0))
               (loop (Scdr lst))))
         #f))) ;; "file not found"
@@ -49,33 +49,9 @@
 (define (Zcall-with-output-file/truncate path proc)
   (let* ((port (list '()))
          (result (proc port))
-         (content (string-concat (slatex.reverse! (Scar port)))))
+         (content (LIBstring-concatenate (slatex.reverse! (Scar port)))))
     (set! filesystem (cons (cons path content) filesystem))
     result))
-
-(define (string-concat string-and-char-list)
-
-  (define (concat string-and-char-list i)
-    (if (pair? string-and-char-list)
-        (let ((x (Scar string-and-char-list)))
-          (if (char? x)
-              (let ((result (concat (Scdr string-and-char-list) (SFX+ i 1))))
-                (Sstring-set! result i x)
-                result)
-              (let* ((n (Sstring-length x))
-                     (result (concat (Scdr string-and-char-list) (SFX+ i n))))
-                (let loop ((j (SFX- (Sstring-length x) 1)))
-                  (if (SFX>= j 0)
-                      (begin
-                        (Sstring-set! result (SFX+ i j) (Sstring-ref x j))
-                        (loop (SFX- j 1)))
-                      result)))))
-        (Smake-string1 i)))
-
-  (concat string-and-char-list 0))
-
-(define (Zstring-append . strings)
-  (string-concat strings))
 
 (define-macro (Zdisplay obj port)
   `(let ((obj ,obj) (port ,port))
@@ -83,93 +59,6 @@
 
 (define-macro (Znewline port)
   `(Zdisplay "\n" ,port))
-
-(define-macro (Zchar-alphabetic? c)
-  `(let ((c ,c))
-     (if (Schar>=? c #\a)
-         (Schar<=? c #\z)
-         (and (Schar>=? c #\A) (Schar<=? c #\Z)))))
-
-(define-macro (Zchar-whitespace? c)
-  `(Schar<=? ,c #\space))
-
-(define-macro (Zmemv key lst)
-  `(let ((key ,key) (lst ,lst))
-     (let loop ((lst lst))
-       (if (pair? lst)
-           (if (eqv? key (Scar lst))
-               lst
-               (loop (Scdr lst)))
-           #f))))
-
-(define-macro (Zmemq key lst)
-  `(let ((key ,key) (lst ,lst))
-     (let loop ((lst lst))
-       (if (pair? lst)
-           (if (eq? key (Scar lst))
-               lst
-               (loop (Scdr lst)))
-           #f))))
-
-(define-macro (Zappend lst1 lst2)
-  `(let ((lst1 ,lst1) (lst2 ,lst2))
-     (let loop ((lst1 lst1))
-       (if (pair? lst1)
-           (cons (Scar lst1) (loop (Scdr lst1)))
-           lst2))))
-
-(define-macro (Zlist-tail lst i)
-  `(let ((lst ,lst) (i ,i))
-     (let loop ((lst lst) (i i))
-       (if (SFX<= i 0)
-           lst
-           (loop (Scdr lst) (SFX- i 1))))))
-
-(define (Zstring=? str1 str2)
-  (let ((len (Sstring-length str1)))
-    (and (SFX= len (Sstring-length str2))
-         (let loop ((i (SFX- len 1)))
-           (if (SFX< i 0)
-               #t
-               (and (Schar=? (Sstring-ref str1 i)
-                            (Sstring-ref str2 i))
-                    (loop (SFX- i 1))))))))
-
-(define (Zstring-ci=? str1 str2)
-
-  (define (char-downcase c)
-    (if (Schar<=? c #\Z)
-        (if (Schar>=? c #\A)
-            (Sinteger->char (SFX+ (Schar->integer c) 32))
-            c)
-        c))
-
-  (let ((len (Sstring-length str1)))
-    (and (SFX= len (Sstring-length str2))
-         (let loop ((i (SFX- len 1)))
-           (if (SFX< i 0)
-               #t
-               (and (Schar=? (char-downcase (Sstring-ref str1 i))
-                            (char-downcase (Sstring-ref str2 i)))
-                    (loop (SFX- i 1))))))))
-
-(define (Zlist->string char-list)
-
-  (define (concat char-list i)
-    (if (pair? char-list)
-        (let ((x (Scar char-list)))
-          (let ((result (concat (Scdr char-list) (SFX+ i 1))))
-            (Sstring-set! result i x)
-            result))
-        (Smake-string1 i)))
-
-  (concat char-list 0))
-
-(define (Zstring->list str)
-  (let loop ((i (SFX- (Sstring-length str) 1)) (result '()))
-    (if (SFX>= i 0)
-        (loop (SFX- i 1) (cons (Sstring-ref str i) result))
-        result)))
 
 ;;;----------------------------------------------------------------------------
 
@@ -262,7 +151,7 @@
   (lambda (key lst)
     (let loop ((lst lst))
       (if (pair? lst)
-          (if (Zstring=? key (Scar lst))
+          (if (Sstring=? key (Scar lst))
               lst
               (loop (Scdr lst)))
           #f))))
@@ -271,16 +160,16 @@
   (lambda (s l) (if (slatex.member-string s l) l (cons s l))))
 
 (define slatex.remove-string!
-  (lambda (s l) (slatex.remove-if! (lambda (l_i) (Zstring=? l_i s)) l)))
+  (lambda (s l) (slatex.remove-if! (lambda (l_i) (Sstring=? l_i s)) l)))
 
-(define slatex.adjoin-char (lambda (c l) (if (Zmemv c l) l (cons c l))))
+(define slatex.adjoin-char (lambda (c l) (if (Smemv c l) l (cons c l))))
 
 (define slatex.remove-char!
   (lambda (c l) (slatex.remove-if! (lambda (l_i) (Schar=? l_i c)) l)))
 
 (define slatex.sublist
   (lambda (l i f)
-    (let loop ((l (Zlist-tail l i)) (k i) (r '()))
+    (let loop ((l (Slist-tail l i)) (k i) (r '()))
       (cond ((SFX>= k f) (slatex.reverse! r))
             ((null? l) (slatex.error 'slatex.sublist 'list-too-small))
             (else (loop (Scdr l) (SFX+ k 1) (cons (Scar l) r)))))))
@@ -302,7 +191,7 @@
 
 (define slatex.token=?
   (lambda (t1 t2)
-    ((if slatex.*slatex-case-sensitive?* Zstring=? Zstring-ci=?) t1 t2)))
+    (if slatex.*slatex-case-sensitive?* (Sstring=? t1 t2) (Sstring-ci=? t1 t2))))
 
 (define slatex.assoc-token
   (lambda (x s)
@@ -404,8 +293,8 @@
 
 (define slatex.tex-analog
   (lambda (c)
-    (cond ((Zmemv c '(#\$ #\& #\% #\# #\_)) (string #\\ c))
-          ((Zmemv c '(#\{ #\})) (string #\$ #\\ c #\$))
+    (cond ((Smemv c '(#\$ #\& #\% #\# #\_)) (string #\\ c))
+          ((Smemv c '(#\{ #\})) (string #\$ #\\ c #\$))
           ((Schar=? c #\\) "$\\backslash$")
           ((Schar=? c #\+) "$+$")
           ((Schar=? c #\=) "$=$")
@@ -496,13 +385,13 @@
         (lambda (c) (slatex.token=? (Scar c) x))
         slatex.special-symbols))))
 
-(define slatex.texify (lambda (s) (Zlist->string (slatex.texify-aux s))))
+(define slatex.texify (lambda (s) (Slist->string (slatex.texify-aux s))))
 
 (define slatex.texify-data
   (lambda (s)
     (let loop ((l (slatex.texify-aux s)) (r '()))
       (if (null? l)
-        (Zlist->string (slatex.reverse! r))
+        (Slist->string (slatex.reverse! r))
         (let ((c (Scar l)))
           (loop (Scdr l)
                 (if (Schar=? c #\-)
@@ -510,19 +399,19 @@
                   (cons c r))))))))
 
 (define slatex.texify-aux
-  (let* ((arrow (Zstring->list "-$>$")) (arrow-lh (length arrow)))
+  (let* ((arrow (Sstring->list "-$>$")) (arrow-lh (length arrow)))
     (lambda (s)
-      (let* ((sl (Zstring->list s))
+      (let* ((sl (Sstring->list s))
              (texified-sl
                (slatex.append-map!
-                 (lambda (c) (Zstring->list (slatex.tex-analog c)))
+                 (lambda (c) (Sstring->list (slatex.tex-analog c)))
                  sl)))
         (slatex.ormapcdr
           (lambda (d)
             (if (slatex.list-prefix? arrow d)
-              (let ((to (Zstring->list "$\\to$")))
+              (let ((to (Sstring->list "$\\to$")))
                 (Sset-car! d (Scar to))
-                (Sset-cdr! d (Zappend (Scdr to) (Zlist-tail d arrow-lh)))))
+                (Sset-cdr! d (Sappend (Scdr to) (Slist-tail d arrow-lh)))))
             #f)
           texified-sl)
         texified-sl))))
@@ -840,7 +729,7 @@
                      (vector-ref line slatex.=tab)
                      i
                      slatex.&void-tab)
-                   (cond ((Zmemv c slatex.*math-triggerers*)
+                   (cond ((Smemv c slatex.*math-triggerers*)
                           (Sstring-set! (vector-ref line slatex.=char) i #\$)
                           (Sstring-set!
                             (vector-ref line slatex.=notab)
@@ -945,7 +834,7 @@
                      slatex.&begin-comment)
                    (set! curr-notab slatex.&mid-comment)
                    (loop (SFX+ i 1)))
-                  ((Zmemv c slatex.*math-triggerers*)
+                  ((Smemv c slatex.*math-triggerers*)
                    (Sstring-set! (vector-ref line slatex.=char) i #\$)
                    (Sstring-set!
                      (vector-ref line slatex.=space)
@@ -1037,7 +926,7 @@
                                     (vector-ref curr slatex.=space)
                                     i
                                     slatex.&bracket-space))
-                                 ((or (Zmemv (Sstring-ref
+                                 ((or (Smemv (Sstring-ref
                                               (vector-ref prev slatex.=char)
                                               i)
                                             '(#\' #\` #\,))
@@ -1049,7 +938,7 @@
                                     (vector-ref curr slatex.=space)
                                     i
                                     slatex.&quote-space)))
-                           (if (Zmemv (Sstring-ref
+                           (if (Smemv (Sstring-ref
                                        (vector-ref prev slatex.=tab)
                                        i)
                                      (list slatex.&set-tab slatex.&move-tab))
@@ -1062,13 +951,13 @@
                       ((not (eqv? (Sstring-ref (vector-ref prev slatex.=tab) i)
                                   slatex.&void-tab))
                        (set! remove-tabs-from (SFX+ i 1))
-                       (if (Zmemv (Sstring-ref (vector-ref prev slatex.=tab) i)
+                       (if (Smemv (Sstring-ref (vector-ref prev slatex.=tab) i)
                                  (list slatex.&set-tab slatex.&move-tab))
                          (Sstring-set!
                            (vector-ref curr slatex.=tab)
                            i
                            slatex.&move-tab)))
-                      ((Zmemv (Sstring-ref (vector-ref prev slatex.=space) i)
+                      ((Smemv (Sstring-ref (vector-ref prev slatex.=space) i)
                              (list slatex.&init-space
                                    slatex.&init-plain-space
                                    slatex.&paren-space
@@ -1101,7 +990,7 @@
                                              j)
                                            slatex.&void-tab))
                                 'exit-loop1)
-                               ((Zmemv (Sstring-ref
+                               ((Smemv (Sstring-ref
                                         (vector-ref curr slatex.=space)
                                         j)
                                       (list slatex.&paren-space
@@ -1117,7 +1006,7 @@
                                               j)
                                             #\space))
                                 (let ((k (SFX+ j 1)))
-                                  (if (Zmemv (Sstring-ref
+                                  (if (Smemv (Sstring-ref
                                               (vector-ref prev slatex.=notab)
                                               k)
                                             (list slatex.&mid-comment
@@ -1190,7 +1079,7 @@
                    slatex.&move-tab)
              (let loop2 ((i (SFX- i 1)))
                (cond ((SFX< i 0) 'exit-loop2)
-                     ((Zmemv (Sstring-ref (vector-ref line slatex.=space) i)
+                     ((Smemv (Sstring-ref (vector-ref line slatex.=space) i)
                             (list slatex.&init-space
                                   slatex.&paren-space
                                   slatex.&bracket-space
@@ -1364,7 +1253,7 @@
                  slatex.*out*)
                (Zdisplay c slatex.*out*)
                (loop (SFX+ i 1)))
-              ((Zmemv (Sstring-ref (vector-ref line slatex.=notab) i)
+              ((Smemv (Sstring-ref (vector-ref line slatex.=notab) i)
                      (list slatex.&mid-math slatex.&end-math))
                (Zdisplay c slatex.*out*)
                (loop (SFX+ i 1)))
@@ -1421,7 +1310,7 @@
                    (slatex.display-tex-char #\@ slatex.*out*)
                    (loop (SFX+ 2 i)))
                  (loop (SFX+ i 1))))
-              ((Zmemv c '(#\( #\[))
+              ((Smemv c '(#\( #\[))
                (slatex.display-tab
                  (Sstring-ref (vector-ref line slatex.=tab) i)
                  slatex.*out*)
@@ -1468,7 +1357,7 @@
                           (if (SFX= (vector-ref top slatex.=in-case-exp) 2)
                             (set! slatex.*in-qtd-tkn* #t))))))
                (loop (SFX+ i 1)))
-              ((Zmemv c '(#\) #\]))
+              ((Smemv c '(#\) #\]))
                (slatex.display-tab
                  (Sstring-ref (vector-ref line slatex.=tab) i)
                  slatex.*out*)
@@ -1539,8 +1428,8 @@
                                (SFX+ i 1))
                              (cons c buf))
                        (SFX+ i 2)))
-                ((or (Zmemv c token-delims) (Zmemv c slatex.*math-triggerers*))
-                 (slatex.output-token (Zlist->string (slatex.reverse! buf)))
+                ((or (Smemv c token-delims) (Smemv c slatex.*math-triggerers*))
+                 (slatex.output-token (Slist->string (slatex.reverse! buf)))
                  i)
                 ((char? c)
                  (loop (cons (Sstring-ref (vector-ref line slatex.=char) i) buf)
@@ -1625,12 +1514,12 @@
 
 (define slatex.path->list
   (lambda (p)
-    (let loop ((p (Zstring->list p)) (r (list "")))
+    (let loop ((p (Sstring->list p)) (r (list "")))
       (let ((separator-pos (slatex.position-char slatex.*path-separator* p)))
         (if separator-pos
-          (loop (Zlist-tail p (SFX+ separator-pos 1))
-                (cons (Zlist->string (slatex.sublist p 0 separator-pos)) r))
-          (slatex.reverse! (cons (Zlist->string p) r)))))))
+          (loop (Slist-tail p (SFX+ separator-pos 1))
+                (cons (Slist->string (slatex.sublist p 0 separator-pos)) r))
+          (slatex.reverse! (cons (Slist->string p) r)))))))
 
 (define slatex.find-some-file
   (lambda (path . files)
@@ -1638,10 +1527,10 @@
       (if (null? path)
         #f
         (let ((dir (Scar path)))
-          (let loop2 ((files (if (or (Zstring=? dir "") (Zstring=? dir "."))
+          (let loop2 ((files (if (or (Sstring=? dir "") (Sstring=? dir "."))
                                files
                                (map (lambda (file)
-                                      (Zstring-append
+                                      (Sstring-append
                                         dir
                                         slatex.*directory-mark*
                                         file))
@@ -1671,11 +1560,11 @@
 (define slatex.full-texfile-name
   (lambda (filename)
     (let ((extn (slatex.file-extension filename)))
-      (if (and extn (or (Zstring=? extn ".sty") (Zstring=? extn ".tex")))
+      (if (and extn (or (Sstring=? extn ".sty") (Sstring=? extn ".tex")))
         (slatex.find-some-file slatex.*texinputs-list* filename)
         (slatex.find-some-file
           slatex.*texinputs-list*
-          (Zstring-append filename ".tex")
+          (Sstring-append filename ".tex")
           filename)))))
 
 (define slatex.full-scmfile-name
@@ -1683,7 +1572,7 @@
     (apply slatex.find-some-file
            slatex.*texinputs-list*
            filename
-           (map (lambda (extn) (Zstring-append filename extn))
+           (map (lambda (extn) (Sstring-append filename extn))
                 '(".scm" ".ss" ".s")))))
 
 (define slatex.new-aux-file
@@ -1700,24 +1589,28 @@
 (define slatex.new-primary-aux-file
   (lambda e
     (set! primary-aux-file-count (SFX+ primary-aux-file-count 1))
-    (apply Zstring-append
-           slatex.*file-hider*
-           "z"
-           (SFXnumber->string primary-aux-file-count)
-;           slatex.subjobname
-           e)))
+    (LIBstring-concatenate (cons
+                            slatex.*file-hider*
+                            (cons
+                             "z"
+                             (cons
+                              (SFXnumber->string primary-aux-file-count)
+;;                              slatex.subjobname
+                              e))))))
 
 (define secondary-aux-file-count -1)
 
 (define slatex.new-secondary-aux-file
   (lambda e
     (set! secondary-aux-file-count (SFX+ secondary-aux-file-count 1))
-    (apply Zstring-append
-           slatex.*file-hider*
-           "zz"
-           (SFXnumber->string secondary-aux-file-count)
-;           slatex.subjobname
-           e)))
+    (LIBstring-concatenate (cons
+                            slatex.*file-hider*
+                            (cons
+                             "zz"
+                             (cons
+                              (SFXnumber->string secondary-aux-file-count)
+;;                              slatex.subjobname
+                              e))))))
 
 (define slatex.eat-till-newline
   (lambda (in)
@@ -1731,13 +1624,13 @@
   (lambda (in)
     (let ((c (Zread-char in)))
       (if (Zeof-object? c) (slatex.error 'read-ctrl-exp 1))
-      (if (Zchar-alphabetic? c)
-        (Zlist->string
+      (if (Schar-alphabetic? c)
+        (Slist->string
           (slatex.reverse!
             (let loop ((s (list c)))
               (let ((c (Zpeek-char in)))
                 (cond ((Zeof-object? c) s)
-                      ((Zchar-alphabetic? c) (Zread-char in) (loop (cons c s)))
+                      ((Schar-alphabetic? c) (Zread-char in) (loop (cons c s)))
                       ((Schar=? c #\%) (slatex.eat-till-newline in) (loop s))
                       (else s))))))
         (string c)))))
@@ -1757,7 +1650,7 @@
     (let loop ()
       (let ((c (Zpeek-char in)))
         (cond ((Zeof-object? c) 'done)
-              ((Zchar-whitespace? c) (Zread-char in) (loop))
+              ((Schar-whitespace? c) (Zread-char in) (loop))
               (else 'done))))))
 
 (define slatex.eat-latex-whitespace
@@ -1765,13 +1658,13 @@
     (let loop ()
       (let ((c (Zpeek-char in)))
         (cond ((Zeof-object? c) 'done)
-              ((Zchar-whitespace? c) (Zread-char in) (loop))
+              ((Schar-whitespace? c) (Zread-char in) (loop))
               ((Schar=? c #\%) (slatex.eat-till-newline in))
               (else 'done))))))
 
 (define slatex.chop-off-whitespace
   (lambda (l)
-    (slatex.ormapcdr (lambda (d) (if (Zchar-whitespace? (Scar d)) #f d)) l)))
+    (slatex.ormapcdr (lambda (d) (if (Schar-whitespace? (Scar d)) #f d)) l)))
 
 (define slatex.read-grouped-latexexp
   (lambda (in)
@@ -1780,7 +1673,7 @@
       (if (Zeof-object? c) (slatex.error 'slatex.read-grouped-latexexp 1))
       (if (Schar=? c #\{) 'ok (slatex.error 'slatex.read-grouped-latexexp 2))
       (slatex.eat-latex-whitespace in)
-      (Zlist->string
+      (Slist->string
         (slatex.reverse!
           (slatex.chop-off-whitespace
             (let loop ((s '()) (nesting 0) (escape? #f))
@@ -1819,7 +1712,7 @@
         (if (Zeof-object? c) (slatex.error 'slatex.read-filename 1))
         (if (Schar=? c #\{)
           (slatex.read-grouped-latexexp in)
-          (Zlist->string
+          (Slist->string
             (slatex.reverse!
               (let loop ((s '()) (escape? #f))
                 (let ((c (Zpeek-char in)))
@@ -1827,7 +1720,7 @@
                          (if escape? (slatex.error 'slatex.read-filename 2) s))
                         (escape? (Zread-char in) (loop (cons c s) #f))
                         ((Schar=? c #\\) (Zread-char in) (loop (cons c s) #t))
-                        ((Zmemv c filename-delims) s)
+                        ((Smemv c filename-delims) s)
                         (else (Zread-char in) (loop (cons c s) #f))))))))))))
 
 (define slatex.read-schemeid
@@ -1844,14 +1737,14 @@
                 slatex.*tab*)))
     (lambda (in)
       (slatex.eat-whitespace in)
-      (Zlist->string
+      (Slist->string
         (slatex.reverse!
           (let loop ((s '()) (escape? #f))
             (let ((c (Zpeek-char in)))
               (cond ((Zeof-object? c) s)
                     (escape? (Zread-char in) (loop (cons c s) #f))
                     ((Schar=? c #\\) (Zread-char in) (loop (cons c s) #t))
-                    ((Zmemv c schemeid-delims) s)
+                    ((Smemv c schemeid-delims) s)
                     (else (Zread-char in) (loop (cons c s) #f))))))))))
 
 (define slatex.read-delimed-commaed-filenames
@@ -1917,7 +1810,7 @@
 
 (define slatex.add-to-slatex-db
   (lambda (in categ)
-    (if (Zmemq categ '(keyword constant variable))
+    (if (Smemq categ '(keyword constant variable))
       (slatex.add-to-slatex-db-basic in categ)
       (slatex.add-to-slatex-db-special in categ))))
 
@@ -2008,7 +1901,7 @@
             (set! slatex.*slatex-in-protected-region?* #f)
             (let ((%temp% (begin
                             (slatex.process-tex-file
-                              (Zstring-append filename ".sty")))))
+                              (Sstring-append filename ".sty")))))
               (set! slatex.*slatex-in-protected-region?* %:g0%)
               %temp%)))
         (slatex.read-bktd-commaed-filenames in)))))
@@ -2017,8 +1910,8 @@
   (lambda (in)
     (let ((bool (slatex.read-grouped-latexexp in)))
       (set! slatex.*slatex-case-sensitive?*
-        (cond ((Zstring-ci=? bool "true") #t)
-              ((Zstring-ci=? bool "false") #f)
+        (cond ((Sstring-ci=? bool "true") #t)
+              ((Sstring-ci=? bool "false") #f)
               (else
                (slatex.error
                  'slatex.process-case-info
@@ -2068,7 +1961,7 @@
 ;;      (let loop ((buf ""))
 ;;        (let ((c (Zread-char in)))
 ;;          (if (Zeof-object? c) (slatex.error 'slatex.dump-display 2))
-;;          (let ((buf (Zstring-append buf (string c))))
+;;          (let ((buf (Sstring-append buf (string c))))
 ;;            (if (slatex.string-prefix? buf ender)
 ;;              (if (SFX= (Sstring-length buf) ender-lh) 'done (loop buf))
 ;;              (begin (Zdisplay buf out) (loop "")))))))))
@@ -2122,21 +2015,21 @@
                                  (begin
                                    (set! slatex.seen-first-command? #t)
                                    (slatex.decide-latex-or-tex
-                                     (Zstring=? cs "documentstyle"))))
+                                     (Sstring=? cs "documentstyle"))))
                                (cond ((not slatex.*slatex-enabled?*)
-                                      (if (Zstring=?
+                                      (if (Sstring=?
                                             cs
                                             slatex.*slatex-reenabler*)
                                         (slatex.enable-slatex-again)))
-                                     ((Zstring=? cs "slatexignorecurrentfile")
+                                     ((Sstring=? cs "slatexignorecurrentfile")
                                       (set! done? #t))
-                                     ((Zstring=? cs "slatexseparateincludes")
+                                     ((Sstring=? cs "slatexseparateincludes")
                                       (if slatex.*latex?*
                                         (set! slatex.*slatex-separate-includes?*
                                           #t)))
-                                     ((Zstring=? cs "slatexdisable")
+                                     ((Sstring=? cs "slatexdisable")
                                       (slatex.disable-slatex-temply in))
-                                     ((Zstring=? cs "begin")
+                                     ((Sstring=? cs "begin")
                                       (let ((cs (slatex.read-grouped-latexexp
                                                   in)))
                                         (cond ((slatex.member-string cs
@@ -2186,7 +2079,7 @@
                                      ((slatex.member-string cs slatex.*input-triggerers*)
                                       (slatex.process-scheme-file
                                         (slatex.read-filename in)))
-                                     ((Zstring=? cs "input")
+                                     ((Sstring=? cs "input")
                                       (let ((%:g1% slatex.*slatex-in-protected-region?*))
                                         (set! slatex.*slatex-in-protected-region?*
                                           #f)
@@ -2197,7 +2090,7 @@
                                           (set! slatex.*slatex-in-protected-region?*
                                             %:g1%)
                                           %temp%)))
-                                     ((Zstring=? cs "include")
+                                     ((Sstring=? cs "include")
                                       (if slatex.*latex?*
                                         (let ((f (slatex.full-texfile-name
                                                    (slatex.read-filename in))))
@@ -2232,95 +2125,95 @@
                                                 (set! primary-aux-file-count
                                                   %:g4%)
                                                 %temp%))))))
-                                     ((Zstring=? cs "includeonly")
+                                     ((Sstring=? cs "includeonly")
                                       (if slatex.*latex?*
                                         (slatex.process-include-only in)))
-                                     ((Zstring=? cs "documentstyle")
+                                     ((Sstring=? cs "documentstyle")
                                       (if slatex.*latex?*
                                         (slatex.process-documentstyle in)))
-                                     ((Zstring=? cs "schemecasesensitive")
+                                     ((Sstring=? cs "schemecasesensitive")
                                       (slatex.process-case-info in))
-                                     ((Zstring=? cs "defschemetoken")
+                                     ((Sstring=? cs "defschemetoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.adjoin-string
                                         'intext))
-                                     ((Zstring=? cs "undefschemetoken")
+                                     ((Sstring=? cs "undefschemetoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.remove-string!
                                         'intext))
-                                     ((Zstring=? cs "defschemeresulttoken")
+                                     ((Sstring=? cs "defschemeresulttoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.adjoin-string
                                         'resultintext))
-                                     ((Zstring=? cs "undefschemeresulttoken")
+                                     ((Sstring=? cs "undefschemeresulttoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.remove-string!
                                         'resultintext))
-                                     ((Zstring=? cs "defschemedisplaytoken")
+                                     ((Sstring=? cs "defschemedisplaytoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.adjoin-string
                                         'display))
-                                     ((Zstring=? cs "undefschemedisplaytoken")
+                                     ((Sstring=? cs "undefschemedisplaytoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.remove-string!
                                         'display))
-                                     ((Zstring=? cs "defschemeboxtoken")
+                                     ((Sstring=? cs "defschemeboxtoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.adjoin-string
                                         'box))
-                                     ((Zstring=? cs "undefschemeboxtoken")
+                                     ((Sstring=? cs "undefschemeboxtoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.remove-string!
                                         'box))
-                                     ((Zstring=? cs "defschemeinputtoken")
+                                     ((Sstring=? cs "defschemeinputtoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.adjoin-string
                                         'input))
-                                     ((Zstring=? cs "undefschemeinputtoken")
+                                     ((Sstring=? cs "undefschemeinputtoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.remove-string!
                                         'input))
-                                     ((Zstring=? cs "defschemeregiontoken")
+                                     ((Sstring=? cs "defschemeregiontoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.adjoin-string
                                         'region))
-                                     ((Zstring=? cs "undefschemeregiontoken")
+                                     ((Sstring=? cs "undefschemeregiontoken")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.remove-string!
                                         'region))
-                                     ((Zstring=? cs "defschememathescape")
+                                     ((Sstring=? cs "defschememathescape")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.adjoin-char
                                         'mathescape))
-                                     ((Zstring=? cs "undefschememathescape")
+                                     ((Sstring=? cs "undefschememathescape")
                                       (slatex.process-slatex-alias
                                         in
                                         slatex.remove-char!
                                         'mathescape))
-                                     ((Zstring=? cs "setkeyword")
+                                     ((Sstring=? cs "setkeyword")
                                       (slatex.add-to-slatex-db in 'keyword))
-                                     ((Zstring=? cs "setconstant")
+                                     ((Sstring=? cs "setconstant")
                                       (slatex.add-to-slatex-db in 'constant))
-                                     ((Zstring=? cs "setvariable")
+                                     ((Sstring=? cs "setvariable")
                                       (slatex.add-to-slatex-db in 'variable))
-                                     ((Zstring=? cs "setspecialsymbol")
+                                     ((Sstring=? cs "setspecialsymbol")
                                       (slatex.add-to-slatex-db
                                         in
                                         'setspecialsymbol))
-                                     ((Zstring=? cs "unsetspecialsymbol")
+                                     ((Sstring=? cs "unsetspecialsymbol")
                                       (slatex.add-to-slatex-db
                                         in
                                         'unsetspecialsymbol)))))))
@@ -2363,8 +2256,8 @@
 (define slatex.trigger-scheme2tex
   (lambda (typ in env)
     (let* ((aux (slatex.new-aux-file))
-           (aux.scm (Zstring-append aux ".scm"))
-           (aux.tex (Zstring-append aux ".tex")))
+           (aux.scm (Sstring-append aux ".scm"))
+           (aux.tex (Sstring-append aux ".tex")))
       (if (slatex.file-exists? aux.scm) (slatex.delete-file aux.scm))
       (if (slatex.file-exists? aux.tex) (slatex.delete-file aux.tex))
 ;      (display ".")
@@ -2372,11 +2265,11 @@
       (Zcall-with-output-file/truncate
         aux.scm
         (lambda (out)
-          (cond ((Zmemq typ '(intext resultintext)) (slatex.dump-intext in out))
-                ((Zmemq typ '(envdisplay envbox))
-                 (slatex.dump-display in out (Zstring-append "\\end{" env "}")))
-                ((Zmemq typ '(plaindisplay plainbox))
-                 (slatex.dump-display in out (Zstring-append "\\end" env)))
+          (cond ((Smemq typ '(intext resultintext)) (slatex.dump-intext in out))
+                ((Smemq typ '(envdisplay envbox))
+                 (slatex.dump-display in out (Sstring-append "\\end{" env "}")))
+                ((Smemq typ '(plaindisplay plainbox))
+                 (slatex.dump-display in out (Sstring-append "\\end" env)))
                 (else (slatex.error 'slatex.trigger-scheme2tex 1)))))
       (Zcall-with-input-file
         aux.scm
@@ -2385,13 +2278,13 @@
             aux.tex
             (lambda (out)
               (let ((%:g7% slatex.*intext?*) (%:g8% slatex.*code-env-spec*))
-                (set! slatex.*intext?* (Zmemq typ '(intext resultintext)))
+                (set! slatex.*intext?* (Smemq typ '(intext resultintext)))
                 (set! slatex.*code-env-spec*
                   (cond ((eq? typ 'intext) "ZZZZschemecodeintext")
                         ((eq? typ 'resultintext) "ZZZZschemeresultintext")
-                        ((Zmemq typ '(envdisplay plaindisplay))
+                        ((Smemq typ '(envdisplay plaindisplay))
                          "ZZZZschemedisplay")
-                        ((Zmemq typ '(envbox plainbox)) "ZZZZschemebox")
+                        ((Smemq typ '(envbox plainbox)) "ZZZZschemebox")
                         (else (slatex.error 'slatex.trigger-scheme2tex 2))))
                 (let ((%temp% (begin (scheme2tex in out))))
                   (set! slatex.*intext?* %:g7%)
@@ -2400,7 +2293,7 @@
       (if slatex.*slatex-in-protected-region?*
         (set! slatex.*protected-files*
           (cons aux.tex slatex.*protected-files*)))
-      (if (Zmemq typ '(envdisplay plaindisplay envbox plainbox))
+      (if (Smemq typ '(envdisplay plaindisplay envbox plainbox))
         (slatex.process-tex-file aux.tex))
       (slatex.delete-file aux.scm))))
 
@@ -2424,12 +2317,12 @@
                                    (slatex.dump-display
                                      in
                                      out
-                                     (Zstring-append "\\end{" env "}")))
+                                     (Sstring-append "\\end{" env "}")))
                                   ((eq? typ 'plainregion)
                                    (slatex.dump-display
                                      in
                                      out
-                                     (Zstring-append "\\end" env)))
+                                     (Sstring-append "\\end" env)))
                                   (else
                                    (slatex.error 'slatex.trigger-region 1)))))
                         (slatex.process-tex-file aux2.tex)
@@ -2459,7 +2352,7 @@
                     ((Schar=? c #\%) (slatex.eat-till-newline in))
                     ((Schar=? c #\\)
                      (let ((cs (slatex.read-ctrl-seq in)))
-                       (cond ((Zstring=? cs "begin")
+                       (cond ((Sstring=? cs "begin")
                               (let ((cs (slatex.read-grouped-latexexp in)))
                                 (cond ((slatex.member-string cs slatex.*display-triggerers*)
                                        (slatex.inline-protected
@@ -2513,14 +2406,14 @@
            (Zdisplay "\\begin{" out)
            (Zdisplay env out)
            (Zdisplay "}" out)
-           (slatex.dump-display in out (Zstring-append "\\end{" env "}"))
+           (slatex.dump-display in out (Sstring-append "\\end{" env "}"))
            (Zdisplay "\\end{" out)
            (Zdisplay env out)
            (Zdisplay "}" out))
           ((eq? typ 'plainregion)
            (Zdisplay "\\" out)
            (Zdisplay env out)
-           (slatex.dump-display in out (Zstring-append "\\end" env))
+           (slatex.dump-display in out (Sstring-append "\\end" env))
            (Zdisplay "\\end" out)
            (Zdisplay env out))
           (else
@@ -2530,11 +2423,11 @@
                f
                (lambda (in) (slatex.inline-protected-files in out)))
              (slatex.delete-file f))
-           (cond ((Zmemq typ '(intext resultintext)) (slatex.dump-intext in #f))
-                 ((Zmemq typ '(envdisplay envbox))
-                  (slatex.dump-display in #f (Zstring-append "\\end{" env "}")))
-                 ((Zmemq typ '(plaindisplay plainbox))
-                  (slatex.dump-display in #f (Zstring-append "\\end" env)))
+           (cond ((Smemq typ '(intext resultintext)) (slatex.dump-intext in #f))
+                 ((Smemq typ '(envdisplay envbox))
+                  (slatex.dump-display in #f (Sstring-append "\\end{" env "}")))
+                 ((Smemq typ '(plaindisplay plainbox))
+                  (slatex.dump-display in #f (Sstring-append "\\end" env)))
                  ((eq? typ 'input) (slatex.read-filename in))
                  (else (slatex.error 'slatex.inline-protected 1)))))))
 

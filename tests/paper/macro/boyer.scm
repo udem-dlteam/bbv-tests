@@ -41,14 +41,6 @@
        (cons (list-deep-copy (Scar l)) (list-deep-copy (Scdr l)))
        l))
        
-(define (local-assq obj alist)
-   (let loop ((alist alist))
-      (if (null? alist)
-          #f
-          (if (eq? (Scar (Scar alist)) obj)
-              (Scar alist)
-              (loop (Scdr alist))))))
-
 (define unify-subst '())
 (define temp-temp 0)
 
@@ -56,11 +48,11 @@
 (define lemmas-prop-list '())
 
 (define (get-lemmas s)
-  (cond  ((local-assq s lemmas-prop-list) => Scdr)
+  (cond  ((Sassq s lemmas-prop-list) => (lambda (x) (Scdr x)))
 	 (else '())))
 
 (define (put-lemmas s v)
-  (cond ((local-assq s lemmas-prop-list) => (lambda (p) (Sset-cdr! p v)))
+  (cond ((Sassq s lemmas-prop-list) => (lambda (p) (Sset-cdr! p v)))
 	(else (set! lemmas-prop-list (cons (cons s v) lemmas-prop-list)))))
 
 (define (add-lemma term)
@@ -80,7 +72,7 @@
 
 (define (apply-subst alist term)
   (cond ((not (pair? term))
-         (cond ((begin (set! temp-temp (local-assq term alist))
+         (cond ((begin (set! temp-temp (Sassq term alist))
                        temp-temp)
                 (Scdr temp-temp))
                (else term)))
@@ -103,7 +95,7 @@
 
 (define (one-way-unify1 term1 term2)
   (cond ((not (pair? term2))
-         (cond ((begin (set! temp-temp (local-assq term2 unify-subst))
+         (cond ((begin (set! temp-temp (Sassq term2 unify-subst))
                        temp-temp)
                 (Sequal? term1 (Scdr temp-temp)))
                (else (set! unify-subst (cons (cons term2 term1)
@@ -607,12 +599,12 @@
 ;;; make sure you've run (setup) then call:  (test)
 
 (define (run #!key (n (unknown 500 1)))
-   (let loop ((n n))
-      (setup)
-      (let ((r (test)))
-	 (if (=fx n 0)
-	     r
-	     (loop (-fx n 1))))))
+  (let loop ((n n) (result #f))
+    (if (SFX> n 0)
+        (begin
+          (setup)
+          (loop (SFX- n 1) (test)))
+        result)))
 
 (define (check result)
    (equal? result '(#t . 136)))
