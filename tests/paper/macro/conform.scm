@@ -440,15 +440,14 @@
   '(made a b c d))
 
 (define (run #!key (n (unknown 1000 1)))
-   (let loop ((n n)
-	      (r #f))
-      (if (=fx n 0)
-	  r
-	  (begin
-	     (setup)
-	     (loop (-fx n 1)
-		(map name
-		   (graph-nodes (make-lattice (make-graph a b c d any-node none-node)))))))))
+  (let loop ((n n) (r #f))
+    (if (FX= n 0)
+        r
+      (begin
+        (setup)
+        (loop (FX- n 1)
+              (map name
+                (graph-nodes (make-lattice (make-graph a b c d any-node none-node)))))))))
 
 (define (check result)
   (equal? (map (lambda (s)
