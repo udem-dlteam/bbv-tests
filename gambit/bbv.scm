@@ -565,12 +565,12 @@
                  (DEAD-END "string-length type error"))))))
 
 (define-macro (Sstring-append . args)
-  (let ((vars (map (lambda () (gensym)) args)))
+  (let ((vars (map (lambda (_) (gensym)) args)))
     `(let ,(map list vars args)
        ,(if (eq? arithmetic 'S)
             `(PRIMop string-append ,@vars)
             `(if (and ,@(map (lambda (var) `(string? ,var)) vars))
-                 (PRIMop string-length ,@vars)
+                 (PRIMop string-append ,@vars)
                  (DEAD-END "string-append type error"))))))
 
 (define-macro (Ssubstring str start end)
