@@ -94,7 +94,7 @@ static long saw_vectorlength = 0;
 #  define BGL_SUBFX_SANS_OV(x, y) (saw_sub++, BINT(CINT(x) - CINT(y)))
 
 #  undef BGL_MULFX_SANS_OV
-#  define BGL_MULFX_SANS_OV(x, y) (saw_mul++, (((long)(x)) * (y)))
+#  define BGL_MULFX_SANS_OV(x, y) (saw_mul++, BINT(CINT(x) * CINT(y)))
 
 #  undef PAIRP
 #  if(defined(TAG_PAIR))

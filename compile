@@ -73,7 +73,7 @@ while [ "$#" != "0" ]; do
       VERSION_LIMIT="$1"
       ;;
     -gsi)
-     GAMBITCOMP="$GAMBITDIR/gsi/gsi -:d,=$GAMBITDIR $GAMBITDIR/gsc/igsc"
+     GAMBITCOMP="$GAMBITDIR/gsi/gsi -:dar,=$GAMBITDIR $GAMBITDIR/gsc/igsc"
      ;;
     -M) # merge strategy
       shift
