@@ -123,53 +123,12 @@
 ;   Enders of V     = (5 19 20)
 ;   Predictors of V = (15 17)
 
-(define (my-append lst1 lst2)
-  (if (pair? lst1)
-      (cons (Scar lst1) (my-append (Scdr lst1) lst2))
-      lst2))
-
-(define (my-map f lst)
-  (if (pair? lst)
-      (cons (f (Scar lst)) (my-map f (Scdr lst)))
-      '()))
-
-(define (my-reverse lst)
-  (let loop ((lst lst) (result '()))
-    (if (pair? lst)
-        (loop (Scdr lst) (cons (Scar lst) result))
-        result)))
-
-(define (my-member key lst)
-  (let loop ((lst lst))
-    (if (pair? lst)
-        (if (equal? key (Scar lst))
-            lst
-            (loop (Scdr lst)))
-        #f)))
-
-(define (my-length lst)
-  (let loop ((lst lst) (len 0))
-    (if (pair? lst)
-        (loop (Scdr lst) (SFX+ len 1))
-        len)))
-
-(define (my-list->vector lst)
-
-  (define (convert lst i)
-    (if (pair? lst)
-        (let ((result (convert (Scdr lst) (SFX+ i 1))))
-          (Svector-set! result i (Scar lst))
-          result)
-        (Smake-vector1 i)))
-
-  (convert lst 0))
-
 (define (make-parser grammar lexer)
 
   (define (non-terminals grammar) ; return vector of non-terminals in grammar
 
     (define (add-nt nt nts)
-      (if (my-member nt nts) nts (cons nt nts))) ; use equal? for equality tests
+      (if (Smember nt nts) nts (cons nt nts))) ; use equal? for equality tests
 
     (let def-loop ((defs grammar) (nts '()))
       (if (pair? defs)
@@ -185,7 +144,7 @@
                       (loop (Scdr l) (add-nt nt nts)))
                     (rule-loop (Scdr rules) nts))))
               (def-loop (Scdr defs) nts))))
-        (my-list->vector (my-reverse nts))))) ; goal non-terminal must be at index 0
+        (Slist->vector (Sreverse nts))))) ; goal non-terminal must be at index 0
 
   (define (ind nt nts) ; return index of non-terminal `nt' in `nts'
     (let loop ((i (SFX- (Svector-length nts) 1)))
@@ -289,10 +248,10 @@
                 (if i
                   (loop (Scdr l1) (cons i l2))
                   (loop (Scdr l1) l2)))
-              (cons (Scar tok) (my-reverse l2)))))
+              (cons (Scar tok) (Sreverse l2)))))
 
         (define (input->tokens input lexer nts)
-          (my-list->vector (my-map (lambda (tok) (comp-tok tok nts)) (lexer input))))
+          (Slist->vector (Smap2 (lambda (tok) (comp-tok tok nts)) (lexer input))))
 
         (define (make-states nb-toks nb-confs)
           (let ((states (Smake-vector2 (SFX+ nb-toks 1) #f)))
@@ -559,8 +518,8 @@
                                       (let loop4 ((l4 prev-trees) (l2 l2))
                                         (if (pair? l4)
                                           (loop4 (Scdr l4)
-                                                 (cons (my-append (Scar l4)
-                                                               ender-tree)
+                                                 (cons (Sappend (Scar l4)
+                                                                ender-tree)
                                                        l2))
                                           (loop3 (Scdr l3) l2))))
                                     (loop2 (conf-set-next ender-set k) l2))))
@@ -578,8 +537,8 @@
                     (let ((conf (Scar l)))
                       (if (conf-set-member? (Svector-ref states j) conf i)
                         (loop (Scdr l)
-                              (my-append (deriv-trees conf i j enders steps names
-                                                   toks states nb-nts)
+                              (Sappend (deriv-trees conf i j enders steps names
+                                                    toks states nb-nts)
                                       trees))
                         (loop (Scdr l) trees)))
                     trees)))
@@ -680,9 +639,9 @@
 
 (define (test)
   (let ((p (make-parser '( (s (a) (s s)) )
-                        (lambda (l) (my-map (lambda (x) (list x x)) l)))))
+                        (lambda (l) (Smap2 (lambda (x) (list x x)) l)))))
     (let ((x (p '(a a a a a a a a a))))
-      (my-length (parse->trees x 's 0 9)))))
+      (Slength (parse->trees x 's 0 9)))))
 
 (define (run #!key (n (unknown 10000 1)))
   (let loop ((n n) (result #f))

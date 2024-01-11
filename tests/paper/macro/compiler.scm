@@ -1,144 +1,3 @@
-(define (my-append lst1 lst2)
-  (if (pair? lst1)
-      (cons (Scar lst1) (my-append (Scdr lst1) lst2))
-      lst2))
-
-(define (append-lists list-of-lists)
-
-  (define (concat first rest)
-    (if (pair? rest)
-        (my-append first (concat (Scar rest) (Scdr rest)))
-        first))
-
-  (if (pair? list-of-lists)
-      (concat (Scar list-of-lists) (Scdr list-of-lists))
-      '()))
-
-(define (my-map f lst)
-  (if (pair? lst)
-      (cons (f (Scar lst)) (my-map f (Scdr lst)))
-      '()))
-
-(define (my-reverse lst)
-  (let loop ((lst lst) (result '()))
-    (if (pair? lst)
-        (loop (Scdr lst) (cons (Scar lst) result))
-        result)))
-
-(define (my-memq key lst)
-  (let loop ((lst lst))
-    (if (pair? lst)
-        (if (eq? key (Scar lst))
-            lst
-            (loop (Scdr lst)))
-        #f)))
-
-(define (my-memv key lst)
-  (let loop ((lst lst))
-    (if (pair? lst)
-        (if (eqv? key (Scar lst))
-            lst
-            (loop (Scdr lst)))
-        #f)))
-
-(define (my-assq key lst)
-  (let loop ((lst lst))
-    (if (pair? lst)
-        (let ((x (Scar lst)))
-          (if (eq? key (Scar x))
-              x
-              (loop (Scdr lst))))
-        #f)))
-
-(define (my-assv key lst)
-  (let loop ((lst lst))
-    (if (pair? lst)
-        (let ((x (Scar lst)))
-          (if (eqv? key (Scar x))
-              x
-              (loop (Scdr lst))))
-        #f)))
-
-(define (my-assoc key lst)
-  (let loop ((lst lst))
-    (if (pair? lst)
-        (let ((x (Scar lst)))
-          (if (equal? key (Scar x))
-              x
-              (loop (Scdr lst))))
-        #f)))
-
-(define (my-length lst)
-  (let loop ((lst lst) (len 0))
-    (if (pair? lst)
-        (loop (Scdr lst) (SFX+ len 1))
-        len)))
-
-(define (my-list-ref lst i)
-  (let loop ((lst lst) (i i))
-    (if (SFX<= i 0)
-        (Scar lst)
-        (loop (Scdr lst) (SFX- i 1)))))
-
-(define (string-concat string-list)
-
-  (define (concat string-list i)
-    (if (pair? string-list)
-        (let ((x (Scar string-list)))
-          (let* ((n (Sstring-length x))
-                 (result (concat (Scdr string-list) (SFX+ i n))))
-            (let loop ((j (SFX- (Sstring-length x) 1)))
-              (if (SFX>= j 0)
-                  (begin
-                    (Sstring-set! result (SFX+ i j) (Sstring-ref x j))
-                    (loop (SFX- j 1)))
-                  result))))
-        (Smake-string1 i)))
-
-  (concat string-list 0))
-
-(define (my-string-append . strings)
-  (string-concat strings))
-
-(define (my-string=? str1 str2)
-  (let ((len (Sstring-length str1)))
-    (and (SFX= len (Sstring-length str2))
-         (let loop ((i (SFX- len 1)))
-           (if (SFX< i 0)
-               #t
-               (and (Schar=? (Sstring-ref str1 i)
-                            (Sstring-ref str2 i))
-                    (loop (SFX- i 1))))))))
-
-(define (my-string<? str1 str2)
-  (let loop ((i 0))
-    (if (SFX< i (Sstring-length str1))
-        (if (SFX< i (Sstring-length str2))
-            (let ((c1 (Sstring-ref str1 i))
-                  (c2 (Sstring-ref str2 i)))
-              (and (Schar<? c1 c2)
-                   (loop (SFX+ i 1))))
-            #f)
-        (SFX< i (Sstring-length str2)))))
-
-(define (my-char-alphabetic? c)
-  (if (Schar>=? c #\a)
-      (Schar<=? c #\z)
-      (and (Schar>=? c #\A) (Schar<=? c #\Z))))
-
-(define (my-char-numeric? c)
-  (and (Schar>=? c #\0) (Schar<=? c #\9)))
-
-(define (my-char-whitespace? c)
-  (Schar<=? c #\space))
-
-(define (my-char-downcase c)
-  (if (Schar<=? c #\Z)
-      (if (Schar>=? c #\A)
-          (Sinteger->char (SFX+ (Schar->integer c) 32))
-          c)
-      c))
-
 ;(define integer->char ascii->char)
 ;(define char->integer char->ascii)
 
@@ -227,7 +86,7 @@
 (define (string-pos-in-list x l)
   (let loop ((l l) (i 0))
     (cond ((not (pair? l)) #f)
-          ((my-string=? (Scar l) x) i)
+          ((Sstring=? (Scar l) x) i)
           (else (loop (Scdr l) (SFX+ i 1))))))
 (define (nth-after l n)
   (let loop ((l l) (n n)) (if (SFX> n 0) (loop (Scdr l) (SFX- n 1)) l)))
@@ -257,7 +116,7 @@
           (merge l1 l2))))
   (mergesort l))
 (define (lst->vector l)
-  (let* ((n (my-length l)) (v (Smake-vector1 n)))
+  (let* ((n (Slength l)) (v (Smake-vector1 n)))
     (let loop ((l l) (i 0))
       (if (pair? l)
           (begin (Svector-set! v i (Scar l)) (loop (Scdr l) (SFX+ i 1)))
@@ -266,7 +125,7 @@
   (let loop ((l '()) (i (SFX- (Svector-length v) 1)))
     (if (SFX< i 0) l (loop (cons (Svector-ref v i) l) (SFX- i 1)))))
 (define (lst->string l)
-  (let* ((n (my-length l)) (s (Smake-string1 n)))
+  (let* ((n (Slength l)) (s (Smake-string1 n)))
     (let loop ((l l) (i 0))
       (if (pair? l)
           (begin (Sstring-set! s i (Scar l)) (loop (Scdr l) (SFX+ i 1)))
@@ -330,7 +189,7 @@
      (set-union
       edges
       (apply set-union
-             (my-map (lambda (label) (gnode-edges (gnode-find label graph)))
+             (Smap2 (lambda (label) (gnode-edges (gnode-find label graph)))
                   (set->list edges))))))
   (let ((new-graph
          (set-map (lambda (x)
@@ -378,33 +237,33 @@
 (define (set->list set) set)
 (define (set-empty) '())
 (define (set-empty? set) (null? set))
-(define (set-member? x set) (my-memq x set))
+(define (set-member? x set) (Smemq x set))
 (define (set-singleton x) (list x))
-(define (set-adjoin set x) (if (my-memq x set) set (cons x set)))
+(define (set-adjoin set x) (if (Smemq x set) set (cons x set)))
 (define (set-remove set x)
   (cond ((null? set) '())
         ((eq? (Scar set) x) (Scdr set))
         (else (cons (Scar set) (set-remove (Scdr set) x)))))
 (define (set-equal? s1 s2)
   (cond ((null? s1) (null? s2))
-        ((my-memq (Scar s1) s2) (set-equal? (Scdr s1) (set-remove s2 (Scar s1))))
+        ((Smemq (Scar s1) s2) (set-equal? (Scdr s1) (set-remove s2 (Scar s1))))
         (else #f)))
 (define (set-difference set . other-sets)
   (define (difference s1 s2)
     (cond ((null? s1) '())
-          ((my-memq (Scar s1) s2) (difference (Scdr s1) s2))
+          ((Smemq (Scar s1) s2) (difference (Scdr s1) s2))
           (else (cons (Scar s1) (difference (Scdr s1) s2)))))
   (n-ary difference set other-sets))
 (define (set-union . sets)
   (define (union s1 s2)
     (cond ((null? s1) s2)
-          ((my-memq (Scar s1) s2) (union (Scdr s1) s2))
+          ((Smemq (Scar s1) s2) (union (Scdr s1) s2))
           (else (cons (Scar s1) (union (Scdr s1) s2)))))
   (n-ary union '() sets))
 (define (set-intersection set . other-sets)
   (define (intersection s1 s2)
     (cond ((null? s1) '())
-          ((my-memq (Scar s1) s2) (cons (Scar s1) (intersection (Scdr s1) s2)))
+          ((Smemq (Scar s1) s2) (cons (Scar s1) (intersection (Scdr s1) s2)))
           (else (intersection (Scdr s1) s2))))
   (n-ary intersection set other-sets))
 (define (n-ary function first rest)
@@ -443,7 +302,7 @@
     (let loop ((str str) (s (Smake-string1 len)) (i (SFX- len 1)))
       (if (SFX>= i 0)
           (begin
-            (Sstring-set! s i (my-char-downcase (Sstring-ref str i)))
+            (Sstring-set! s i (Schar-downcase (Sstring-ref str i)))
             (loop str s (SFX- i 1)))
           (Sstring->symbol s)))))
 (define quote-sym (string->canonical-symbol "QUOTE"))
@@ -506,7 +365,7 @@
         (if (pair? exts)
             (let* ((ext (Scar exts))
                    (full-name
-                    (if ext (my-string-append filename "." ext) filename))
+                    (if ext (Sstring-append filename "." ext) filename))
                    (port (open-input-file* full-name)))
               (if port (vector port full-name 0 1 0) (loop (Scdr exts))))
             (open-err)))
@@ -525,7 +384,7 @@
 (define (sf-read-error sf msg . args)
   (apply compiler-user-error
          (cons (sf->locat sf)
-               (cons (my-string-append "Read error -- " msg) args))))
+               (cons (Sstring-append "Read error -- " msg) args))))
 (define (sf->locat sf)
   (vector 'file
           (Svector-ref sf 1)
@@ -632,7 +491,7 @@
   (file->sources
    (if (path-absolute? filename)
        filename
-       (my-string-append (file-path (locat-filename loc)) filename))
+       (Sstring-append (file-path (locat-filename loc)) filename))
    info-port))
 (define (read-source sf)
   (define (read-char*)
@@ -688,11 +547,11 @@
     (if (delimiter? (sf-peek-char sf))
         (Smake-string2 i #\space)
         (let* ((c (sf-read-char sf)) (s (read-symbol/number-string (SFX+ i 1))))
-          (Sstring-set! s i (my-char-downcase c))
+          (Sstring-set! s i (Schar-downcase c))
           s)))
   (define (read-symbol/number c)
     (let ((s (read-symbol/number-string 1)))
-      (Sstring-set! s 0 (my-char-downcase c))
+      (Sstring-set! s 0 (Schar-downcase c))
       (or (Sstring->number2 s 10) (string->canonical-symbol s))))
   (define (read-prefixed-number c)
     (let ((s (read-symbol/number-string 2)))
@@ -723,17 +582,17 @@
               (let ((x (read-non-whitespace-char)))
                 (if (Schar=? x #\)) '() (read-list (rd* x)))))
              ((Schar=? c #\#)
-              (let ((c (my-char-downcase (sf-read-char sf))))
+              (let ((c (Schar-downcase (sf-read-char sf))))
                 (cond ((Schar=? c #\() (read-vector))
                       ((Schar=? c #\f) false-object)
                       ((Schar=? c #\t) #t)
                       ((Schar=? c #\\)
                        (let ((c (read-char*)))
-                         (if (or (not (my-char-alphabetic? c))
+                         (if (or (not (Schar-alphabetic? c))
                                  (delimiter? (sf-peek-char sf)))
                              c
                              (let ((name (read-symbol/number c)))
-                               (let ((x (my-assq name named-char-table)))
+                               (let ((x (Sassq name named-char-table)))
                                  (if x
                                      (Scdr x)
                                      (sf-read-error
@@ -845,7 +704,7 @@
         (let ((decl (Scar decls)))
           (if (eq? (Scar decl) namespace-sym)
               (let ((syms (Scddr decl)))
-                (if (or (null? syms) (my-memq name syms))
+                (if (or (null? syms) (Smemq name syms))
                     (Scadr decl)
                     (loop (Scdr decls))))
               (loop (Scdr decls))))
@@ -888,7 +747,7 @@
 (define (make-full-name prefix sym)
   (if (SFX= (Sstring-length prefix) 0)
       sym
-      (string->canonical-symbol (my-string-append prefix (Ssymbol->string sym)))))
+      (string->canonical-symbol (Sstring-append prefix (Ssymbol->string sym)))))
 (define (env-lookup-var env name source)
   (env-lookup
    env
@@ -974,7 +833,7 @@
         (if (pair? l)
             (let ((d (Scar l)))
               (if (and (eq? (Scar d) name)
-                       (or (null? (Scddr d)) (my-memq element (Scddr d))))
+                       (or (null? (Scddr d)) (Smemq element (Scddr d))))
                   (Scadr d)
                   (loop (Scdr l))))
             (declaration-value name element default (env-parent-ref decls))))))
@@ -1157,13 +1016,13 @@
                              (node-decl oper))))
                   (if (and proc
                            (not (nb-args-conforms?
-                                 (my-length args)
+                                 (Slength args)
                                  (standard-procedure-call-pattern proc))))
                       (begin
                         (display "*** WARNING -- \"" *ptree-port*)
                         (display (var-name var) *ptree-port*)
                         (display "\" is called with " *ptree-port*)
-                        (display (my-length args) *ptree-port*)
+                        (display (Slength args) *ptree-port*)
                         (display " argument(s)." *ptree-port*)
                         (newline *ptree-port*))))))))
   (new-call source decl oper args))
@@ -1221,11 +1080,11 @@
        (new-prc (node-source proc)
                 (node-decl proc)
                 (prc-name proc)
-                (my-length vars)
+                (Slength vars)
                 #f
-                (my-reverse vars)
+                (Sreverse vars)
                 body)
-       (my-reverse vals))
+       (Sreverse vals))
       body))
 (define (new-temps source names)
   (if (null? names)
@@ -1250,7 +1109,7 @@
           (loop (Scdr vars) (Scdr vals))))))
 (define (free-variables node)
   (if (eq? (node-fv node) #t)
-      (let ((x (apply set-union (my-map free-variables (node-children node)))))
+      (let ((x (apply set-union (Smap2 free-variables (node-children node)))))
         (node-fv-set!
          node
          (cond ((ref? node)
@@ -1343,14 +1202,14 @@
 (define (make-standard-procedure x)
   (cons (string->canonical-symbol (Scar x)) (Scdr x)))
 (define (standard-procedure name decl)
-  (or (my-assq name (dialect-specific-procedures (scheme-dialect decl)))
-      (my-assq name common-procedures)))
+  (or (Sassq name (dialect-specific-procedures (scheme-dialect decl)))
+      (Sassq name common-procedures)))
 (define (standard-procedure-call-pattern proc) (Scdr proc))
 (define ieee-scheme-specific-keywords '())
-(define ieee-scheme-specific-procedures (my-map make-standard-procedure '()))
+(define ieee-scheme-specific-procedures (Smap2 make-standard-procedure '()))
 (define r4rs-scheme-specific-keywords (list delay-sym))
 (define r4rs-scheme-specific-procedures
-  (my-map make-standard-procedure
+  (Smap2 make-standard-procedure
        '(("LIST-TAIL" 2)
          ("-" . 1)
          ("/" . 1)
@@ -1370,7 +1229,7 @@
          ("TRANSCRIPT-OFF" 0))))
 (define multilisp-specific-keywords (list delay-sym future-sym))
 (define multilisp-specific-procedures
-  (my-map make-standard-procedure '(("FORCE" 1) ("TOUCH" 1))))
+  (Smap2 make-standard-procedure '(("FORCE" 1) ("TOUCH" 1))))
 (define common-keywords
   (list quote-sym
         quasiquote-sym
@@ -1395,7 +1254,7 @@
         **declare-sym
         **include-sym))
 (define common-procedures
-  (my-map make-standard-procedure
+  (Smap2 make-standard-procedure
        '(("NOT" 1)
          ("BOOLEAN?" 1)
          ("EQV?" 2)
@@ -1577,7 +1436,7 @@
 (define (parse-program program env module-name proc)
   (define (parse-prog program env lst proc)
     (if (null? program)
-        (proc (my-reverse lst) env)
+        (proc (Sreverse lst) env)
         (let ((source (Scar program)))
           (cond ((macro-expr? source env)
                  (parse-prog
@@ -1587,7 +1446,7 @@
                   proc))
                 ((begin-defs-expr? source)
                  (parse-prog
-                  (my-append (begin-defs-body source) (Scdr program))
+                  (Sappend (begin-defs-body source) (Scdr program))
                   env
                   lst
                   proc))
@@ -1598,7 +1457,7 @@
                            *ptree-port*
                            (source-locat source))))
                    (if *ptree-port* (newline *ptree-port*))
-                   (parse-prog (my-append x (Scdr program)) env lst proc)))
+                   (parse-prog (Sappend x (Scdr program)) env lst proc)))
                 ((define-macro-expr? source env)
                  (if *ptree-port*
                      (begin
@@ -1679,9 +1538,9 @@
   #f)
 (define (c-interface-end)
   (let ((i (make-c-intf
-            (my-reverse c-interface-decls)
-            (my-reverse c-interface-procs)
-            (my-reverse c-interface-inits))))
+            (Sreverse c-interface-decls)
+            (Sreverse c-interface-procs)
+            (Sreverse c-interface-inits))))
     (set! c-interface-module-name #f)
     (set! c-interface-proc-count #f)
     (set! c-interface-decls #f)
@@ -1739,7 +1598,7 @@
         (list boolean-sym "BOOLEAN" "int")
         (list string-sym "STRING" "char*")
         (list scheme-object-sym "SCMOBJ" "long")))
-(define (convert-type typ) (if (my-assq typ scheme-to-c-notation) typ #f))
+(define (convert-type typ) (if (Sassq typ scheme-to-c-notation) typ #f))
 (define (check-arg-and-result-types source arg-typs-source res-typ-source)
   (let ((arg-typs (source-code arg-typs-source))
         (res-typ (source-code res-typ-source)))
@@ -1771,7 +1630,7 @@
 (define (pt-c-procedure source env use)
   (let* ((code (source-code source))
          (name (build-c-procedure
-                (my-map source-code (source-code (Scadr code)))
+                (Smap2 source-code (source-code (Scadr code)))
                 (source-code (Scaddr code))
                 (source-code (Scadddr code))))
          (decl (env-declarations env)))
@@ -1781,7 +1640,7 @@
     (let loop ((i (SFX- (Sstring-length proc-name-or-code) 1)))
       (if (SFX>= i 0)
           (let ((c (Sstring-ref proc-name-or-code i)))
-            (if (or (my-char-alphabetic? c) (Schar=? c #\_)) (loop (SFX- i 1)) #f))
+            (if (or (Schar-alphabetic? c) (Schar=? c #\_)) (loop (SFX- i 1)) #f))
           #t)))
   (define nl (string #\newline))
   (define undefined-value "UND")
@@ -1791,24 +1650,24 @@
   (define c-result-name "result")
   (define scheme-to-c-prefix "SCMOBJ_TO_")
   (define c-to-scheme-suffix "_TO_SCMOBJ")
-  (define (c-type-name typ) (Scadr (my-assq typ scheme-to-c-notation)))
-  (define (c-type-decl typ) (Scaddr (my-assq typ scheme-to-c-notation)))
+  (define (c-type-name typ) (Scadr (Sassq typ scheme-to-c-notation)))
+  (define (c-type-decl typ) (Scaddr (Sassq typ scheme-to-c-notation)))
   (define (listify strings)
     (if (null? strings)
         ""
-        (my-string-append
+        (Sstring-append
          (Scar strings)
-         (string-concat
-                (my-map (lambda (s) (my-string-append "," s)) (Scdr strings))))))
+         (LIBstring-concatenate
+                (Smap2 (lambda (s) (Sstring-append "," s)) (Scdr strings))))))
   (define (scheme-arg-var t)
-    (my-string-append c-id-prefix scheme-arg-prefix (SFXnumber->string (Scdr t))))
+    (Sstring-append c-id-prefix scheme-arg-prefix (SFXnumber->string (Scdr t))))
   (define (c-arg-var t)
-    (my-string-append c-id-prefix c-arg-prefix (SFXnumber->string (Scdr t))))
+    (Sstring-append c-id-prefix c-arg-prefix (SFXnumber->string (Scdr t))))
   (define (make-c-procedure arg-types res-type)
     (define (make-arg-decl)
-      (string-concat
-             (my-map (lambda (t)
-                    (my-string-append
+      (LIBstring-concatenate
+             (Smap2 (lambda (t)
+                    (Sstring-append
                      (c-type-decl (Scar t))
                      " "
                      (c-arg-var t)
@@ -1817,12 +1676,12 @@
                   arg-types)))
     (define (make-conversions)
       (if (not (null? arg-types))
-          (let loop ((lst arg-types) (str (my-string-append "if (" nl)))
+          (let loop ((lst arg-types) (str (Sstring-append "if (" nl)))
             (if (null? lst)
-                (my-string-append str "   )" nl)
+                (Sstring-append str "   )" nl)
                 (let ((t (Scar lst)) (rest (Scdr lst)))
                   (loop rest
-                        (my-string-append
+                        (Sstring-append
                          str
                          "    "
                          c-id-prefix
@@ -1838,10 +1697,10 @@
           ""))
     (define (make-body)
       (if proc-name?
-          (let* ((param-list (listify (my-map c-arg-var arg-types)))
-                 (call (my-string-append proc-name-or-code "(" param-list ")")))
+          (let* ((param-list (listify (Smap2 c-arg-var arg-types)))
+                 (call (Sstring-append proc-name-or-code "(" param-list ")")))
             (if (eq? res-type void-sym)
-                (my-string-append
+                (Sstring-append
                  "{"
                  nl
                  call
@@ -1856,7 +1715,7 @@
                  nl
                  "}"
                  nl)
-                (my-string-append
+                (Sstring-append
                  c-id-prefix
                  (c-type-name res-type)
                  c-to-scheme-suffix
@@ -1868,7 +1727,7 @@
                  ");"
                  nl)))
           (if (eq? res-type void-sym)
-              (my-string-append
+              (Sstring-append
                "{"
                nl
                proc-name-or-code
@@ -1882,7 +1741,7 @@
                nl
                "}"
                nl)
-              (my-string-append
+              (Sstring-append
                "{"
                nl
                proc-name-or-code
@@ -1901,13 +1760,13 @@
                "}"
                nl))))
     (let* ((index (SFXnumber->string c-interface-proc-count))
-           (scheme-name (my-string-append "#!" c-interface-module-name "#" index))
-           (c-name (my-string-append c-id-prefix (scheme-id->c-id scheme-name)))
-           (arity (my-length argument-types))
-           (def (my-string-append
+           (scheme-name (Sstring-append "#!" c-interface-module-name "#" index))
+           (c-name (Sstring-append c-id-prefix (scheme-id->c-id scheme-name)))
+           (arity (Slength argument-types))
+           (def (Sstring-append
                  (if (or proc-name? (eq? res-type void-sym))
                      ""
-                     (my-string-append
+                     (Sstring-append
                       (c-type-decl res-type)
                       " "
                       c-id-prefix
@@ -1923,13 +1782,13 @@
   (let loop ((i 1) (lst1 argument-types) (lst2 '()))
     (if (pair? lst1)
         (loop (SFX+ i 1) (Scdr lst1) (cons (cons (Scar lst1) i) lst2))
-        (make-c-procedure (my-reverse lst2) result-type))))
+        (make-c-procedure (Sreverse lst2) result-type))))
 (define (scheme-id->c-id s)
   (define (hex->char i) (Sstring-ref "0123456789abcdef" i))
   (let loop ((i (SFX- (Sstring-length s) 1)) (l '()))
     (if (SFX>= i 0)
         (let ((c (Sstring-ref s i)))
-          (cond ((or (my-char-alphabetic? c) (my-char-numeric? c))
+          (cond ((or (Schar-alphabetic? c) (Schar-numeric? c))
                  (loop (SFX- i 1) (cons c l)))
                 ((Schar=? c #\_) (loop (SFX- i 1) (cons c (cons c l))))
                 (else
@@ -1942,7 +1801,7 @@
 (define (pt-syntax-error source msg . args)
   (apply compiler-user-error
          (cons (source-locat source)
-               (cons (my-string-append "Syntax error -- " msg) args))))
+               (cons (Sstring-append "Syntax error -- " msg) args))))
 (define (pt source env use)
   (cond ((macro-expr? source env) (pt (macro-expand source env) env use))
         ((self-eval-expr? source) (pt-self-eval source env use))
@@ -2049,7 +1908,7 @@
   (cond ((and (cst? ptree1) (cst? ptree2))
          (new-cst source
                   (env-declarations env)
-                  (my-append (cst-val ptree1) (cst-val ptree2))))
+                  (Sappend (cst-val ptree1) (cst-val ptree2))))
         ((and (cst? ptree2) (null? (cst-val ptree2))) ptree1)
         (else
          (new-call*
@@ -2197,7 +2056,7 @@
             vars
             vals
             envs
-            (my-append (begin-defs-body (Scar body)) (Scdr body))
+            (Sappend (begin-defs-body (Scar body)) (Scdr body))
             env))
           ((include-expr? (Scar body))
            (if *ptree-port* (display "  " *ptree-port*))
@@ -2206,7 +2065,7 @@
                      *ptree-port*
                      (source-locat (Scar body)))))
              (if *ptree-port* (newline *ptree-port*))
-             (letrec-defines vars vals envs (my-append x (Scdr body)) env)))
+             (letrec-defines vars vals envs (Sappend x (Scdr body)) env)))
           ((define-expr? (Scar body) env)
            (let* ((var** (definition-variable (Scar body)))
                   (var* (source-code var**))
@@ -2239,7 +2098,7 @@
            (letrec-defines vars vals envs (Scdr body) env))
           ((null? vars) (pt-sequence source body env use))
           (else
-           (let ((vars* (my-reverse vars)))
+           (let ((vars* (Sreverse vars)))
              (let loop ((vals* '()) (l1 vals) (l2 envs))
                (if (not (null? l1))
                    (loop (cons (pt (Scar l1) (Scar l2) 'true) vals*)
@@ -2353,15 +2212,15 @@
   (let ((code (source-code source)))
     (if (bindable-var? (Scadr code) env)
         (let* ((self (new-variables (list (Scadr code))))
-               (bindings (my-map source-code (source-code (Scaddr code))))
-               (vars (new-variables (my-map (lambda (x) (Scar x)) bindings)))
-               (vals (my-map (lambda (x) (pt (Scadr x) env 'true)) bindings))
+               (bindings (Smap2 source-code (source-code (Scaddr code))))
+               (vars (new-variables (Smap2 (lambda (x) (Scar x)) bindings)))
+               (vals (Smap2 (lambda (x) (pt (Scadr x) env 'true)) bindings))
                (env (env-frame (env-frame env vars) self))
                (self-proc
                 (list (new-prc source
                                (env-declarations env)
                                #f
-                               (my-length vars)
+                               (Slength vars)
                                #f
                                vars
                                (pt-body source (Scdddr code) env use)))))
@@ -2384,9 +2243,9 @@
            self-proc))
         (if (null? (source-code (Scadr code)))
             (pt-body source (Scddr code) env use)
-            (let* ((bindings (my-map source-code (source-code (Scadr code))))
-                   (vars (new-variables (my-map (lambda (x) (Scar x)) bindings)))
-                   (vals (my-map (lambda (x) (pt (Scadr x) env 'true)) bindings))
+            (let* ((bindings (Smap2 source-code (source-code (Scadr code))))
+                   (vars (new-variables (Smap2 (lambda (x) (Scar x)) bindings)))
+                   (vals (Smap2 (lambda (x) (pt (Scadr x) env 'true)) bindings))
                    (env (env-frame env vars)))
               (set-prc-names! vars vals)
               (new-call*
@@ -2395,7 +2254,7 @@
                (new-prc source
                         (env-declarations env)
                         #f
-                        (my-length vars)
+                        (Slength vars)
                         #f
                         vars
                         (pt-body source (Scddr code) env use))
@@ -2425,13 +2284,13 @@
     (pt-bindings (source-code (Scadr code)) env use)))
 (define (pt-letrec source env use)
   (let* ((code (source-code source))
-         (bindings (my-map source-code (source-code (Scadr code))))
-         (vars* (new-variables (my-map (lambda (x) (Scar x)) bindings)))
+         (bindings (Smap2 source-code (source-code (Scadr code))))
+         (vars* (new-variables (Smap2 (lambda (x) (Scar x)) bindings)))
          (env* (env-frame env vars*)))
     (pt-recursive-let
      source
      vars*
-     (my-map (lambda (x) (pt (Scadr x) env* 'true)) bindings)
+     (Smap2 (lambda (x) (pt (Scadr x) env* 'true)) bindings)
      (Scddr code)
      env*
      use)))
@@ -2448,12 +2307,12 @@
               (set-intersection (list->set vars) (free-variables val)))))))
     (dgraph vars vals))
   (define (val-of var)
-    (my-list-ref vals (SFX- (my-length vars) (my-length (my-memq var vars)))))
+    (Slist-ref vals (SFX- (Slength vars) (Slength (Smemq var vars)))))
   (define (bind-in-order order)
     (if (null? order)
         (pt-body source body env use)
         (let* ((vars-set (Scar order)) (vars (set->list vars-set)))
-          (let loop1 ((l (my-reverse vars))
+          (let loop1 ((l (Sreverse vars))
                       (vars-b '())
                       (vals-b '())
                       (vars-a '()))
@@ -2487,7 +2346,7 @@
                                      (new-prc source
                                               (env-declarations env)
                                               #f
-                                              (my-length vars-b)
+                                              (Slength vars-b)
                                               #f
                                               vars-b
                                               result1)
@@ -2500,11 +2359,11 @@
                                      (new-prc source
                                               (env-declarations env)
                                               #f
-                                              (my-length vars-a)
+                                              (Slength vars-a)
                                               #f
                                               vars-a
                                               result2)
-                                     (my-map (lambda (var)
+                                     (Smap2 (lambda (var)
                                             (new-cst source
                                                      (env-declarations env)
                                                      undef-object))
@@ -2518,11 +2377,11 @@
 (define (pt-do source env use)
   (let* ((code (source-code source))
          (loop (new-temps source '(loop)))
-         (bindings (my-map source-code (source-code (Scadr code))))
-         (vars (new-variables (my-map (lambda (x) (Scar x)) bindings)))
-         (init (my-map (lambda (x) (pt (Scadr x) env 'true)) bindings))
+         (bindings (Smap2 source-code (source-code (Scadr code))))
+         (vars (new-variables (Smap2 (lambda (x) (Scar x)) bindings)))
+         (init (Smap2 (lambda (x) (pt (Scadr x) env 'true)) bindings))
          (env (env-frame env vars))
-         (step (my-map (lambda (x)
+         (step (Smap2 (lambda (x)
                       (pt (if (length? x 2) (Scar x) (Scaddr x)) env 'true))
                     bindings))
          (exit (source-code (Scaddr code))))
@@ -2544,7 +2403,7 @@
      (list (new-prc source
                     (env-declarations env)
                     #f
-                    (my-length vars)
+                    (Slength vars)
                     #f
                     vars
                     (new-tst source
@@ -2585,7 +2444,7 @@
      source
      (env-declarations env)
      oper
-     (my-map (lambda (x) (pt x env 'true)) (Scdr code)))))
+     (Smap2 (lambda (x) (pt x env 'true)) (Scdr code)))))
 (define (pt-delay source env use)
   (let ((code (source-code source)))
     (new-call*
@@ -2623,8 +2482,8 @@
   (let ((code (source-code source)))
     (and (symbol-object? code) (not-keyword source env code))))
 (define (not-keyword source env name)
-  (if (or (my-memq name common-keywords)
-          (my-memq name
+  (if (or (Smemq name common-keywords)
+          (Smemq name
                 (dialect-specific-keywords
                  (scheme-dialect (env-declarations env)))))
       (pt-syntax-error
@@ -2640,7 +2499,7 @@
        (proper-parms? (source->parms (Scadr (source-code source))) env)))
 (define (if-expr? source)
   (and (mymatch if-sym -2 source)
-       (or (SFX<= (my-length (source-code source)) 4)
+       (or (SFX<= (Slength (source-code source)) 4)
            (pt-syntax-error source "Ill-formed special form" if-sym))))
 (define (cond-expr? source)
   (and (mymatch cond-sym -1 source) (proper-clauses? source)))
@@ -2653,7 +2512,7 @@
        (let ((code (source-code source)))
          (if (bindable-var? (Scadr code) env)
              (and (proper-bindings? (Scaddr code) #t env)
-                  (or (SFX> (my-length code) 3)
+                  (or (SFX> (Slength code) 3)
                       (pt-syntax-error source "Ill-formed named 'let'")))
              (proper-bindings? (Scadr code) #t env)))))
 (define (let*-expr? source env)
@@ -2673,9 +2532,9 @@
        (let ((v (definition-variable source)))
          (not-macro v env (source-code v)))))
 (define (combination-expr? source)
-  (let ((my-length (proper-length (source-code source))))
-    (if my-length
-        (or (SFX> my-length 0) (pt-syntax-error source "Ill-formed procedure call"))
+  (let ((length (proper-length (source-code source))))
+    (if length
+        (or (SFX> length 0) (pt-syntax-error source "Ill-formed procedure call"))
         (pt-syntax-error source "Ill-terminated procedure call"))))
 (define (delay-expr? source env)
   (and (not (eq? (scheme-dialect (env-declarations env)) ieee-scheme-sym))
@@ -2763,11 +2622,11 @@
              (cond ((pair? parm)
                     (if (eq? (scheme-dialect (env-declarations env))
                              multilisp-sym)
-                        (let ((my-length (proper-length parm)))
+                        (let ((Slength (proper-length parm)))
                           (if (or (eqv? length 1) (eqv? length 2))
                               (let ((var (Scar parm)))
                                 (if (bindable-var? var env)
-                                    (if (my-memq (source-code var) seen)
+                                    (if (Smemq (source-code var) seen)
                                         (pt-syntax-error
                                          var
                                          "Duplicate parameter in parameter list")
@@ -2787,7 +2646,7 @@
                    (optional-seen
                     (pt-syntax-error parm* "Optional parameter expected"))
                    ((bindable-var? parm* env)
-                    (if (my-memq parm seen)
+                    (if (Smemq parm seen)
                         (pt-syntax-error
                          parm*
                          "Duplicate parameter in parameter list"))
@@ -2798,7 +2657,7 @@
                      "Parameter must be an identifier")))))
           ((null? parms) #t)
           ((bindable-var? parms env)
-           (if (my-memq (source-code parms) seen)
+           (if (Smemq (source-code parms) seen)
                (pt-syntax-error parms "Duplicate parameter in parameter list")
                #t))
           (else
@@ -2869,7 +2728,7 @@
              (if (eqv? (proper-length binding) 2)
                  (let ((var (Scar binding)))
                    (if (bindable-var? var env)
-                       (if (and check-dupl? (my-memq (source-code var) seen))
+                       (if (and check-dupl? (Smemq (source-code var) seen))
                            (pt-syntax-error
                             var
                             "Duplicate variable in bindings")
@@ -2893,7 +2752,7 @@
                (if (or (eqv? length 2) (eqv? length 3))
                    (let ((var (Scar binding)))
                      (if (bindable-var? var env)
-                         (if (my-memq (source-code var) seen)
+                         (if (Smemq (source-code var) seen)
                              (pt-syntax-error
                               var
                               "Duplicate variable in bindings")
@@ -2930,7 +2789,7 @@
                        (pt-syntax-error
                         id*
                         "Declaration name must be an identifier"))
-                      ((my-assq id flag-declarations)
+                      ((Sassq id flag-declarations)
                        (cond ((not pos)
                               (pt-syntax-error
                                id*
@@ -2938,13 +2797,13 @@
                              ((null? (Scdr x))
                               (flag-decl
                                source
-                               (Scdr (my-assq id flag-declarations))
+                               (Scdr (Sassq id flag-declarations))
                                id))
                              (else
                               (pt-syntax-error
                                source
                                "Ill-formed declaration"))))
-                      ((my-memq id parameterized-declarations)
+                      ((Smemq id parameterized-declarations)
                        (cond ((not pos)
                               (pt-syntax-error
                                id*
@@ -2958,11 +2817,11 @@
                               (pt-syntax-error
                                source
                                "Ill-formed declaration"))))
-                      ((my-memq id boolean-declarations)
+                      ((Smemq id boolean-declarations)
                        (if (null? (Scdr x))
                            (boolean-decl source id pos)
                            (pt-syntax-error source "Ill-formed declaration")))
-                      ((my-assq id namable-declarations)
+                      ((Sassq id namable-declarations)
                        (cond ((not pos)
                               (pt-syntax-error
                                id*
@@ -2970,16 +2829,16 @@
                              (else
                               (namable-decl
                                source
-                               (Scdr (my-assq id namable-declarations))
+                               (Scdr (Sassq id namable-declarations))
                                id
-                               (my-map source->expression (Scdr x))))))
-                      ((my-memq id namable-boolean-declarations)
+                               (Smap2 source->expression (Scdr x))))))
+                      ((Smemq id namable-boolean-declarations)
                        (namable-boolean-decl
                         source
                         id
                         pos
-                        (my-map source->expression (Scdr x))))
-                      ((my-memq id namable-string-declarations)
+                        (Smap2 source->expression (Scdr x))))
+                      ((Smemq id namable-string-declarations)
                        (if (not (pair? (Scdr x)))
                            (pt-syntax-error source "Ill-formed declaration")
                            (let* ((str* (Scadr x)) (str (source-code str*)))
@@ -2994,7 +2853,7 @@
                                      source
                                      id
                                      str
-                                     (my-map source->expression (Scddr x))))))))
+                                     (Smap2 source->expression (Scddr x))))))))
                       (else (pt-syntax-error id* "Unknown declaration")))))))))
 (define (add-declarations source env)
   (let loop ((l (Scdr (source-code source))) (env env))
@@ -3037,7 +2896,7 @@
         ((ref? ptree)
          (let ((var (ref-var ptree)))
            (var-refs-set! var (set-remove (var-refs var) ptree))
-           (let ((x (my-assq var consts)))
+           (let ((x (Sassq var consts)))
              (if x
                  (new-cst (node-source ptree) (node-decl ptree) (Scdr x))
                  (let ((y (global-val var)))
@@ -3096,13 +2955,13 @@
          (let ((oper (app-oper ptree)) (args (app-args ptree)))
            (if (and (prc? oper)
                     (not (prc-rest oper))
-                    (SFX= (my-length (prc-parms oper)) (my-length args)))
+                    (SFX= (Slength (prc-parms oper)) (Slength args)))
                (pe-let ptree consts)
                (new-call
                 (node-source ptree)
                 (node-decl ptree)
                 (pe oper consts)
-                (my-map (lambda (x) (pe x consts)) args)))))
+                (Smap2 (lambda (x) (pe x consts)) args)))))
         ((fut? ptree)
          (new-fut (node-source ptree)
                   (node-decl ptree)
@@ -3132,11 +2991,11 @@
                (new-prc (node-source proc)
                         (node-decl proc)
                         #f
-                        (my-length new-vars)
+                        (Slength new-vars)
                         #f
-                        (my-reverse new-vars)
+                        (Sreverse new-vars)
                         (pe (prc-body proc) new-consts))
-               (my-reverse new-vals)))
+               (Sreverse new-vals)))
           (let ((var (Scar l)) (val (pe (Scar v) consts)))
             (if (and (set-member? var non-mut-vars) (cst? val))
                 (loop (Scdr l)
@@ -3157,7 +3016,7 @@
          (let ((var (ref-var ptree)))
            (if (global? var)
                ptree
-               (let ((x (my-assq var mut)))
+               (let ((x (Sassq var mut)))
                  (if x
                      (let ((source (node-source ptree)))
                        (var-refs-set! var (set-remove (var-refs var) ptree))
@@ -3178,7 +3037,7 @@
                 source
                 (node-decl ptree)
                 (new-ref-extended-bindings source **cell-set!-sym env)
-                (list (new-ref source (node-decl ptree) (Scdr (my-assq var mut)))
+                (list (new-ref source (node-decl ptree) (Scdr (Sassq var mut)))
                       val)))))
         ((tst? ptree)
          (new-tst (node-source ptree)
@@ -3203,13 +3062,13 @@
          (let ((oper (app-oper ptree)) (args (app-args ptree)))
            (if (and (prc? oper)
                     (not (prc-rest oper))
-                    (SFX= (my-length (prc-parms oper)) (my-length args)))
+                    (SFX= (Slength (prc-parms oper)) (Slength args)))
                (ac-let ptree env mut)
                (new-call
                 (node-source ptree)
                 (node-decl ptree)
                 (ac oper env mut)
-                (my-map (lambda (x) (ac x env mut)) args)))))
+                (Smap2 (lambda (x) (ac x env mut)) args)))))
         ((fut? ptree)
          (new-fut (node-source ptree)
                   (node-decl ptree)
@@ -3217,8 +3076,8 @@
         (else (compiler-internal-error "ac, unknown parse tree node type"))))
 (define (ac-proc ptree env mut)
   (let* ((mut-parms (ac-mutables (prc-parms ptree)))
-         (mut-parms-copies (my-map var-copy mut-parms))
-         (mut (my-append (pair-up mut-parms mut-parms-copies) mut))
+         (mut-parms-copies (Smap2 var-copy mut-parms))
+         (mut (Sappend (pair-up mut-parms mut-parms-copies) mut))
          (new-body (ac (prc-body ptree) env mut)))
     (new-prc (node-source ptree)
              (node-decl ptree)
@@ -3234,11 +3093,11 @@
                   (new-prc (node-source ptree)
                            (node-decl ptree)
                            #f
-                           (my-length mut-parms-copies)
+                           (Slength mut-parms-copies)
                            #f
                            mut-parms-copies
                            new-body)
-                  (my-map (lambda (var)
+                  (Smap2 (lambda (var)
                          (new-call
                           (var-source var)
                           (node-decl ptree)
@@ -3254,10 +3113,10 @@
   (let* ((proc (app-oper ptree))
          (vals (app-args ptree))
          (vars (prc-parms proc))
-         (vals-fv (apply set-union (my-map free-variables vals)))
+         (vals-fv (apply set-union (Smap2 free-variables vals)))
          (mut-parms (ac-mutables vars))
-         (mut-parms-copies (my-map var-copy mut-parms))
-         (mut (my-append (pair-up mut-parms mut-parms-copies) mut)))
+         (mut-parms-copies (Smap2 var-copy mut-parms))
+         (mut (Sappend (pair-up mut-parms mut-parms-copies) mut)))
     (let loop ((l vars)
                (v vals)
                (new-vars '())
@@ -3266,10 +3125,10 @@
       (if (null? l)
           (new-let ptree proc new-vars new-vals new-body)
           (let ((var (Scar l)) (val (Scar v)))
-            (if (my-memq var mut-parms)
+            (if (Smemq var mut-parms)
                 (let ((src (node-source val))
                       (decl (node-decl val))
-                      (var* (Scdr (my-assq var mut))))
+                      (var* (Scdr (Sassq var mut))))
                   (if (set-member? var vals-fv)
                       (loop (Scdr l)
                             (Scdr v)
@@ -3324,10 +3183,10 @@
     (define (loop i l)
       (if (pair? l)
           (let ((var (Scar l)))
-            (cons (cons var (cons (my-length (set->list (var-refs var))) i))
+            (cons (cons var (cons (Slength (set->list (var-refs var))) i))
                   (loop (SFX+ i 1) (Scdr l))))
           env))
-    (loop (my-length env) vars))
+    (loop (Slength env) vars))
   (cond ((or (cst? ptree)
              (ref? ptree)
              (set? ptree)
@@ -3344,7 +3203,7 @@
          (let ((oper (app-oper ptree)) (args (app-args ptree)))
            (if (and (prc? oper)
                     (not (prc-rest oper))
-                    (SFX= (my-length (prc-parms oper)) (my-length args)))
+                    (SFX= (Slength (prc-parms oper)) (Slength args)))
                (ll!-let ptree cst-procs (new-env env (prc-parms oper)))
                (for-each
                 (lambda (child) (ll! child cst-procs env))
@@ -3355,7 +3214,7 @@
          (vals (app-args ptree))
          (vars (prc-parms proc))
          (var-val-map (pair-up vars vals)))
-    (define (var->val var) (Scdr (my-assq var var-val-map)))
+    (define (var->val var) (Scdr (Sassq var var-val-map)))
     (define (liftable-proc-vars vars)
       (let loop ((cst-proc-vars
                   (set-keep
@@ -3385,7 +3244,7 @@
               (loop cst-proc-vars*)))))
     (define (transitively-closed-free-variables vars)
       (let ((tcfv-map
-             (my-map (lambda (var) (cons var (free-variables (var->val var))))
+             (Smap2 (lambda (var) (cons var (free-variables (var->val var))))
                   vars)))
         (let loop ((changed? #f))
           (for-each
@@ -3394,19 +3253,19 @@
                (if (null? l)
                    (if (not (set-equal? fv (Scdr var-tcfv)))
                        (begin (Sset-cdr! var-tcfv fv) (set! changed? #t)))
-                   (let ((x (my-assq (Scar l) tcfv-map)))
+                   (let ((x (Sassq (Scar l) tcfv-map)))
                      (loop2 (Scdr l) (if x (set-union fv (Scdr x)) fv))))))
            tcfv-map)
           (if changed? (loop #f) tcfv-map))))
     (let* ((tcfv-map
             (transitively-closed-free-variables (liftable-proc-vars vars)))
-           (cst-proc-vars-list (my-map (lambda (x) (Scar x)) tcfv-map))
+           (cst-proc-vars-list (Smap2 (lambda (x) (Scar x)) tcfv-map))
            (cst-procs* (set-union (list->set cst-proc-vars-list) cst-procs)))
-      (define (var->tcfv var) (Scdr (my-assq var tcfv-map)))
+      (define (var->tcfv var) (Scdr (Sassq var tcfv-map)))
       (define (order-vars vars)
-        (my-map (lambda (x) (Scar x))
+        (Smap2 (lambda (x) (Scar x))
              (sort-list
-              (my-map (lambda (var) (my-assq var env)) vars)
+              (Smap2 (lambda (var) (Sassq var env)) vars)
               (lambda (x y)
                 (if (SFX= (Scadr x) (Scadr y))
                     (SFX< (Scddr x) (Scddr y))
@@ -3424,16 +3283,16 @@
                    (node-children-set!
                     node
                     (cons (app-oper node)
-                          (my-append (my-map new-ref* vars) (app-args node))))))
+                          (Sappend (Smap2 new-ref* vars) (app-args node))))))
                (set->list (var-refs var))))))
       (define (lift-prc! var)
         (let* ((val (var->val var)) (vars (lifted-vars var)))
           (if (not (null? vars))
-              (let ((var-copies (my-map var-copy vars)))
-                (prc-parms-set! val (my-append var-copies (prc-parms val)))
+              (let ((var-copies (Smap2 var-copy vars)))
+                (prc-parms-set! val (Sappend var-copies (prc-parms val)))
                 (for-each (lambda (x) (var-bound-set! x val)) var-copies)
                 (node-fv-invalidate! val)
-                (prc-min-set! val (SFX+ (prc-min val) (my-length vars)))
+                (prc-min-set! val (SFX+ (prc-min val) (Slength vars)))
                 (ll-rename! val (pair-up vars var-copies))))))
       (for-each lift-app! cst-proc-vars-list)
       (for-each lift-prc! cst-proc-vars-list)
@@ -3441,14 +3300,14 @@
       (ll! (prc-body proc) cst-procs* env))))
 (define (ll-rename! ptree var-map)
   (cond ((ref? ptree)
-         (let* ((var (ref-var ptree)) (x (my-assq var var-map)))
+         (let* ((var (ref-var ptree)) (x (Sassq var var-map)))
            (if x
                (begin
                  (var-refs-set! var (set-remove (var-refs var) ptree))
                  (var-refs-set! (Scdr x) (set-adjoin (var-refs (Scdr x)) ptree))
                  (ref-var-set! ptree (Scdr x))))))
         ((set? ptree)
-         (let* ((var (set-var ptree)) (x (my-assq var var-map)))
+         (let* ((var (set-var ptree)) (x (Sassq var var-map)))
            (if x
                (begin
                  (var-sets-set! var (set-remove (var-sets var) ptree))
@@ -3460,16 +3319,16 @@
 (define (se ptree env num)
   (cond ((cst? ptree) (list quote-sym (cst-val ptree)))
         ((ref? ptree)
-         (let ((x (my-assq (ref-var ptree) env)))
+         (let ((x (Sassq (ref-var ptree) env)))
            (if x (Scdr x) (var-name (ref-var ptree)))))
         ((set? ptree)
          (list set!-sym
-               (let ((x (my-assq (set-var ptree) env)))
+               (let ((x (Sassq (set-var ptree) env)))
                  (if x (Scdr x) (var-name (set-var ptree))))
                (se (set-val ptree) env num)))
         ((def? ptree)
          (list define-sym
-               (let ((x (my-assq (def-var ptree) env)))
+               (let ((x (Sassq (def-var ptree) env)))
                  (if x (Scdr x) (var-name (def-var ptree))))
                (se (def-val ptree) env num)))
         ((tst? ptree)
@@ -3498,32 +3357,32 @@
          (let ((oper (app-oper ptree)) (args (app-args ptree)))
            (if (and (prc? oper)
                     (not (prc-rest oper))
-                    (SFX= (my-length (prc-parms oper)) (my-length args)))
+                    (SFX= (Slength (prc-parms oper)) (Slength args)))
                (let ((new-env (se-rename (prc-parms oper) env num)))
                  (list (if (set-empty?
                             (set-intersection
                              (list->set (prc-parms oper))
-                             (apply set-union (my-map free-variables args))))
+                             (apply set-union (Smap2 free-variables args))))
                            let-sym
                            letrec-sym)
                        (se-bindings (prc-parms oper) args new-env num)
                        (se (prc-body oper) new-env num)))
-               (my-map (lambda (x) (se x env num)) (cons oper args)))))
+               (Smap2 (lambda (x) (se x env num)) (cons oper args)))))
         ((fut? ptree) (list future-sym (se (fut-val ptree) env num)))
         (else (compiler-internal-error "se, unknown parse tree node type"))))
 (define (se-parameters parms rest min env)
   (define (se-parms parms rest n env)
     (cond ((null? parms) '())
-          ((and rest (null? (Scdr parms))) (Scdr (my-assq (Scar parms) env)))
+          ((and rest (null? (Scdr parms))) (Scdr (Sassq (Scar parms) env)))
           (else
-           (let ((parm (Scdr (my-assq (Scar parms) env))))
+           (let ((parm (Scdr (Sassq (Scar parms) env))))
              (cons (if (SFX> n 0) parm (list parm))
                    (se-parms (Scdr parms) rest (SFX- n 1) env))))))
   (se-parms parms rest min env))
 (define (se-bindings vars vals env num)
   (if (null? vars)
       '()
-      (cons (list (Scdr (my-assq (Scar vars) env)) (se (Scar vals) env num))
+      (cons (list (Scdr (Sassq (Scar vars) env)) (se (Scar vals) env num))
             (se-bindings (Scdr vars) (Scdr vals) env num))))
 (define (se-rename vars env num)
   (define (rename vars)
@@ -3531,7 +3390,7 @@
         env
         (cons (cons (Scar vars)
                     (string->canonical-symbol
-                     (my-string-append
+                     (Sstring-append
                       (Ssymbol->string (var-name (Scar vars)))
                       "#"
                       (SFXnumber->string (Scar num)))))
@@ -3612,7 +3471,7 @@
               #f))
         (if (set-member? var live) var #f))))
 (define (frame-first-empty-slot frame)
-  (let loop ((i 1) (s (my-reverse (frame-slots frame))))
+  (let loop ((i 1) (s (Sreverse (frame-slots frame))))
     (if (pair? s)
         (if (frame-live? (Scar s) frame) (loop (SFX+ i 1) (Scdr s)) i)
         i)))
@@ -3709,10 +3568,10 @@
   (queue-put! (Svector-ref bb 1) gvm-instr))
 (define (bb-put-branch! bb gvm-instr) (Svector-set! bb 2 gvm-instr))
 (define (bb-add-reference! bb ref)
-  (if (not (my-memq ref (Svector-ref bb 3)))
+  (if (not (Smemq ref (Svector-ref bb 3)))
       (Svector-set! bb 3 (cons ref (Svector-ref bb 3)))))
 (define (bb-add-precedent! bb prec)
-  (if (not (my-memq prec (Svector-ref bb 4)))
+  (if (not (Smemq prec (Svector-ref bb 4)))
       (Svector-set! bb 4 (cons prec (Svector-ref bb 4)))))
 (define (bb-last-non-branch-instr bb)
   (let ((non-branch-instrs (bb-non-branch-instrs bb)))
@@ -3772,7 +3631,7 @@
 (define (comment-put! comment name val)
   (Sset-cdr! comment (cons (cons name val) (Scdr comment))))
 (define (comment-get comment name)
-  (and comment (let ((x (my-assq name (Scdr comment)))) (if x (Scdr x) #f))))
+  (and comment (let ((x (Sassq name (Scdr comment)))) (if x (Scdr x) #f))))
 (define (bbs-purify! bbs)
   (let loop ()
     (bbs-remove-jump-cascades! bbs)
@@ -3788,7 +3647,7 @@
          (not (first-class-jump? branch))
          (jump-lbl? branch)))
   (define (jump-cascade-to lbl-num fs poll? seen thunk)
-    (if (my-memq lbl-num seen)
+    (if (Smemq lbl-num seen)
         (thunk lbl-num fs poll?)
         (let ((bb (lbl-num->bb lbl-num bbs)))
           (if (and (empty-bb? bb) (SFX<= (bb-slots-gained bb) 0))
@@ -3804,7 +3663,7 @@
                     (thunk lbl-num fs poll?)))
               (thunk lbl-num fs poll?)))))
   (define (equiv-lbl lbl-num seen)
-    (if (my-memq lbl-num seen)
+    (if (Smemq lbl-num seen)
         lbl-num
         (let ((bb (lbl-num->bb lbl-num bbs)))
           (if (empty-bb? bb)
@@ -3868,7 +3727,7 @@
                                   bb
                                   (make-ifjump
                                    (ifjump-test last-branch)
-                                   (my-map adjust-opnd (ifjump-opnds last-branch))
+                                   (Smap2 adjust-opnd (ifjump-opnds last-branch))
                                    (equiv-lbl (ifjump-true last-branch) '())
                                    (equiv-lbl (ifjump-false last-branch) '())
                                    (or poll? (ifjump-poll? last-branch))
@@ -3906,7 +3765,7 @@
   (let ((new-bb-queue (queue-empty)) (scan-queue (queue-empty)))
     (define (reachable ref bb)
       (if bb (bb-add-reference! bb ref))
-      (if (not (my-memq ref (queue->list new-bb-queue)))
+      (if (not (Smemq ref (queue->list new-bb-queue)))
           (begin
             (bb-references-set! ref '())
             (bb-precedents-set! ref '())
@@ -3972,13 +3831,13 @@
                    (frame2 (gvm-instr-frame (bb-label-instr dest-bb))))
               (if (and (eq? (bb-label-type dest-bb) 'simple)
                        (frame-eq? frame1 frame2)
-                       (SFX= (my-length (bb-precedents dest-bb)) 1))
+                       (SFX= (Slength (bb-precedents dest-bb)) 1))
                   (begin
                     (set! changed? #t)
                     (bb-non-branch-instrs-set!
                      bb
-                     (my-append (bb-non-branch-instrs bb)
-                             (my-append (bb-non-branch-instrs dest-bb)
+                     (Sappend (bb-non-branch-instrs bb)
+                             (Sappend (bb-non-branch-instrs dest-bb)
                              '())))
                     (bb-branch-instr-set! bb (bb-branch-instr dest-bb))
                     (remove-useless-jump bb)))))))
@@ -3986,14 +3845,14 @@
     changed?))
 (define (bbs-remove-common-code! bbs)
   (let* ((bb-list (queue->list (bbs-bb-queue bbs)))
-         (n (my-length bb-list))
+         (n (Slength bb-list))
          (hash-table-length (cond ((SFX< n 50) 43) ((SFX< n 500) 403) (else 4003)))
          (hash-table (Smake-vector2 hash-table-length '()))
          (prim-table '())
          (block-map '())
          (changed? #f))
     (define (hash-prim prim)
-      (let ((n (my-length prim-table)) (i (pos-in-list prim prim-table)))
+      (let ((n (Slength prim-table)) (i (pos-in-list prim prim-table)))
         (if i
             (SFX- n i)
             (begin (set! prim-table (cons prim prim-table)) (SFX+ n 1)))))
@@ -4020,7 +3879,7 @@
                   (else 0))
                 hash-table-length)))
     (define (replacement-lbl-num lbl)
-      (let ((x (my-assv lbl block-map))) (if x (Scdr x) lbl)))
+      (let ((x (Sassv lbl block-map))) (if x (Scdr x) lbl)))
     (define (fix-map! bb1 bb2)
       (let loop ((l block-map))
         (if (pair? l)
@@ -4067,11 +3926,11 @@
                                                    bbs)))
                                (bb-non-branch-instrs-set! bb** tail)
                                (bb-branch-instr-set! bb** branch)
-                               (bb-non-branch-instrs-set! bb* (my-reverse head*))
+                               (bb-non-branch-instrs-set! bb* (Sreverse head*))
                                (bb-branch-instr-set!
                                 bb*
                                 (make-jump (make-lbl lbl) #f #f frame #f))
-                               (bb-non-branch-instrs-set! bb (my-reverse head))
+                               (bb-non-branch-instrs-set! bb (Sreverse head))
                                (bb-branch-instr-set!
                                 bb
                                 (make-jump (make-lbl lbl) #f #f frame #f))
@@ -4080,8 +3939,8 @@
                       (cons bb* (add-bb bb (Scdr l)))))))
           (list bb)))
     (define (extract-common-tail bb1 bb2 cont)
-      (let loop ((l1 (my-reverse (bb-non-branch-instrs bb1)))
-                 (l2 (my-reverse (bb-non-branch-instrs bb2)))
+      (let loop ((l1 (Sreverse (bb-non-branch-instrs bb1)))
+                 (l2 (Sreverse (bb-non-branch-instrs bb2)))
                  (tail '()))
         (if (and (pair? l1) (pair? l2))
             (let ((i1 (Scar l1)) (i2 (Scar l2)))
@@ -4092,7 +3951,7 @@
     (define (eqv-bb? bb1 bb2)
       (let ((bb1-non-branch (bb-non-branch-instrs bb1))
             (bb2-non-branch (bb-non-branch-instrs bb2)))
-        (and (SFX= (my-length bb1-non-branch) (my-length bb2-non-branch))
+        (and (SFX= (Slength bb1-non-branch) (Slength bb2-non-branch))
              (eqv-gvm-instr? (bb-label-instr bb1) (bb-label-instr bb2))
              (eqv-gvm-instr? (bb-branch-instr bb1) (bb-branch-instr bb2))
              (eqv-list? eqv-gvm-instr? bb1-non-branch bb2-non-branch))))
@@ -4185,7 +4044,7 @@
       (if (SFX< i hash-table-length)
           (let ((bb-kept (Svector-ref hash-table i)))
             (for-each update-bb! bb-kept)
-            (loop (SFX+ i 1) (my-append bb-kept result)))
+            (loop (SFX+ i 1) (Sappend bb-kept result)))
           (bbs-bb-queue-set! bbs (list->queue result))))
     changed?))
 (define (replace-label-references! bb replacement-lbl-num)
@@ -4201,12 +4060,12 @@
       (make-closure-parms
        (update-gvm-opnd (closure-parms-loc p))
        (replacement-lbl-num (closure-parms-lbl p))
-       (my-map update-gvm-opnd (closure-parms-opnds p))))
+       (Smap2 update-gvm-opnd (closure-parms-opnds p))))
     (case (gvm-instr-type instr)
       ((apply)
        (make-apply
         (apply-prim instr)
-        (my-map update-gvm-opnd (apply-opnds instr))
+        (Smap2 update-gvm-opnd (apply-opnds instr))
         (update-gvm-opnd (apply-loc instr))
         (gvm-instr-frame instr)
         (gvm-instr-comment instr)))
@@ -4218,13 +4077,13 @@
         (gvm-instr-comment instr)))
       ((close)
        (make-close
-        (my-map update-closure-parms (close-parms instr))
+        (Smap2 update-closure-parms (close-parms instr))
         (gvm-instr-frame instr)
         (gvm-instr-comment instr)))
       ((ifjump)
        (make-ifjump
         (ifjump-test instr)
-        (my-map update-gvm-opnd (ifjump-opnds instr))
+        (Smap2 update-gvm-opnd (ifjump-opnds instr))
         (replacement-lbl-num (ifjump-true instr))
         (replacement-lbl-num (ifjump-false instr))
         (ifjump-poll? instr)
@@ -4241,7 +4100,7 @@
        (compiler-internal-error "update-gvm-instr, unknown 'instr':" instr))))
   (bb-non-branch-instrs-set!
    bb
-   (my-map update-gvm-instr (bb-non-branch-instrs bb)))
+   (Smap2 update-gvm-instr (bb-non-branch-instrs bb)))
   (bb-branch-instr-set! bb (update-gvm-instr (bb-branch-instr bb))))
 (define (bbs-order! bbs)
   (let ((new-bb-queue (queue-empty))
@@ -4256,7 +4115,7 @@
         (if (null? l)
             best
             (let* ((x (Scar l)) (x-fs (bb-exit-frame-size x)))
-              (if (and (my-memq x left-to-schedule)
+              (if (and (Smemq x left-to-schedule)
                        (or (not best) (SFX< x-fs best-fs)))
                   (loop (Scdr l) x x-fs)
                   (loop (Scdr l) best best-fs))))))
@@ -4280,9 +4139,9 @@
         (case (gvm-instr-type branch)
           ((ifjump)
            (let* ((true-bb (lbl-num->bb (ifjump-true branch) bbs))
-                  (true-bb* (and (my-memq true-bb left-to-schedule) true-bb))
+                  (true-bb* (and (Smemq true-bb left-to-schedule) true-bb))
                   (false-bb (lbl-num->bb (ifjump-false branch) bbs))
-                  (false-bb* (and (my-memq false-bb left-to-schedule) false-bb)))
+                  (false-bb* (and (Smemq false-bb left-to-schedule) false-bb)))
              (if (and true-bb* false-bb*)
                  (best-succ true-bb* false-bb*)
                  (or true-bb* false-bb*))))
@@ -4290,7 +4149,7 @@
            (let ((opnd (jump-opnd branch)))
              (and (lbl? opnd)
                   (let ((bb (lbl-num->bb (lbl-num opnd) bbs)))
-                    (and (my-memq bb left-to-schedule) bb)))))
+                    (and (Smemq bb left-to-schedule) bb)))))
           (else (compiler-internal-error "bbs-order!, unknown branch type")))))
     (define (schedule-from bb)
       (queue-put! new-bb-queue bb)
@@ -4328,7 +4187,7 @@
     (define (schedule-refs bb)
       (for-each
        (lambda (x)
-         (if (my-memq x left-to-schedule) (schedule-around (remove-bb! x))))
+         (if (Smemq x left-to-schedule) (schedule-around (remove-bb! x))))
        (bb-references bb)))
     (schedule-from (remove-bb! (lbl-num->bb (bbs-entry-lbl-num bbs) bbs)))
     (bbs-bb-queue-set! bbs new-bb-queue)
@@ -4340,7 +4199,7 @@
               (label-lbl-num-set! label-instr i)
               (loop (Scdr l) (SFX+ i 1) (cons (cons old-lbl-num i) lbl-map)))
             (let ()
-              (define (replacement-lbl-num x) (Scdr (my-assv x lbl-map)))
+              (define (replacement-lbl-num x) (Scdr (Sassv x lbl-map)))
               (define (update-bb! bb)
                 (replace-label-references! bb replacement-lbl-num))
               (for-each update-bb! bb-list)
@@ -4451,7 +4310,7 @@
 (define (write-bb bb port)
   (write-gvm-instr (bb-label-instr bb) port)
   (display " [precedents=" port)
-  (write (my-map bb-lbl-num (bb-precedents bb)) port)
+  (write (Smap2 bb-lbl-num (bb-precedents bb)) port)
   (display "]" port)
   (newline port)
   (for-each
@@ -4473,7 +4332,7 @@
              (let ((val (obj-val gvm-opnd)))
                (if (and (proc-obj? val)
                         (proc-obj-code val)
-                        (not (my-memq val (queue->list proc-seen))))
+                        (not (Smemq val (queue->list proc-seen))))
                    (begin
                      (queue-put! proc-seen val)
                      (queue-put! proc-left val)))))
@@ -4520,12 +4379,12 @@
                    (line (if (and loc (eq? (Svector-ref loc 0) 'file))
                              (Svector-ref loc 3)
                              prev-line)))
-              (if (or (not (my-string=? filename prev-filename))
+              (if (or (not (Sstring=? filename prev-filename))
                       (not (SFX= line prev-line)))
                   (begin
                     (display "#line " port)
                     (display line port)
-                    (if (not (my-string=? filename prev-filename))
+                    (if (not (Sstring=? filename prev-filename))
                         (begin (display " " port) (write filename port)))
                     (newline port)))
               (scan-code code)
@@ -4691,7 +4550,7 @@
         (begin
           (display "=" port)
           (cond ((eq? var closure-env-var)
-                 (write (my-map (lambda (var) (var-name var))
+                 (write (Smap2 (lambda (var) (var-name var))
                              (frame-closed frame))
                         port))
                 ((eq? var ret-var) (display "#" port))
@@ -4705,7 +4564,7 @@
                      (set-intersection
                       live
                       (list->set (frame-closed frame)))))))))
-  (let loop1 ((i 1) (l (my-reverse (frame-slots frame))) (sep "; "))
+  (let loop1 ((i 1) (l (Sreverse (frame-slots frame))) (sep "; "))
     (if (pair? l)
         (let ((var (Scar l)))
           (write-var (if (live? var) var #f) (make-stk i) sep)
@@ -4793,10 +4652,10 @@
 (define (target-task-return-set! x y) (Svector-set! x 10 y))
 (define targets-loaded '())
 (define (get-target name)
-  (let ((x (my-assq name targets-loaded)))
+  (let ((x (Sassq name targets-loaded)))
     (if x (Scdr x) (compiler-error "Target package is not available" name))))
 (define (put-target targ)
-  (let* ((name (target-name targ)) (x (my-assq name targets-loaded)))
+  (let* ((name (target-name targ)) (x (Sassq name targets-loaded)))
     (if x
         (Sset-cdr! x targ)
         (set! targets-loaded (cons (cons name targ) targets-loaded)))
@@ -4846,7 +4705,7 @@
 (define (cf source target-name . opts)
   (let* ((dest (file-root source))
          (module-name (file-name dest))
-         (info-port (if (my-memq 'verbose opts) (current-output-port) #f))
+         (info-port (if (Smemq 'verbose opts) (current-output-port) #f))
          (result (compile-program
                   (list **include-sym source)
                   (if target-name target-name (default-target))
@@ -4860,7 +4719,7 @@
 (define (ce source target-name . opts)
   (let* ((dest "program")
          (module-name "program")
-         (info-port (if (my-memq 'verbose opts) (current-output-port) #f))
+         (info-port (if (Smemq 'verbose opts) (current-output-port) #f))
          (result (compile-program
                   source
                   (if target-name target-name (default-target))
@@ -4888,9 +4747,9 @@
            module-name
            (lambda (lst env c-intf)
              (let ((parsed-program
-                    (my-map (lambda (x) (normalize-parse-tree (Scar x) (Scdr x)))
+                    (Smap2 (lambda (x) (normalize-parse-tree (Scar x) (Scdr x)))
                          lst)))
-               (if (my-memq 'expansion opts)
+               (if (Smemq 'expansion opts)
                    (let ((port (current-output-port)))
                      (display "Expansion:" port)
                      (newline port)
@@ -4909,10 +4768,10 @@
                        env
                        c-intf
                        info-port)))
-                 (if (my-memq 'report opts) (generate-report env))
-                 (if (my-memq 'gvm opts)
+                 (if (Smemq 'report opts) (generate-report env))
+                 (if (Smemq 'gvm opts)
                      (let ((gvm-port
-                            (open-output-file (my-string-append dest ".gvm"))))
+                            (open-output-file (Sstring-append dest ".gvm"))))
                        (virtual.dump module-init-proc gvm-port)
                        (close-output-port gvm-port)))
                  (target.dump module-init-proc dest c-intf opts)
@@ -4933,7 +4792,7 @@
     successful))
 (define (valid-module-name? module-name)
   (define (valid-char? c)
-    (and (not (my-memv c
+    (and (not (Smemv c
                     '(#\#
                       #\;
                       #\(
@@ -4947,10 +4806,10 @@
                       #\'
                       #\`
                       #\,)))
-         (not (my-char-whitespace? c))))
+         (not (Schar-whitespace? c))))
   (let ((n (Sstring-length module-name)))
     (and (SFX> n 0)
-         (not (my-string=? module-name "."))
+         (not (Sstring=? module-name "."))
          (not (Sstring->number2 module-name 10))
          (let loop ((i 0))
            (if (SFX< i n)
@@ -4962,7 +4821,7 @@
         (inits (c-intf-inits c-intf)))
     (if (or (not (null? decls)) (not (null? procs)) (not (null? inits)))
         (let* ((module-name (proc-obj-name module-init-proc))
-               (filename (my-string-append dest ".c"))
+               (filename (Sstring-append dest ".c"))
                (port (open-output-file filename)))
           (display "/* File: \"" port)
           (display filename port)
@@ -4993,7 +4852,7 @@
                 (display "#define " port)
                 (display c-id-prefix port)
                 (display "C_PRC_COUNT " port)
-                (display (my-length procs) port)
+                (display (Slength procs) port)
                 (newline port)))
           (display "#include \"gambit.h\"" port)
           (newline port)
@@ -5209,7 +5068,7 @@
     (if info-port (begin (newline info-port) (newline info-port)))
     (bbs-purify! *bbs*)
     (let ((proc (make-proc-obj
-                 (my-string-append "#!" module-name)
+                 (Sstring-append "#!" module-name)
                  #t
                  *bbs*
                  '(0)
@@ -5256,7 +5115,7 @@
                      (set-union (free-variables (prc-body node)) ret-var-set)))
              (bb1 (make-bb (make-label-entry
                             lbl1
-                            (my-length (prc-parms node))
+                            (Slength (prc-parms node))
                             (prc-min node)
                             (prc-rest node)
                             #f
@@ -5293,7 +5152,7 @@
         (set! proc-queue p-proc-queue)
         (set! known-procs p-known-procs)
         (restore-context p-context)
-        (let* ((x (my-assq var constant-vars))
+        (let* ((x (Sassq var constant-vars))
                (proc (if x
                          (let ((p (Scdr x)))
                            (proc-obj-code-set! (obj-val p) bbs)
@@ -5320,7 +5179,7 @@
        ret-var-set
        (source-comment node))))
 (define (call-pattern node)
-  (make-pattern (prc-min node) (my-length (prc-parms node)) (prc-rest node)))
+  (make-pattern (prc-min node) (Slength (prc-parms node)) (prc-rest node)))
 (define (make-context nb-slots slots regs closed poll entry-bb)
   (vector nb-slots slots regs closed poll entry-bb))
 (define (context-nb-slots x) (Svector-ref x 0))
@@ -5378,7 +5237,7 @@
   (let* ((parms (prc-parms proc))
          (pc (target.label-info
               (prc-min proc)
-              (my-length parms)
+              (Slength parms)
               (prc-rest proc)
               (not (null? closed))))
          (fs (pcontext-fs pc))
@@ -5410,13 +5269,13 @@
             (cond ((eq? name 'return) (assign-var-to-loc ret-var loc))
                   ((eq? name 'closure-env)
                    (assign-var-to-loc closure-env-var loc))
-                  (else (assign-var-to-loc (my-list-ref parms (SFX- name 1)) loc)))
+                  (else (assign-var-to-loc (Slist-ref parms (SFX- name 1)) loc)))
             (loop (Scdr l)))))
     (make-context fs slots-list regs-list closed (entry-poll) #f)))
 (define (get-var opnd)
   (cond ((glo? opnd) (env-lookup-global-var *global-env* (glo-name opnd)))
-        ((reg? opnd) (my-list-ref regs (reg-num opnd)))
-        ((stk? opnd) (my-list-ref slots (SFX- nb-slots (stk-num opnd))))
+        ((reg? opnd) (Slist-ref regs (reg-num opnd)))
+        ((stk? opnd) (Slist-ref slots (SFX- nb-slots (stk-num opnd))))
         (else
          (compiler-internal-error
           "get-var, location must be global, register or stack slot"))))
@@ -5453,31 +5312,31 @@
 (define (dead-slots live)
   (let ((live-v (live-vars live)))
     (define (loop s l i)
-      (cond ((null? l) (list->set (my-reverse s)))
+      (cond ((null? l) (list->set (Sreverse s)))
             ((set-member? (Scar l) live-v) (loop s (Scdr l) (SFX- i 1)))
             (else (loop (cons i s) (Scdr l) (SFX- i 1)))))
     (loop '() slots nb-slots)))
 (define (live-slots live)
   (let ((live-v (live-vars live)))
     (define (loop s l i)
-      (cond ((null? l) (list->set (my-reverse s)))
+      (cond ((null? l) (list->set (Sreverse s)))
             ((set-member? (Scar l) live-v) (loop (cons i s) (Scdr l) (SFX- i 1)))
             (else (loop s (Scdr l) (SFX- i 1)))))
     (loop '() slots nb-slots)))
 (define (dead-regs live)
   (let ((live-v (live-vars live)))
     (define (loop s l i)
-      (cond ((SFX>= i target.nb-regs) (list->set (my-reverse s)))
+      (cond ((SFX>= i target.nb-regs) (list->set (Sreverse s)))
             ((null? l) (loop (cons i s) l (SFX+ i 1)))
-            ((and (set-member? (Scar l) live-v) (not (my-memq (Scar l) slots)))
+            ((and (set-member? (Scar l) live-v) (not (Smemq (Scar l) slots)))
              (loop s (Scdr l) (SFX+ i 1)))
             (else (loop (cons i s) (Scdr l) (SFX+ i 1)))))
     (loop '() regs 0)))
 (define (live-regs live)
   (let ((live-v (live-vars live)))
     (define (loop s l i)
-      (cond ((null? l) (list->set (my-reverse s)))
-            ((and (set-member? (Scar l) live-v) (not (my-memq (Scar l) slots)))
+      (cond ((null? l) (list->set (Sreverse s)))
+            ((and (set-member? (Scar l) live-v) (not (Smemq (Scar l) slots)))
              (loop (cons i s) (Scdr l) (SFX+ i 1)))
             (else (loop s (Scdr l) (SFX+ i 1)))))
     (loop '() regs 0)))
@@ -5493,7 +5352,7 @@
 (define (above set n) (set-keep (lambda (x) (SFX> x n)) set))
 (define (below set n) (set-keep (lambda (x) (SFX< x n)) set))
 (define (var->opnd var)
-  (let ((x (my-assq var constant-vars)))
+  (let ((x (Sassq var constant-vars)))
     (if x
         (Scdr x)
         (if (global? var)
@@ -5516,15 +5375,15 @@
   (sort-list
    lst
    (lambda (x y)
-     (my-string<? (Ssymbol->string (var-name x)) (Ssymbol->string (var-name y))))))
+     (Sstring<? (Ssymbol->string (var-name x)) (Ssymbol->string (var-name y))))))
 (define (add-constant-var var opnd)
   (set! constant-vars (cons (cons var opnd) constant-vars)))
 (define (let-constant-var var opnd thunk)
-  (let* ((x (my-assq var constant-vars)) (temp (Scdr x)))
+  (let* ((x (Sassq var constant-vars)) (temp (Scdr x)))
     (Sset-cdr! x opnd)
     (thunk)
     (Sset-cdr! x temp)))
-(define (constant-var? var) (my-assq var constant-vars))
+(define (constant-var? var) (Sassq var constant-vars))
 (define (not-constant-var? var) (not (constant-var? var)))
 (define (add-known-proc label proc)
   (set! known-procs (cons (cons label proc) known-procs)))
@@ -5548,7 +5407,7 @@
                  (set-union (free-variables (prc-body proc)) ret-var-set)))
          (bb1 (make-bb (make-label-entry
                         lbl1
-                        (my-length (prc-parms proc))
+                        (Slength (prc-parms proc))
                         (prc-min proc)
                         (prc-rest proc)
                         (not (null? closed-list))
@@ -5610,7 +5469,7 @@
                                  (list (make-closure-parms
                                         slot
                                         (lbl-num proc-lbl)
-                                        (my-map var->opnd closed-list)))
+                                        (Smap2 var->opnd closed-list)))
                                  (current-frame (set-adjoin live var))
                                  (source-comment node)))
                                slot)))))
@@ -5655,7 +5514,7 @@
                (let ((spec (specialize-for-call proc (node-decl node))))
                  (if (and (proc-obj-test spec)
                           (nb-args-conforms?
-                           (my-length (app-args node))
+                           (Slength (app-args node))
                            (proc-obj-call-pat spec)))
                      (if (eq? spec **not-proc-obj)
                          (predicate (Scar (app-args node)) live cont*)
@@ -5728,7 +5587,7 @@
            *bb*
            (make-ifjump
             test
-            (my-map var->opnd (my-reverse vars*))
+            (Smap2 var->opnd (Sreverse vars*))
             true-lbl
             false-lbl
             #f
@@ -5835,8 +5694,8 @@
                 (let ((r (make-reg i)))
                   (put-var r empty-var)
                   (if (not (or (not (set-member? var live-v))
-                               (my-memq var regs)
-                               (my-memq var slots)))
+                               (Smemq var regs)
+                               (Smemq var slots)))
                       (let ((top (make-stk (SFX+ nb-slots 1))))
                         (put-copy r top var live-v comment)))
                   (put-copy (var->opnd other-var) r other-var live-v comment)))
@@ -5848,8 +5707,8 @@
                 (let ((s (make-stk i)))
                   (if (SFX<= i nb-slots) (put-var s empty-var))
                   (if (not (or (not (set-member? var live-v))
-                               (my-memq var regs)
-                               (my-memq var slots)))
+                               (Smemq var regs)
+                               (Smemq var slots)))
                       (let ((top (make-stk (SFX+ nb-slots 1))))
                         (put-copy s top var live-v comment)))
                   (put-copy (var->opnd other-var) s other-var live-v comment))
@@ -5885,7 +5744,7 @@
       (if (SFX< i split-point)
           (loop (SFX+ i 1) (Scdr l1) (cons (Scar l1) l2))
           (let* ((label-instr (bb-label-instr *bb*))
-                 (non-branch-instrs1 (my-reverse l2))
+                 (non-branch-instrs1 (Sreverse l2))
                  (non-branch-instrs2 l1)
                  (frame (gvm-instr-frame
                          (Scar (my-last-pair
@@ -5899,16 +5758,16 @@
             (bb-label-instr-set! *bb* (make-label-simple new-lbl frame #f))
             (bb-non-branch-instrs-set! *bb* non-branch-instrs2)
             (set! poll (make-poll #t 0))))))
-  (define (poll-at-end) (poll-at (my-length (bb-non-branch-instrs *bb*))))
+  (define (poll-at-end) (poll-at (Slength (bb-non-branch-instrs *bb*))))
   (define (impose-polling-constraints)
-    (let ((n (SFX+ (my-length (bb-non-branch-instrs *bb*)) 1))
+    (let ((n (SFX+ (Slength (bb-non-branch-instrs *bb*)) 1))
           (delta (poll-delta poll)))
       (if (SFX> (SFX+ delta n) poll-period)
           (begin
             (poll-at (max (SFX- poll-period delta) 0))
             (impose-polling-constraints)))))
   (if poll? (impose-polling-constraints))
-  (let* ((n (SFX+ (my-length (bb-non-branch-instrs *bb*)) 1))
+  (let* ((n (SFX+ (Slength (bb-non-branch-instrs *bb*)) 1))
          (delta (SFX+ (poll-delta poll) n))
          (since-entry? (poll-since-entry? poll)))
     (if (and poll?
@@ -5926,7 +5785,7 @@
         ((SFX> i 0) (reg->var (Scdr regs) (SFX- i 1)))
         (else (Scar regs))))
 (define (stk->var slots i)
-  (let ((j (SFX- (my-length slots) i))) (if (SFX< j 0) '() (my-list-ref slots j))))
+  (let ((j (SFX- (Slength slots) i))) (if (SFX< j 0) '() (Slist-ref slots j))))
 (define (gen-conj/disj node live why)
   (let ((pre (if (conj? node) (conj-pre node) (disj-pre node)))
         (alt (if (conj? node) (conj-alt node) (disj-alt node))))
@@ -6041,17 +5900,17 @@
              (alternative false-lbl true-lbl)
              (alternative true-lbl false-lbl)))))))
 (define (gen-call node live why)
-  (let* ((oper (app-oper node)) (args (app-args node)) (nb-args (my-length args)))
+  (let* ((oper (app-oper node)) (args (app-args node)) (nb-args (Slength args)))
     (if (and (prc? oper)
              (not (prc-rest oper))
-             (SFX= (my-length (prc-parms oper)) nb-args))
+             (SFX= (Slength (prc-parms oper)) nb-args))
         (gen-let (prc-parms oper) args (prc-body oper) live why)
         (if (inlinable-app? node)
             (let ((eval-order (arg-eval-order #f args))
-                  (vars (my-map (lambda (x) (cons x #f)) args)))
+                  (vars (Smap2 (lambda (x) (cons x #f)) args)))
               (let loop ((l eval-order) (liv live))
                 (if (not (null? l))
-                    (let* ((needed (vals-live-vars liv (my-map (lambda (x) (Scar x)) (Scdr l))))
+                    (let* ((needed (vals-live-vars liv (Smap2 (lambda (x) (Scar x)) (Scdr l))))
                            (arg (Scar (Scar l)))
                            (pos (Scdr (Scar l)))
                            (var (save-var
@@ -6059,7 +5918,7 @@
                                  (make-temp-var pos)
                                  needed
                                  (source-comment arg))))
-                      (Sset-cdr! (my-assq arg vars) var)
+                      (Sset-cdr! (Sassq arg vars) var)
                       (loop (Scdr l) (set-adjoin liv var)))
                     (let ((loc (if (eq? why 'side)
                                    (make-reg 0)
@@ -6067,7 +5926,7 @@
                                        (lowest-dead-slot live)))))
                       (if (and (stk? loc) (SFX> (stk-num loc) nb-slots))
                           (push-slot))
-                      (let* ((args (my-map var->opnd (my-map (lambda (x) (Scdr x)) vars)))
+                      (let* ((args (Smap2 var->opnd (Smap2 (lambda (x) (Scdr x)) vars)))
                              (var (make-temp-var 'result))
                              (proc (node->proc oper))
                              (strict-pat (proc-obj-strict-pat proc)))
@@ -6086,12 +5945,12 @@
                     (and (ref? oper)
                          (let ((opnd (var->opnd (ref-var oper))))
                            (and (lbl? opnd)
-                                (let ((x (my-assq (lbl-num opnd) known-procs)))
+                                (let ((x (Sassq (lbl-num opnd) known-procs)))
                                   (and x
                                        (let ((proc (Scdr x)))
                                          (and (not (prc-rest proc))
                                               (SFX= (prc-min proc) nb-args)
-                                              (SFX= (my-length (prc-parms proc))
+                                              (SFX= (Slength (prc-parms proc))
                                                  nb-args)
                                               (lbl-num opnd)))))))))
                    (jstate (get-jump-state
@@ -6201,7 +6060,7 @@
                                            oper-var))))
                             (let loop3 ((i (SFX- target.nb-regs 1)))
                               (if (SFX>= i 0)
-                                  (let ((couple (my-assq i reg-map)))
+                                  (let ((couple (Sassq i reg-map)))
                                     (if couple
                                         (let ((var (Scdr couple)))
                                           (if (not (eq? (reg->var regs i) var))
@@ -6220,7 +6079,7 @@
                                              (if return-lbl 'call 'tail-call))
                                     (dealloc-slots
                                      (SFX- nb-slots
-                                        (SFX+ frame-start (my-length in-stk))))
+                                        (SFX+ frame-start (Slength in-stk))))
                                     (bb-put-branch!
                                      *bb*
                                      (make-jump
@@ -6290,7 +6149,7 @@
              (let ((spec (specialize-for-call proc (node-decl node))))
                (and (proc-obj-inlinable spec)
                     (nb-args-conforms?
-                     (my-length (app-args node))
+                     (Slength (app-args node))
                      (proc-obj-call-pat spec))))))
       #f))
 (define (boolean-value? node)
@@ -6344,7 +6203,7 @@
       (if (not (null? l))
           (let* ((couple (Scar l)) (name (Scar couple)) (loc (Scdr couple)))
             (cond ((eq? name 'return) (assign-node-to-loc 'return loc))
-                  (else (assign-node-to-loc (my-list-ref args (SFX- name 1)) loc)))
+                  (else (assign-node-to-loc (Slist-ref args (SFX- name 1)) loc)))
             (loop (Scdr l)))))
     (vector slots-list regs-list)))
 (define (jump-state-in-stk x) (Svector-ref x 0))
@@ -6352,11 +6211,11 @@
 (define (arg-eval-order oper nodes)
   (define (loop nodes pos part1 part2)
     (cond ((null? nodes)
-           (let ((p1 (my-reverse part1)) (p2 (free-vars-order part2)))
-             (cond ((not oper) (my-append p1 p2))
+           (let ((p1 (Sreverse part1)) (p2 (free-vars-order part2)))
+             (cond ((not oper) (Sappend p1 p2))
                    ((trivial? oper)
-                    (my-append p1 (my-append p2 (list (cons oper 'operator)))))
-                   (else (my-append (cons (cons oper 'operator) p1) p2)))))
+                    (Sappend p1 (Sappend p2 (list (cons oper 'operator)))))
+                   (else (Sappend (cons (cons oper 'operator) p1) p2)))))
           ((not (Scar nodes)) (loop (Scdr nodes) (SFX+ pos 1) part1 part2))
           ((or (eq? (Scar nodes) 'return) (trivial? (Scar nodes)))
            (loop (Scdr nodes)
@@ -6373,19 +6232,19 @@
   (let ((bins '()) (ordered-args '()))
     (define (free-v x) (if (eq? x 'return) (set-empty) (free-variables x)))
     (define (add-to-bin! x)
-      (let ((y (my-assq x bins)))
+      (let ((y (Sassq x bins)))
         (if y (Sset-cdr! y (SFX+ (Scdr y) 1)) (set! bins (cons (cons x 1) bins)))))
     (define (payoff-if-removed node)
       (let ((x (free-v node)))
         (let loop ((l (set->list x)) (r 0))
           (if (null? l)
               r
-              (let ((y (Scdr (my-assq (Scar l) bins))))
+              (let ((y (Scdr (Sassq (Scar l) bins))))
                 (loop (Scdr l) (SFX+ r (SFXquotient 1000 (SFX* y y)))))))))
     (define (remove-free-vars! x)
       (let loop ((l (set->list x)))
         (if (not (null? l))
-            (let ((y (my-assq (Scar l) bins)))
+            (let ((y (Sassq (Scar l) bins)))
               (Sset-cdr! y (SFX- (Scdr y) 1))
               (loop (Scdr l))))))
     (define (find-max-payoff l thunk)
@@ -6407,7 +6266,7 @@
      l)
     (let loop ((args l) (ordered-args '()))
       (if (null? args)
-          (my-reverse ordered-args)
+          (Sreverse ordered-args)
           (find-max-payoff
            args
            (lambda (best-arg best-payoff)
@@ -6441,8 +6300,8 @@
          (set-union
           live
           (free-variables node)
-          (apply set-union (my-map free-variables vals)))))
-    (define (var->val var) (Scdr (my-assq var var-val-map)))
+          (apply set-union (Smap2 free-variables vals)))))
+    (define (var->val var) (Scdr (Sassq var var-val-map)))
     (define (proc-var? var) (prc? (var->val var)))
     (define (closed-vars var const-proc-vars)
       (set-difference
@@ -6482,14 +6341,14 @@
             (liv (set-union
                   live
                   (apply set-union
-                         (my-map (lambda (x) (closed-vars x const-proc-vars))
+                         (Smap2 (lambda (x) (closed-vars x const-proc-vars))
                               clo-vars-list))
                   (free-variables node))))
         (let loop2 ((vars* non-clo-vars-list))
           (if (not (null? vars*))
               (let* ((var (Scar vars*))
                      (val (var->val var))
-                     (needed (vals-live-vars liv (my-map var->val (Scdr vars*)))))
+                     (needed (vals-live-vars liv (Smap2 var->val (Scdr vars*)))))
                 (if (var-useless? var)
                     (gen-node val needed 'side)
                     (save-val
@@ -6511,7 +6370,7 @@
               (bb-put-non-branch!
                *bb*
                (make-close
-                (my-map (lambda (var)
+                (Smap2 (lambda (var)
                        (let ((closed-list
                               (sort-variables
                                (set->list (closed-vars var const-proc-vars)))))
@@ -6524,7 +6383,7 @@
                               (lbl-num (schedule-gen-proc
                                         (var->val var)
                                         closed-list))
-                              (my-map var->opnd closed-list)))))
+                              (Smap2 var->opnd closed-list)))))
                      clo-vars-list)
                 (current-frame liv)
                 (source-comment node)))))
@@ -6590,13 +6449,13 @@
         (if (null? l)
             (dealloc-slots (SFX- nb-slots (SFX+ frame-start i)))
             (let ((var (Scar l)) (rest (Scdr l)))
-              (if (my-memq var regs)
+              (if (Smemq var regs)
                   (loop1 rest i)
                   (let loop2 ((j (SFX- target.nb-regs 1)))
                     (if (SFX>= j 0)
-                        (if (or (SFX>= j (my-length regs))
+                        (if (or (SFX>= j (Slength regs))
                                 (not (set-member?
-                                      (my-list-ref regs j)
+                                      (Slist-ref regs j)
                                       live-starting-task)))
                             (let ((reg (make-reg j)))
                               (put-copy
@@ -6610,7 +6469,7 @@
                         (let ((slot (make-stk (SFX+ frame-start (SFX+ i 1))))
                               (needed (list->set rest)))
                           (if (and (or (SFX> (stk-num slot) nb-slots)
-                                       (not (my-memq (my-list-ref
+                                       (not (Smemq (Slist-ref
                                                    slots
                                                    (SFX- nb-slots (stk-num slot)))
                                                   regs)))
@@ -6640,7 +6499,7 @@
       (let ((task-context
              (make-context
               (SFX- nb-slots frame-start)
-              (my-reverse (nth-after (my-reverse slots) frame-start))
+              (Sreverse (nth-after (Sreverse slots) frame-start))
               (cons ret-var (Scdr regs))
               '()
               poll
@@ -7056,11 +6915,11 @@
 (define (ofile.begin! filename add-obj)
   (set! ofile-add-obj add-obj)
   (set! ofile-syms (queue-empty))
-;  (set! *ofile-port1* (open-output-file (my-string-append filename ".O")))
+;  (set! *ofile-port1* (open-output-file (Sstring-append filename ".O")))
   (if ofile-asm?
       (begin
         (set! *ofile-port2*
-              (asm-open-output-file (my-string-append filename ".asm")))
+              (asm-open-output-file (Sstring-append filename ".asm")))
         (set! *ofile-pos* 0)))
   (ofile-word ofile-version-major)
   (ofile-word ofile-version-minor)
@@ -7081,7 +6940,7 @@
   (if (eqv? obj char-newline)
       (begin
         (set! asm-output
-              (cons (string-concat (my-reverse asm-line)) asm-output))
+              (cons (LIBstring-concatenate (Sreverse asm-line)) asm-output))
         (set! asm-line '()))
       (set! asm-line
             (cons (cond ((string? obj) obj)
@@ -7089,7 +6948,7 @@
                         ((number? obj) (SFXnumber->string obj))
                         (else (compiler-internal-error "asm-display" obj)))
                   asm-line))))
-(define (asm-output-get) (my-reverse asm-output))
+(define (asm-output-get) (Sreverse asm-output))
 (define *ofile-port1* '())
 (define *ofile-port2* '())
 (define *ofile-pos* '())
@@ -7146,7 +7005,7 @@
   (let ((n (string-pos-in-list name (queue->list ofile-syms))))
     (if n
         (ofile-word (SFX+ tag n))
-        (let ((m (my-length (queue->list ofile-syms))))
+        (let ((m (Slength (queue->list ofile-syms))))
           (queue-put! ofile-syms name)
           (ofile-word (SFX+ tag word-index-mask))
           (ofile-string name)))))
@@ -7154,7 +7013,7 @@
   (let ((n (string-pos-in-list name (queue->list ofile-syms))))
     (if n
         (ofile-long (SFX+ tag (SFX* n 8)))
-        (let ((m (my-length (queue->list ofile-syms))))
+        (let ((m (Slength (queue->list ofile-syms))))
           (queue-put! ofile-syms name)
           (ofile-long (SFX+ tag (SFX* long-index-mask 8)))
           (ofile-string name)))))
@@ -7222,10 +7081,10 @@
              (cond ((pair? l1)
                     (loop (Scdr l1)
                           (cons (obj->string (Scar l1)) (cons " " l2))))
-                   ((null? l1) (string-concat (my-reverse (cons ")" l2))))
+                   ((null? l1) (LIBstring-concatenate (Sreverse (cons ")" l2))))
                    (else
-                    (string-concat
-                           (my-reverse (cons ")"
+                    (LIBstring-concatenate
+                           (Sreverse (cons ")"
                                           (cons (obj->string l1)
                                                 (cons " . " l2)))))))))
           (else
@@ -7386,7 +7245,7 @@
     (let* ((fix-list
             (let loop ((l code-list) (len header-offset) (x '()))
               (if (null? l)
-                  (my-reverse x)
+                  (Sreverse x)
                   (let ((part (Scar l)) (rest (Scdr l)))
                     (if (pair? part)
                         (case (Scar part)
@@ -7422,13 +7281,13 @@
                 (if (pair? part)
                     (case (Scar part)
                       ((brab)
-                       (Sset-cdr! (Scdr part) (Scdr (my-assq (Scddr part) lbl-list))))
+                       (Sset-cdr! (Scdr part) (Scdr (Sassq (Scddr part) lbl-list))))
                       ((wrel)
-                       (Sset-car! (Scdr part) (Scdr (my-assq (Scadr part) lbl-list))))
+                       (Sset-car! (Scdr part) (Scdr (Sassq (Scadr part) lbl-list))))
                       ((lrel)
                        (Sset-car!
                         (Scdr part)
-                        (Scdr (my-assq (Scadr part) lbl-list))))))
+                        (Scdr (Sassq (Scadr part) lbl-list))))))
                 (loop rest)))))
       (define (assign-loc-to-labels)
         (let loop ((l fix-list) (loc 0))
@@ -7526,8 +7385,8 @@
                     (begin (ofile-word part) (loop (SFX+ loc 2) rest)))))))
       (define (write-code)
         (let ((proc-len
-               (SFX+ (Scadr (Scdr (my-assq const-lbl lbl-list)))
-                  (SFX* (my-length const-list) 4))))
+               (SFX+ (Scadr (Scdr (Sassq const-lbl lbl-list)))
+                  (SFX* (Slength const-list) 4))))
           (if (SFX>= proc-len 32768)
               (compiler-limitation-error
                "procedure is too big (32K bytes limit per procedure)"))
@@ -7579,7 +7438,7 @@
                       (loop2 rest (SFX+ loc 2)))))))
         (ofile-word end-of-code-tag)
         (for-each ofile-ref const-list)
-        (ofile-long (obj-encoding (SFX+ (my-length const-list) 1))))
+        (ofile-long (obj-encoding (SFX+ (Slength const-list) 1))))
       (replace-lbl-refs-by-pointer-to-label)
       (branch-tensioning-pass)
       (write-code))))
@@ -7691,7 +7550,7 @@
       (if (SFX>= i 0)
           (loop (SFX- i 1)
                 (SFXquotient bit 2)
-                (if (my-memq i reg-list)
+                (if (Smemq i reg-list)
                     (SFX+ mask (if flip-bits? (SFXquotient 32768 bit) bit))
                     mask))
           mask)))
@@ -8085,7 +7944,7 @@
 (define (emit-trap2 num args)
   (asm-word (SFX+ 20136 (areg-num table-reg)))
   (asm-word (trap-offset num))
-  (asm-align 8 (SFXmodulo (SFX- 4 (SFX* (my-length args) 2)) 8))
+  (asm-align 8 (SFXmodulo (SFX- 4 (SFX* (Slength args) 2)) 8))
   (let loop ((args args))
     (if (not (null? args)) (begin (asm-word (Scar args)) (loop (Scdr args)))))
   (if ofile-asm?
@@ -8162,7 +8021,7 @@
   (let ((n (pos-in-list obj (queue->list asm-const-queue))))
     (if n
         (make-pcr const-lbl (SFX* n 4))
-        (let ((m (my-length (queue->list asm-const-queue))))
+        (let ((m (Slength (queue->list asm-const-queue))))
           (queue-put! asm-const-queue obj)
           (make-pcr const-lbl (SFX* m 4))))))
 (define (emit-stat stat)
@@ -8344,13 +8203,13 @@
           '#("a0@-" "a1@-" "a2@-" "a3@-" "a4@-" "a5@-" "a6@-" "sp@-")
           (areg-num (pdec-areg opnd))))
         ((disp? opnd)
-         (my-string-append
+         (Sstring-append
           (opnd-str (disp-areg opnd))
           "@("
           (SFXnumber->string (disp-offset opnd))
           ")"))
         ((inx? opnd)
-         (my-string-append
+         (Sstring-append
           (opnd-str (inx-areg opnd))
           "@("
           (SFXnumber->string (inx-offset opnd))
@@ -8360,15 +8219,15 @@
         ((pcr? opnd)
          (let ((lbl (pcr-lbl opnd)) (offs (pcr-offset opnd)))
            (if (SFX= offs 0)
-               (my-string-append "L" (SFXnumber->string lbl))
-               (my-string-append
+               (Sstring-append "L" (SFXnumber->string lbl))
+               (Sstring-append
                 "L"
                 (SFXnumber->string lbl)
                 "+"
                 (SFXnumber->string offs)))))
-        ((imm? opnd) (my-string-append "#" (SFXnumber->string (imm-val opnd))))
+        ((imm? opnd) (Sstring-append "#" (SFXnumber->string (imm-val opnd))))
         ((glob? opnd)
-         (my-string-append "GLOB(" (Ssymbol->string (glob-name opnd)) ")"))
+         (Sstring-append "GLOB(" (Ssymbol->string (glob-name opnd)) ")"))
         ((freg? opnd)
          (Svector-ref
           '#("fp0" "fp1" "fp2" "fp3" "fp4" "fp5" "fp6" "fp7")
@@ -8376,8 +8235,8 @@
         ((reg-list? opnd)
          (let loop ((l (reg-list-regs opnd)) (result "[") (sep ""))
            (if (pair? l)
-               (loop (Scdr l) (my-string-append result sep (opnd-str (Scar l))) "/")
-               (my-string-append result "]"))))
+               (loop (Scdr l) (Sstring-append result sep (opnd-str (Scar l))) "/")
+               (Sstring-append result "]"))))
         (else (compiler-internal-error "opnd-str, unknown 'opnd'" opnd))))
 (define (begin! info-port targ)
   (set! return-reg (make-reg 0))
@@ -8397,12 +8256,12 @@
 (define nb-arg-regs 3)
 (define pointer-size 4)
 (define prim-proc-table
-  (my-map (lambda (x)
+  (Smap2 (lambda (x)
          (cons (string->canonical-symbol (Scar x))
                (apply make-proc-obj (Scar x) #t #f (Scdr x))))
        prim-procs))
 (define (prim-info name)
-  (let ((x (my-assq name prim-proc-table))) (if x (Scdr x) #f)))
+  (let ((x (Sassq name prim-proc-table))) (if x (Scdr x) #f)))
 (define (get-prim-info name)
   (let ((proc (prim-info (string->canonical-symbol name))))
     (if proc
@@ -8441,9 +8300,9 @@
 (define (dump proc filename c-intf options)
   (if *info-port*
       (begin (display "Dumping:" *info-port*) (newline *info-port*)))
-  (set! ofile-asm? (my-memq 'asm options))
-  (set! ofile-stats? (my-memq 'stats options))
-  (set! debug-info? (my-memq 'debug options))
+  (set! ofile-asm? (Smemq 'asm options))
+  (set! ofile-stats? (Smemq 'stats options))
+  (set! debug-info? (Smemq 'debug options))
   (set! object-queue (queue-empty))
   (set! objects-dumped (queue-empty))
   (ofile.begin! filename add-object)
@@ -8467,7 +8326,7 @@
       (let ((n (pos-in-list obj (queue->list objects-dumped))))
         (if n
             n
-            (let ((m (my-length (queue->list objects-dumped))))
+            (let ((m (Slength (queue->list objects-dumped))))
               (queue-put! objects-dumped obj)
               (queue-put! object-queue obj)
               m)))))
@@ -8602,7 +8461,7 @@
         '()
         (cons (GENremainder n radix) (integer->digits (GENquotient n radix)))))
   (let ((l (integer->digits (abs x))))
-    (ofile-long (SFX+ (SFX* (SFX+ (my-length l) 1) 512) (SFX* subtype-bignum 8)))
+    (ofile-long (SFX+ (SFX* (SFX+ (Slength l) 1) 512) (SFX* subtype-bignum 8)))
     (if (GEN< x 0) (ofile-word 0) (ofile-word 1))
     (for-each ofile-word l)))
 (define (dump-procedure proc)
@@ -8672,7 +8531,7 @@
   (let ((n (index descr (queue->list var-descr-queue))))
     (if n
         n
-        (let ((m (my-length (queue->list var-descr-queue))))
+        (let ((m (Slength (queue->list var-descr-queue))))
           (queue-put! var-descr-queue descr)
           m))))
 (define (add-first-class-label! source slots frame)
@@ -8684,7 +8543,7 @@
                 (let ((descr-index
                        (add-var-descr!
                         (if (pair? x)
-                            (my-map (lambda (y) (add-var-descr! (var-name y))) x)
+                            (Smap2 (lambda (y) (add-var-descr! (var-name y))) x)
                             (var-name x)))))
                   (loop (SFX+ i 1)
                         (Scdr l1)
@@ -8731,7 +8590,7 @@
       (ifjump-false gvm-instr)
       (ifjump-poll? gvm-instr)
       (if (and next-gvm-instr
-               (my-memq (label-type next-gvm-instr) '(simple task-entry)))
+               (Smemq (label-type next-gvm-instr) '(simple task-entry)))
           (label-lbl-num next-gvm-instr)
           #f)))
     ((jump)
@@ -8740,7 +8599,7 @@
       (jump-nb-args gvm-instr)
       (jump-poll? gvm-instr)
       (if (and next-gvm-instr
-               (my-memq (label-type next-gvm-instr) '(simple task-entry)))
+               (Smemq (label-type next-gvm-instr) '(simple task-entry)))
           (label-lbl-num next-gvm-instr)
           #f)))
     (else
@@ -8802,7 +8661,7 @@
   (define (add! stats bin count)
     (Sset-car! stats (SFX+ (Scar stats) count))
     (if (not (null? bin))
-        (let ((x (my-assoc (Scar bin) (Scdr stats))))
+        (let ((x (Sassoc (Scar bin) (Scdr stats))))
           (if x
               (add! (Scdr x) (Scdr bin) count)
               (begin
@@ -9128,11 +8987,11 @@
             (move-opnd68-to-loc reg68 loc sn)))))
 (define (gen-trap source frame save-live? not-save-reg num lbl)
   (define (adjust-slots l n)
-    (cond ((SFX= n 0) (my-append l '()))
+    (cond ((SFX= n 0) (Sappend l '()))
           ((SFX< n 0) (adjust-slots (Scdr l) (SFX+ n 1)))
           (else (adjust-slots (cons empty-var l) (SFX- n 1)))))
   (define (set-slot! slots i x)
-    (let loop ((l slots) (n (SFX- (my-length slots) i)))
+    (let loop ((l slots) (n (SFX- (Slength slots) i)))
       (if (SFX> n 0) (loop (Scdr l) (SFX- n 1)) (Sset-car! l x))))
   (let ((ret-slot (frame-first-empty-slot frame)))
     (let loop1 ((save1 '()) (save2 #f) (regs (frame-regs frame)) (i 0))
@@ -9152,12 +9011,12 @@
                            (SFX+ i 1))
                     (loop1 save1 save2 (Scdr regs) (SFX+ i 1)))))
           (let ((order (sort-list save1 (lambda (x y) (SFX< (Scar x) (Scar y))))))
-            (let ((slots (my-append (my-map (lambda (x) (Scdr x)) order)
+            (let ((slots (Sappend (Smap2 (lambda (x) (Scdr x)) order)
                                  (adjust-slots
                                   (frame-slots frame)
                                   (SFX- current-fs (frame-size frame)))))
-                  (reg-list (my-map (lambda (x) (Scar x)) order))
-                  (nb-regs (my-length order)))
+                  (reg-list (Smap2 (lambda (x) (Scar x)) order))
+                  (nb-regs (Slength order)))
               (define (trap)
                 (emit-trap2 num '())
                 (gen-label-return*
@@ -9173,12 +9032,12 @@
                       sp-reg
                       (SFX* pointer-size (SFX- current-fs ret-slot))))
                     (set-slot! slots ret-slot (Scdr save2))))
-              (if (SFX> (my-length order) 2)
+              (if (SFX> (Slength order) 2)
                   (begin
                     (emit-movem.l reg-list pdec-sp)
                     (trap)
                     (emit-movem.l pinc-sp reg-list))
-                  (let loop2 ((l (my-reverse reg-list)))
+                  (let loop2 ((l (Sreverse reg-list)))
                     (if (pair? l)
                         (let ((reg (Scar l)))
                           (emit-move.l reg pdec-sp)
@@ -9321,7 +9180,7 @@
 (define (gen-label-return* lbl label-descr slots extra)
   (let ((i (pos-in-list ret-var slots)))
     (if i
-        (let* ((fs (my-length slots)) (link (SFX- fs i)))
+        (let* ((fs (Slength slots)) (link (SFX- fs i)))
           (emit-label-return lbl entry-lbl-num (SFX+ fs extra) link label-descr))
         (compiler-internal-error
          "gen-label-return*, no return address in frame"))))
@@ -9368,7 +9227,7 @@
 (define (gen-label-task-return* lbl label-descr slots extra)
   (let ((i (pos-in-list ret-var slots)))
     (if i
-        (let* ((fs (my-length slots)) (link (SFX- fs i)))
+        (let* ((fs (Slength slots)) (link (SFX- fs i)))
           (emit-label-task-return
            lbl
            entry-lbl-num
@@ -9384,7 +9243,7 @@
          (list 'gvm-instr
                'apply
                (string->canonical-symbol (proc-obj-name prim))
-               (my-map opnd-stat opnds)
+               (Smap2 opnd-stat opnds)
                (if loc (opnd-stat loc) #f))
          1)
         (for-each fetch-stat-add! opnds)
@@ -9412,7 +9271,7 @@
   (define (parms->bytes parms)
     (if (null? parms)
         0
-        (SFX+ (size->bytes (my-length (closure-parms-opnds (Scar parms))))
+        (SFX+ (size->bytes (Slength (closure-parms-opnds (Scar parms))))
            (parms->bytes (Scdr parms)))))
   (if ofile-stats?
       (begin
@@ -9422,7 +9281,7 @@
             (list 'gvm-instr
                   'close
                   (opnd-stat (closure-parms-loc x))
-                  (my-map opnd-stat (closure-parms-opnds x)))
+                  (Smap2 opnd-stat (closure-parms-opnds x)))
             1)
            (store-stat-add! (closure-parms-loc x))
            (fetch-stat-add! (make-lbl (closure-parms-lbl x)))
@@ -9436,11 +9295,11 @@
     (emit-bcc lbl1)
     (gen-trap instr-source entry-frame #f #f closure-alloc-trap lbl1)
     (emit-move.l atemp2 closure-ptr-slot)
-    (let* ((opnds* (append-lists (my-map closure-parms-opnds parms)))
+    (let* ((opnds* (LIBconcatenate (Smap2 closure-parms-opnds parms)))
            (sn* (sn-opnds opnds* sn)))
       (let loop1 ((parms parms))
         (let ((loc (closure-parms-loc (Scar parms)))
-              (size (my-length (closure-parms-opnds (Scar parms))))
+              (size (Slength (closure-parms-opnds (Scar parms))))
               (rest (Scdr parms)))
           (if (SFX= size 1)
               (emit-addq.l type-procedure atemp2)
@@ -9450,7 +9309,7 @@
           (move-opnd68-to-loc
            atemp2
            loc
-           (sn-opnds (my-map closure-parms-loc rest) sn*))
+           (sn-opnds (Smap2 closure-parms-loc rest) sn*))
           (if (null? rest)
               (add-n-to-loc68
                (SFX+ (SFX- (size->bytes size) total-space-needed) 2)
@@ -9461,14 +9320,14 @@
       (let loop2 ((parms parms))
         (let* ((opnds (closure-parms-opnds (Scar parms)))
                (lbl (closure-parms-lbl (Scar parms)))
-               (size (my-length opnds))
+               (size (Slength opnds))
                (rest (Scdr parms)))
           (emit-lea (make-pcr lbl 0) atemp1)
           (emit-move.l atemp1 (make-pinc atemp2))
           (let loop3 ((opnds opnds))
             (if (not (null? opnds))
                 (let ((sn** (sn-opnds
-                             (append-lists (my-map closure-parms-opnds rest))
+                             (LIBconcatenate (Smap2 closure-parms-opnds rest))
                              sn)))
                   (move-opnd-to-loc68
                    (Scar opnds)
@@ -9488,7 +9347,7 @@
          (list 'gvm-instr
                'ifjump
                (string->canonical-symbol (proc-obj-name test))
-               (my-map opnd-stat opnds)
+               (Smap2 opnd-stat opnds)
                (if poll? 'poll 'not-poll))
          1)
         (for-each fetch-stat-add! opnds)
@@ -9702,7 +9561,7 @@
           (move-opnd68-to-loc atemp1 loc sn)))))
 (define (commut-oper gen opnds loc sn self? accum-self accum-other)
   (if (null? opnds)
-      (gen (my-reverse accum-self) (my-reverse accum-other) loc sn self?)
+      (gen (Sreverse accum-self) (Sreverse accum-other) loc sn self?)
       (let ((opnd (Scar opnds)) (rest (Scdr opnds)))
         (cond ((and (not self?) (eq? opnd loc))
                (commut-oper gen rest loc sn #t accum-self accum-other))
@@ -9751,12 +9610,12 @@
                      (opnd68->true-opnd68 loc68 sn-other-opnds))))))
         (gen-add-in-place other-opnds loc68 sn))))
 (define (gen-add self-opnds other-opnds loc sn self?)
-  (let* ((opnds (my-append self-opnds other-opnds))
+  (let* ((opnds (Sappend self-opnds other-opnds))
          (first-opnd (Scar opnds))
          (other-opnds (Scdr opnds))
          (sn-other-opnds (sn-opnds other-opnds sn))
          (sn-first-opnd (sn-opnd first-opnd sn-other-opnds)))
-    (if (SFX<= (my-length self-opnds) 1)
+    (if (SFX<= (Slength self-opnds) 1)
         (let ((loc68 (loc->loc68 loc #f sn-first-opnd)))
           (if self?
               (gen-add-in-place opnds loc68 sn)
@@ -9837,7 +9696,7 @@
               (emit-muls.l (opnd68->true-opnd68 opnd68 sn-other-opnds) reg68)))
         (gen-mul-in-place other-opnds reg68 sn))))
 (define (gen-mul self-opnds other-opnds loc sn self?)
-  (let* ((opnds (my-append self-opnds other-opnds))
+  (let* ((opnds (Sappend self-opnds other-opnds))
          (first-opnd (Scar opnds))
          (other-opnds (Scdr opnds))
          (sn-other-opnds (sn-opnds other-opnds sn))
@@ -9984,12 +9843,12 @@
                                (opnd68->true-opnd68 loc68 sn-other-opnds))))))
           (gen-op-in-place other-opnds loc68 sn))))
   (lambda (self-opnds other-opnds loc sn self?)
-    (let* ((opnds (my-append self-opnds other-opnds))
+    (let* ((opnds (Sappend self-opnds other-opnds))
            (first-opnd (Scar opnds))
            (other-opnds (Scdr opnds))
            (sn-other-opnds (sn-opnds other-opnds sn))
            (sn-first-opnd (sn-opnd first-opnd sn-other-opnds)))
-      (if (SFX<= (my-length self-opnds) 1)
+      (if (SFX<= (Slength self-opnds) 1)
           (let ((loc68 (loc->loc68 loc #f sn-first-opnd)))
             (if self?
                 (gen-op-in-place opnds loc68 sn)
@@ -10221,7 +10080,7 @@
 (define (make-gen-vector kind)
   (lambda (opnds loc sn)
     (let ((sn-loc (if loc (sn-opnd loc sn) sn)))
-      (let* ((n (my-length opnds))
+      (let* ((n (Slength opnds))
              (bytes (SFX+ pointer-size
                        (SFX* (vector-select kind 4 1 1 2)
                           (SFX+ n (if (eq? kind 'string) 1 0)))))
@@ -10230,7 +10089,7 @@
          (SFXquotient (SFX* (SFXquotient (SFX+ bytes (SFX- 8 1)) 8) 8) pointer-size))
         (if (not (SFX= adjust 0)) (emit-subq.l adjust heap-reg))
         (if (eq? kind 'string) (emit-move.b (make-imm 0) (make-pdec heap-reg)))
-        (let loop ((opnds (my-reverse opnds)))
+        (let loop ((opnds (Sreverse opnds)))
           (if (pair? opnds)
               (let* ((o (Scar opnds)) (sn-o (sn-opnds (Scdr opnds) sn-loc)))
                 (if (eq? kind 'vector)
