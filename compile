@@ -1,132 +1,160 @@
-#!/bin/sh
+#!/bin/bash
 
-# usage:
-#
-#  For gambit:
-#
-#    ./compile --gambit --view tests/recursive/fib.scm
-#    time ./tests/recursive/fib.gambit.0G4.exe
-#
-#  For bigloo:
-#
-#    ./compile --bigloo --view tests/recursive/fib.scm
-#    time ./tests/recursive/fib.bigloo.0G4.exe
+# usage: see ./compile -h
 
+set -euo pipefail
 
 # find script directory
 SCRIPT_DIR="$0"
-if test "${SCRIPT_DIR#/}" = "$SCRIPT_DIR" ; then
+if [ "${SCRIPT_DIR#/}" = "$SCRIPT_DIR" ]; then
   SCRIPT_DIR="$(pwd)/$SCRIPT_DIR"
 fi
 SCRIPT_DIR="${SCRIPT_DIR%/*}"
 SCRIPT_DIR="${SCRIPT_DIR%/.}"
 
-
-# default settings:
-
-SYSTEM=gambit
-VIEW=no
-TESTS=""          # empty to compile all tests in tests directory
-
-OPTIMIZE_BEFORE=0
-ARITHMETIC=G      # generic (G) or specialized (S) arithmetic?
-VERSION_LIMIT=4   # version limit (0 to disable BBV)
-INLINING_LIMIT=370  # 370 for default gambit inlining
+# Default parameters
+OPTIM_LEVEL=0     # optimization level
+SAFE_ARITHMETIC=1 # safe/unsafe arithmetic
 PRIMITIVE_COUNT=0 # enables primitive (0 to disable)
 GENERATE_CFG=0    # enable cfg generation
-MERGE_STRATEGY="linear" # default merge strategy
+VIEW_CFG=0        # open cfg in pdf viewer
+USE_IGSC=0        # use gambit igsc instead of gsc
+COMPILER_DIR=     # compiler directory
+VERSION_LIMIT=    # version limit
+SYSTEM=           # system (gambit or bigloo)
 
-# for gambit
-if test "$GAMBITDIR" = "" ; then
-  GAMBITDIR="$SCRIPT_DIR/gambit/gambit"
-fi
-
-GAMBITCOMP="$GAMBITDIR/gsc/gsc -:=$GAMBITDIR"
-
-# for bigloo
-if [ "$BIGLOODIR " = " " ]; then
-  BIGLOODIR="$SCRIPT_DIR/bigloo/local"
-fi  
-BIGLOOCOMP="$BIGLOODIR/bin/bigloo"
-BGLCFG="$BIGLOODIR/bin/bglcfg"
-
-while [ "$#" != "0" ]; do
-  case "$1" in
-    -g|--gambit) # system
-      SYSTEM=gambit
+# Parse parameters
+while getopts "f:S:D:V:O:UPGWIch" opt; do
+  case $opt in
+    f)
+      FILE=$OPTARG
       ;;
-    -b|--bigloo) # system
-      SYSTEM=bigloo
+    S)
+      case $OPTARG in
+        'gambit'|'bigloo')
+          SYSTEM=$OPTARG
+          ;;
+        *)
+          echo "Unknown system: $OPTARG" >&2
+          exit 1
+          ;;
+      esac
       ;;
-    -G) # generic arithmetic
-      ARITHMETIC=G
+    D)
+      COMPILER_DIR=$OPTARG
       ;;
-    -S) # specialized arithmetic when fixnum/flonum operations are possible
-      ARITHMETIC=S
-      ;;
-    -V) # version limit
-      shift
-      if [ "$#" = "0" ]; then
-        printf "version limit (-V) option needs an argument"
-        exit 1
+    V)
+      if ! [ "$OPTARG" -eq "$OPTARG" ] 2> /dev/null; then
+          echo "Version limit must be an integer not '$OPTARG'"
+          exit 1
       fi
-      VERSION_LIMIT="$1"
+      VERSION_LIMIT=$OPTARG
       ;;
-    -gsi)
-     GAMBITCOMP="$GAMBITDIR/gsi/gsi -:dar,=$GAMBITDIR $GAMBITDIR/gsc/igsc"
-     ;;
-    -M) # merge strategy
-      shift
-      if [ "$#" = "0" ]; then
-        printf "merge strategy (-M) option needs an argument"
-        exit 1
-      fi
-      MERGE_STRATEGY="$1"
+    O)
+      case $OPTARG in
+        1|2|3)
+          OPTIM_LEVEL=$OPTARG
+          ;;
+        *)
+          echo "Invalid optimization level: -O$OPTARG" >&2
+          exit 1
+          ;;
+      esac
       ;;
-    -I) # inlining limit
-      shift
-      if [ "$#" = "0" ]; then
-        printf "inlining limit (-I) option needs an argument"
-        exit 1
-      fi
-      INLINING_LIMIT="$1"
+    U)
+      SAFE_ARITHMETIC=0
       ;;
-    -O) # optimize before
-      OPTIMIZE_BEFORE=1
-      ;;
-    -P) # primitive counts
+    P)
       PRIMITIVE_COUNT=1
       ;;
-    -CFG) # primitive counts
+    G)
       GENERATE_CFG=1
       ;;
-    -X) # output the code with bbv inbclusions
-      OUTPUT_INCLUDED_CODE=1
+    W)
+      GENERATE_CFG=1
+      VIEW_CFG=1
       ;;
-    -c|--clean) # clean
+    I)
+      USE_IGSC=1
+      ;;
+    c)
       rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o* tests/*/*~ tests/*/*.bbv.dot tests/*/*.exe
-      exit
+      exit 0
       ;;
-    -v|--view) # view CFG
-      VIEW=yes
+    h)
+      echo "Usage: $0 [options]"
+      echo "Options:"
+      echo "  -f <filename>     File to compile"
+      echo "  -S <system>       Specify the system ('gambit' or 'bigloo')"
+      echo "  -D <dir>          Specify compiler directory"
+      echo "  -V <limit>        Set the version limit"
+      echo "  -O <level>        Set optimization level (1, 2, 3)"
+      echo "  -U                Use unsafe arithmetic"
+      echo "  -P                Count primitive usage"
+      echo "  -G                Generate CFG"
+      echo "  -W                View CFG in pdf viewer"
+      echo "  -I                Use igsc (gambit only)"
+      echo "  -c                Clean up tests"
+      echo "  -h                Display this help and exit"
+      exit 0
       ;;
-    -*) # other options
-      printf "*** unknown option: $1\n"
+    \?)
       exit 1
       ;;
-    *)
-      TESTS="$TESTS $1"
-      ;;
   esac
-  shift
 done
+
+# Check valid arguments
+if [ "$FILE" = "" ]; then
+  echo "*** no file provided: use -f <filename>" >&2
+  exit 1
+fi
+
+if [[ "${FILE##*.}" != "scm" ]]; then
+    echo "** provided file must be a .scm file, not '$FILE'"
+    exit 1
+fi
+
+if [ "$SYSTEM" = "" ]; then
+  echo "*** no system provided: use -S <system>" >&2
+  exit 1
+fi
+
+if [ "$VERSION_LIMIT" = "" ]; then
+  echo "*** no version limit provided: use -V <limit>" >&2
+  exit 1
+fi
+
+if [ "$USE_IGSC" = "1" ] && [ "$SYSTEM" != "gambit" ]; then
+  echo "*** igsc only available with '-S gambit'" >&2
+  exit 1
+fi
+
+# Set default value that depend on other options
+if [ "$COMPILER_DIR" = "" ]; then
+  if [ "$SYSTEM" = "bigloo" ]; then
+    COMPILER_DIR="$SCRIPT_DIR/bigloo/local"
+  elif [ "$SYSTEM" = "gambit" ]; then
+    COMPILER_DIR="$SCRIPT_DIR/gambit/gambit"
+  fi
+fi
+
+if [ "$SAFE_ARITHMETIC" = "0" ]; then
+  ARITHMETIC=G
+  SAFETY_MODE="unsafe"
+else
+  ARITHMETIC=S
+  SAFETY_MODE="safe"
+fi
+
+FILE_NO_EXT="${FILE%.scm}"
 
 run_dot()
 {
   if command -v dot > /dev/null 2>&1 ; then
     dot -O -Tpdf $1
   else
-    printf "dot program not found!\n"
+    echo "*** dot program not found" >&2
   fi
 }
 
@@ -138,133 +166,107 @@ run_pdfviewer()
     if command -v open > /dev/null 2>&1 ; then
       open $1
     else
-      printf "PDF viewer program not found!\n"
+      echo "*** PDF viewer program not found" >&2
     fi
   fi
 }
 
-if test "$TESTS" = "" ; then
-  TESTS="tests"
+case "$SYSTEM" in
+  gambit)
+    # Set base compiler command
+    if [ "$USE_IGSC" = "1" ]; then
+      GAMBITCOMP="$COMPILER_DIR/gsi/gsi -:dar,=$COMPILER_DIR $COMPILER_DIR/gsc/igsc"
+    else
+      GAMBITCOMP="$COMPILER_DIR/gsc/gsc -:=$COMPILER_DIR"
+    fi
+
+    # Set optimization level
+    if [ "$OPTIM_LEVEL" = "0" ]; then
+      INLINING_LIMIT=0
+    else
+      INLINING_LIMIT=370
+    fi
+
+    base="$FILE_NO_EXT.gambit.V${VERSION_LIMIT}.O${OPTIM_LEVEL}.$SAFETY_MODE"
+    exe=$base.exe
+
+    PRELUDE="(declare
+               (version-limit $VERSION_LIMIT)
+               (inlining-limit $INLINING_LIMIT))
+             (define-macro (%%%)
+               (eval '(define arithmetic '$ARITHMETIC)))
+             (%%%)
+             (##include \"$SCRIPT_DIR/gambit/bbv.scm\")"
+    # Remove extra spaces
+    PRELUDE=$(echo "$PRELUDE" | sed ':a;N;$!ba;s/\n/ /g' | sed 's/  */ /g')
+
+
+    POSTLUDE="(##include \"$SCRIPT_DIR/gambit/main.scm\")"
+    # Remove extra spaces
+    POSTLUDE=$(echo "$POSTLUDE" | sed ':a;N;$!ba;s/\n/ /g' | sed 's/  */ /g')
+
+    FLAGS="-keep-temp -gvm -exe -o $exe"
+
+    if [ "$GENERATE_CFG" = "1" ]; then
+      FLAGS="$FLAGS -cfg"
+    fi
+    if [ "$PRIMITIVE_COUNT" = "1" ]; then
+      FLAGS="$FLAGS -gvm-interpret"
+    fi
+
+    set -x
+    $GAMBITCOMP -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS $FILE
+    set +x
+
+    if [ "$GENERATE_CFG" = "1" ]; then
+      mv $filenoext.cfg $base.cfg
+      run_dot $base.cfg
+      CFGPDF=$base.cfg.pdf
+    fi
+    ;;
+
+  bigloo)
+    # for bigloo
+    if [ "$BIGLOODIR " = " " ]; then
+      BIGLOODIR="$SCRIPT_DIR/bigloo/local"
+    fi  
+    BIGLOOCOMP="$BIGLOODIR/bin/bigloo"
+    BGLCFG="$BIGLOODIR/bin/bglcfg"
+
+    base="$filenoext.bigloo.$ARITHMETIC$VERSION_LIMIT"
+    exe=$base.exe
+    PATH="$BIGLOODIR/bin:$PATH"
+    BIGLOOBBVSTRATEGY="size"
+    if [ "$OPTIM" = "0" ]; then
+      BIGLOOOPT="$BIGLOOOPT -O2 -fno-user-inlining"
+    else
+      BIGLOOOPT="$BIGLOOOPT -Obench"
+    fi
+    if [ "$PRIMITIVE_COUNT" = "1" ]; then
+      BIGLOOOPT="$BIGLOOOPT -copt -DSAW_BBV_STATS=1"
+    fi
+    if [ "$VERSION_LIMIT" = "0" ]; then
+      BIGLOOOPT="$BIGLOOOPT -fno-saw-bbv"
+    else
+      BIGLOOOPT="$BIGLOOOPT -fsaw-bbv"
+    fi
+    echo "cd $SCRIPT_DIR/bigloo; BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -o $exe"
+    (cd $SCRIPT_DIR/bigloo && \
+  BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe)
+
+    if [ -f $base-program.bbv.cfg ]; then
+      (cd $SCRIPT_DIR/bigloo && \
+    $BGLCFG $base-program.bbv.cfg > $base.dot && \
+    run_dot $base-program.bbv.dot)
+CFGPDF=$base-program.bbv.dot.pdf
+    fi
+    ;;
+
+esac
+
+echo "***executable: $exe"
+
+if [ "$VIEW_CFG" = "1" ] ; then
+  run_pdfviewer $CFGPDF
 fi
 
-FILES=""
-
-add_file()
-{
-  file="$1"
-  if test "${file#*.scm}" != "$file" -a "${file#*.gambit.scm}" = "$file" -a "${file#*.bigloo.scm}" = "$file" ; then
-    if test "${file#/}" = "$file" ; then
-      file="$(pwd)/$file"
-    fi
-    FILES="$FILES $file"
-  fi
-}
-
-for test in $TESTS ; do
-  if test -d $test ; then
-    for file in $(find $test -name "*.scm") ; do
-      add_file "$file"
-    done
-  else
-    add_file "$test"
-  fi
-done
-
-for file in $FILES ; do
-
-  filenoext="${file%.scm}"
-
-  printf "=========== $SYSTEM ${file}\n"
-
-  case "$SYSTEM" in
-
-    gambit)
-      DECL_OPTIM=""
-      if [ "$OPTIMIZE_BEFORE" = "0" ]; then
-        DECL_OPTIM="(not constant-fold)"
-      fi
-      DECL="(declare $DECL_OPTIM (version-limit $VERSION_LIMIT) (inlining-limit $INLINING_LIMIT)) (define-macro (%%%) (eval '(define arithmetic '$ARITHMETIC))) (%%%) (define-macro (npnull? x) (quasiquote (let ((x ,x)) (and (not (##pair? x)) (##null? x)))))"
-      base="$filenoext.gambit.$INLINING_LIMIT$ARITHMETIC$MERGE_STRATEGY$VERSION_LIMIT"
-      exe=$base.exe
-      echo "$OUTPUT_INCLUDED_CODE"
-      if [ "$OUTPUT_INCLUDED_CODE" = "1" ]; then
-        inclusions=$base.code.scm;
-        echo "$DECL" > $inclusions;
-        cat $SCRIPT_DIR/gambit/bbv.scm $file >> $inclusions;
-        echo "(run)" >> $inclusions;
-      fi
-      if [ "$PRIMITIVE_COUNT" = "1" ]; then
-        echo $GAMBITCOMP -prelude "$DECL (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(run)" -gvm-interpret -bbv-merge-strategy "$MERGE_STRATEGY" $file
-        $GAMBITCOMP -prelude "$DECL (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(run)" -gvm-interpret -bbv-merge-strategy "$MERGE_STRATEGY" $file
-      fi
-      CFG_FLAG=""
-      if [ "$GENERATE_CFG" = "1" ]; then
-        CFG_FLAG="-cfg"
-      fi
-      echo $cmd "$GAMBITCOMP -prelude \"$DECL (##include \"$SCRIPT_DIR/gambit/bbv.scm\")\" -postlude \"(##include \"$SCRIPT_DIR/gambit/main.scm\")\" -keep-temp -gvm $CFG_FLAG $PRIM_FLAG -bbv-merge-strategy \"$MERGE_STRATEGY\" -exe -o $exe $file"
-      $GAMBITCOMP -prelude "$DECL (##include \"$SCRIPT_DIR/gambit/bbv.scm\")" -postlude "(##include \"$SCRIPT_DIR/gambit/main.scm\")" -keep-temp -gvm $CFG_FLAG $PRIM_FLAG -bbv-merge-strategy "$MERGE_STRATEGY" -exe -o $exe $file
-      if [ "$GENERATE_CFG" = "1" ]; then
-        mv $filenoext.cfg $base.cfg
-        run_dot $base.cfg
-        CFGPDF=$base.cfg.pdf
-      fi
-      ANALYSISEXT=.gvm
-      ;;
-
-    bigloo)
-      base="$filenoext.bigloo.$INLINING_LIMIT$ARITHMETIC$MERGE_STRATEGY$VERSION_LIMIT"
-      exe=$base.exe
-      PATH="$BIGLOODIR/bin:$PATH"
-      BIGLOOBBVSTRATEGY="$MERGE_STRATEGY"
-      if [ "$OPTIMIZE_BEFORE" = "0" ]; then
-        BIGLOOOPT="$BIGLOOOPT -O -fno-user-inlining"
-      else
-        BIGLOOOPT="$BIGLOOOPT -Obench"
-      fi
-      #if [ "$INLINING_LIMIT " = "0 " ]; then
-	    #  BIGLOOOPT="$BIGLOOOPT -fno-user-inlining"
-      #fi
-      if [ "$PRIMITIVE_COUNT" = "1" ]; then
-        BIGLOOOPT="$BIGLOOOPT -copt -DSAW_BBV_STATS=1"
-      fi
-      echo "cd $SCRIPT_DIR/bigloo; BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe"
-      (cd $SCRIPT_DIR/bigloo && \
-	 BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe)
-
-      if [ -f $base-program.bbv.cfg ]; then
-        (cd $SCRIPT_DIR/bigloo && \
-	   $BGLCFG $base-program.bbv.cfg > $base.dot && \
-	   run_dot $base-program.bbv.dot)
-	CFGPDF=$base-program.bbv.dot.pdf
-	ANALYSISEXT=-program.bbv.cfg
-      fi
-      ;;
-
-  esac
-
-  echo "***executable: $exe"
-
-  if test "$ANALYSISEXT" != "" && fgrep ";; $ANALYSISEXT contains: " $file > /dev/null 2>&1 ; then
-
-    fgrep ";; $ANALYSISEXT contains: " $file | sed -e "s/^;; $ANALYSISEXT contains: //" | while IFS= read -r pattern ; do
-
-      nboccur=$(grep -e "$pattern" $base$ANALYSISEXT | wc -l | sed -e "s/^ *//")
-
-      case "$nboccur" in
-        1) printf "SUCCESS -- $base$ANALYSISEXT contains: $pattern\n"
-           ;;
-        0) printf "FAIL -- pattern not found in $base$ANALYSISEXT: $pattern\n"
-           ;;
-        *) printf "FAIL -- pattern found $nboccur times in $base$ANALYSISEXT: $pattern\n"
-           ;;
-      esac
-
-    done
-
-  fi
-
-  if test "$VIEW" = "yes" ; then
-    run_pdfviewer $CFGPDF
-  fi
-
-done
