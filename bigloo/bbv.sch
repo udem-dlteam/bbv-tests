@@ -995,5 +995,8 @@
                  `(PRIMop substring ,a ,b ,c)
                  (DEAD-END "substring type error"))))))
 
+(define-macro (receive variables producer . body)
+   `(multiple-value-bind ,variables ,producer ,@body))
+
 (register-exit-function! (lambda (status) (bbv-saw-statistics) status))
 
