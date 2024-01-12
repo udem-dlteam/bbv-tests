@@ -26,5 +26,4 @@
                         (error "wrong result =" result)
                         result))))))))
 
-(let ((result (##exec-stats exec-bench)))
-  (for-each (lambda (data) (pp (list (car data) (cdr data)))) (cdr result)))
+(exec-bench)
