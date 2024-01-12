@@ -4,6 +4,7 @@
 
 (module bbv
    (include "./bbv.sch")
+   (include "./bbv.scm")
    (main main))
 
 (define _LOG_ 0)
