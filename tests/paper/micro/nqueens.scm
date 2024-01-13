@@ -35,4 +35,4 @@
   (nqueens n))
 
 (define (check result)
-  (equal? result 73712))
+  (equal? result (unknown 73712 92)))

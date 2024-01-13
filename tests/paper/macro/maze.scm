@@ -784,6 +784,7 @@
 	  result)))
 
 (define (check result)
+   (##gvm-interpreter-debug #t)
    (let ((s (with-output-to-string
 	       (lambda () (pmaze 5 15)))))
       (= (string-length s) 380)))

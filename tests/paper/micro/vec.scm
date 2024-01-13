@@ -1,4 +1,4 @@
-(define (run)
+(define (run #!key (n (unknown 100)))
    
   (define (vref v i)
      (if (and (vector? v) (fixnum? i))
@@ -12,8 +12,12 @@
 		200))
 	 300))
 
-  (let ((v '#(0 1 2 3 4)))
-     (+ (vref v 0) (vref v 1) (vref v 2) (vref v (+ (Svector-length v) 10)))))
+  (let loop ((i n))
+  	(let* ((v '#(0 1 2 3 4))
+		   (result (unknown (+ (vref v 0) (vref v 1) (vref v 2) (vref v (+ (Svector-length v) 10))))))
+		(if (> i 0)
+			(loop (- i 1))
+			result))))
 
 (define (check result)
   (equal? result 203))
