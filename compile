@@ -24,10 +24,10 @@ VERSION_LIMIT=    # version limit
 SYSTEM=           # system (gambit or bigloo)
 
 # Parse parameters
-while getopts "f:S:D:V:O:UPGWIch" opt; do
+while getopts "f:S:D:V:O:UPGWIchv" opt; do
   case $opt in
     f)
-      INPUT_FILE=$OPTARG
+      INPUT_FILE=$(readlink -f $OPTARG)
       ;;
     S)
       case $OPTARG in
@@ -81,6 +81,9 @@ while getopts "f:S:D:V:O:UPGWIch" opt; do
       rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o* tests/*/*~ tests/*/*.bbv.dot tests/*/*.exe
       exit 0
       ;;
+    v)
+      set -x
+      ;;
     h)
       echo "Usage: $0 [options]"
       echo "Options:"
@@ -96,6 +99,7 @@ while getopts "f:S:D:V:O:UPGWIch" opt; do
       echo "  -I                Use igsc (gambit only)"
       echo "  -c                Clean up tests"
       echo "  -h                Display this help and exit"
+      echo "  -v                Execute this script in verbose mode"
       exit 0
       ;;
     \?)
@@ -214,6 +218,7 @@ case "$SYSTEM" in
       FLAGS="$FLAGS -gvm-interpret"
     fi
 
+    # Compilation
     $GAMBITCOMP -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS $INPUT_FILE
 
     if [ "$GENERATE_CFG" = "1" ]; then
@@ -223,35 +228,38 @@ case "$SYSTEM" in
 
   bigloo)
     BIGLOOCOMP="$COMPILER_DIR/bin/bigloo"
-    BGLCFG="$BIGLOODIR/bin/bglcfg"
+    BGLCFG="$COMPILER_DIR/bin/bglcfg"
 
-    base="$FILE_NO_EXT.bigloo.V${VERSION_LIMIT}.O${OPTIM_LEVEL}.$SAFETY_MODE"
-    exe=$base.exe
+    PATH="$COMPILER_DIR/bin:$PATH"
 
-    PATH="$BIGLOODIR/bin:$PATH"
-    BIGLOOBBVSTRATEGY="size"
-    if [ "$OPTIM" = "0" ]; then
-      BIGLOOOPT="$BIGLOOOPT -O2 -fno-user-inlining"
+    BIGLOO_OPTIONS="-srfi arithmetic$ARITHMETIC -w -unsafe -saw -o $OUTPUT_FILE_EXE"
+    BIGLOOBBVVLENGTH=
+    BIGLOOBBVVERSIONLIMIT=
+
+    if [ "$OPTIM_LEVEL" = "0" ]; then
+      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -O2 -fno-user-inlining"
     else
-      BIGLOOOPT="$BIGLOOOPT -Obench"
+      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -Obench"
     fi
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
-      BIGLOOOPT="$BIGLOOOPT -copt -DSAW_BBV_STATS=1"
+      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -copt -DSAW_BBV_STATS=1"
     fi
     if [ "$VERSION_LIMIT" = "0" ]; then
-      BIGLOOOPT="$BIGLOOOPT -fno-saw-bbv"
+      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -fno-saw-bbv"
     else
-      BIGLOOOPT="$BIGLOOOPT -fsaw-bbv"
+      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -fsaw-bbv"
+      BIGLOOBBVVLENGTH=true
+      BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT
     fi
-    echo "cd $SCRIPT_DIR/bigloo; BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -o $exe"
-    (cd $SCRIPT_DIR/bigloo && \
-  BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT $BIGLOOCOMP $BIGLOOOPT -srfi arithmetic$ARITHMETIC bbv.bgl $file -w -unsafe -saw -fsaw-bbv -o $exe)
 
-    if [ -f $base-program.bbv.cfg ]; then
-      (cd $SCRIPT_DIR/bigloo && \
-    $BGLCFG $base-program.bbv.cfg > $base.dot && \
-    run_dot $base-program.bbv.dot)
-CFGPDF=$base-program.bbv.dot.pdf
+    # Compilation
+    (cd $SCRIPT_DIR/bigloo && \
+     BIGLOOBBVVLENGTH=$BIGLOOBBVVLENGTH
+     BIGLOOBBVVERSIONLIMIT=$BIGLOOBBVVERSIONLIMIT
+     $BIGLOOCOMP $BIGLOO_OPTIONS bbv.bgl $INPUT_FILE)
+
+    if [ -f $OUTPUT_FILE_BASE-program.bbv.cfg ]; then
+      (cd $SCRIPT_DIR/bigloo && $BGLCFG $OUTPUT_FILE_BASE-program.bbv.cfg > OUTPUT_FILE_CFG_DOT)
     fi
     ;;
 
