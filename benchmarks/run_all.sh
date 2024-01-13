@@ -1,7 +1,7 @@
 #!/bin/bash
 #set -euxo pipefail
 
-files=/home/omelancon/udem-dlteam/bbv-tests/tests/paper/micro/fibfp.scm #$(find ../tests/paper -type f -name "*.scm")
+files=$(find ../tests/paper -type f -name "*.scm")
 
 . ./venv/bin/activate
 
