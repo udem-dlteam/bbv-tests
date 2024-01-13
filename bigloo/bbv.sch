@@ -31,6 +31,8 @@
 (define-macro-arithmetic (FXop op . args)
    (case op
       ((zero?) `(zerofx? ,@args))
+      ((bit-lsh bit-and bit-or bit-not)
+        `(,op ,@args))
       (else `(,(symbol-append op 'fx) ,@args))))
 
 (define-macro-arithmetic (PRIMop op . args)
@@ -144,11 +146,16 @@
 (define-macro-arithmetic (FX= x y)         `(FXop = ,x ,y))
 (define-macro-arithmetic (FX< x y)         `(FXop < ,x ,y))
 (define-macro-arithmetic (FX> x y)         `(FXop > ,x ,y))
-(define-macro-arithmetic (FX<= x y)        `(FXop <=,x ,y))
+(define-macro-arithmetic (FX<= x y)        `(FXop <= ,x ,y))
 (define-macro-arithmetic (FX>= x y)        `(FXop >= ,x ,y))
 (define-macro-arithmetic (FXzero? x)       `(FXop zero? ,x))
 (define-macro-arithmetic (FXodd? x)        `(FXop odd? ,x))
 (define-macro-arithmetic (FXeven? x)       `(FXop even? ,x))
+
+(define-macro-arithmetic (FXbit-lsh x y)   `(FXop bit-lsh ,x ,y))
+(define-macro-arithmetic (FXbit-and x y)   `(FXop bit-and ,x ,y))
+(define-macro-arithmetic (FXbit-or x y)    `(FXop bit-or ,x ,y))
+(define-macro-arithmetic (FXbit-not x)     `(FXop bit-not ,x))
 
 (define-macro-arithmetic (FLONUM? x) `(PRIMop flonum? ,x))
 (define-macro-arithmetic (FIXNUM? x) `(PRIMop fixnum? ,x))

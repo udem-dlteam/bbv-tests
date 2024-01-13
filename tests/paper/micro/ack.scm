@@ -8,4 +8,4 @@
   (ack m n))
 
 (define (check result)
-  (equal? result 4093))
+  (equal? result (unknown 4093 509)))

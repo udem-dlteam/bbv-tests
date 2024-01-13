@@ -236,9 +236,9 @@
        ;; of cells, quit.
        (and (not (set-equal? set1 set2))
             (let ((walls (cell:walls c1))
-                  (wall-mask (bitwise-not (wall:bit wall))))
+                  (wall-mask (SFXbit-not (wall:bit wall))))
               (union! set1 set2)
-              (set-cell:walls c1 (bitwise-and walls wall-mask))
+              (set-cell:walls c1 (SFXbit-and walls wall-mask))
               (= (set-size set1) ncells)))))
    walls))
 
