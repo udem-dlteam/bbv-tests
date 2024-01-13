@@ -1355,10 +1355,8 @@ if __name__ == "__main__":
 
     benchmark_parser.add_argument('-u', '--unsafe',
                                   dest="safe_arithmetic",
-                                  metavar='U',
                                   action='store_false',
                                   default=True,
-                                  type=bool,
                                   help="Execute benchmark with unsafe arithmetic")
 
     benchmark_parser.add_argument('-r', '--repetitions',
@@ -1404,10 +1402,8 @@ if __name__ == "__main__":
 
     plot_parser.add_argument('-u', '--unsafe',
                              dest="safe_arithmetic",
-                             metavar='U',
                              action='store_false',
                              default=True,
-                             type=bool,
                              help="benchmarks with unsafe arithmetic")
 
     plot_parser.add_argument('-e', '--perf-events',
@@ -1447,10 +1443,8 @@ if __name__ == "__main__":
 
     analysis_parser.add_argument('-u', '--unsafe',
                                  dest="safe_arithmetic",
-                                 metavar='U',
                                  action='store_false',
                                  default=True,
-                                 type=bool,
                                  help="Benchmark with unsafe arithmetic")
 
     analysis_parser.add_argument('-b', '--benchmarks',
@@ -1508,7 +1502,7 @@ if __name__ == "__main__":
                                use_bigloo=args.use_bigloo,
                                file=args.file,
                                version_limits=args.version_limits,
-                               safe_arithmetic=safe_arithmetic,
+                               safe_arithmetic=args.safe_arithmetic,
                                repetitions=args.repetitions,
                                compiler_optimizations=args.compiler_optimizations,
                                force_execution=args.force_execution,
@@ -1517,7 +1511,7 @@ if __name__ == "__main__":
         plot_benchmarks(benchmark=args.benchmark,
                         compiler_name=args.compiler_name,
                         system_name=args.system_name,
-                        safe_arithmetic=safe_arithmetic,
+                        safe_arithmetic=args.safe_arithmetic,
                         perf_event_names=args.perf_event_names,
                         primitive_names_or_amount=args.primitive_names_or_amount,
                         other_measure_names=args.other_measure_names,
@@ -1527,7 +1521,7 @@ if __name__ == "__main__":
             system_name=args.system_name,
             compiler_name=args.compiler_name,
             benchmark_names=args.benchmark_names,
-            safe_arithmetic=safe_arithmetic,
+            safe_arithmetic=args.safe_arithmetic,
             output=args.output)
     elif args.command == 'perf_distribution':
         perf_distribution(system_name=args.system_name,
