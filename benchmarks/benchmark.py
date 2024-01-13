@@ -510,7 +510,12 @@ benchmark_args = {
     "triangl": "repeat: 20 i: 22 depth: 1",
     "almabench": "repeat: 1 K: 36525",
     "fft": "repeat: 1 n: 1048576",
-    "boyer": "repeat: 50",
+    "boyer": "repeat: 1",
+    "earley": "repeat: 1",
+    "compiler": "repeat: 1",
+    "conform": "repeat: 1",
+    "maze": "repeat: 1",
+    "peval": "repeat: 1",
 }
 
 def get_gambit_program_size(executable, benchmark):
@@ -602,7 +607,7 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
 
         base_arguments = benchmark_args.get(benchmark.name)
         if base_arguments is None:
-            logger.warn(f"no CLI argument for {repr(benchmark.name)}")
+            logger.warning(f"no CLI argument for {repr(benchmark.name)}")
             base_arguments = default_arguments
         if compiler.name == 'gambit':
             base_arguments = f"-:m100M {base_arguments}"
