@@ -144,10 +144,10 @@ if [ "$COMPILER_DIR" = "" ]; then
 fi
 
 if [ "$SAFE_ARITHMETIC" = "0" ]; then
-  ARITHMETIC=G
+  ARITHMETIC=S
   SAFETY_MODE="unsafe"
 else
-  ARITHMETIC=S
+  ARITHMETIC=G
   SAFETY_MODE="safe"
 fi
 
