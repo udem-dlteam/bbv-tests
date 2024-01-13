@@ -26,4 +26,11 @@
                         (error "wrong result =" result)
                         result))))))))
 
-(exec-bench)
+(define exec-with-stats
+  (unknown
+    (lambda () 
+      (let ((result (##exec-stats exec-bench)))
+        (for-each (lambda (data) (pp (list (car data) (cdr data)))) (cdr result))))
+    exec-bench))
+
+(exec-with-stats)
