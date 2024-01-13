@@ -199,6 +199,12 @@
            (proc (Svector-ref v i))
            (lp (SFX- i 1))))))
 
+(define (vector-for-each-exit-if proc v)
+  (let lp ((i (SFX- (Svector-length v) 1)))
+    (cond ((SFX>= i 0)
+           (or (proc (Svector-ref v i))
+               (lp (SFX- i 1)))))))
+
 
 ;;; Randomly permute a vector.
 
@@ -216,27 +222,25 @@
 ;;; This is the core of the algorithm.
 
 (define (dig-maze walls ncells)
-  (call-with-current-continuation
-    (lambda (quit)
-      (vector-for-each
-       (lambda (wall)                   ; For each wall,
-         (let* ((c1   (wall:owner wall)) ; find the cells on
-                (set1 (cell:reachable c1))
+  (vector-for-each-exit-if
+   (lambda (wall)                        ; For each wall,
+     (let* ((c1   (wall:owner wall))     ; find the cells on
+            (set1 (cell:reachable c1))
 
-                (c2   (wall:neighbor wall)) ; each side of the wall
-                (set2 (cell:reachable c2)))
+            (c2   (wall:neighbor wall)) ; each side of the wall
+            (set2 (cell:reachable c2)))
 
-           ;; If there is no path from c1 to c2, knock down the
-           ;; wall and union the two sets of reachable cells.
-           ;; If the new set of reachable cells is the whole set
-           ;; of cells, quit.
-           (if (not (set-equal? set1 set2))
-               (let ((walls (cell:walls c1))    
-                     (wall-mask (SFXbit-not (wall:bit wall))))
-                 (union! set1 set2)
-                 (set-cell:walls c1 (SFXbit-and walls wall-mask))
-                 (if (SFX= (set-size set1) ncells) (quit #f))))))
-       walls))))
+       ;; If there is no path from c1 to c2, knock down the
+       ;; wall and union the two sets of reachable cells.
+       ;; If the new set of reachable cells is the whole set
+       ;; of cells, quit.
+       (and (not (set-equal? set1 set2))
+            (let ((walls (cell:walls c1))
+                  (wall-mask (bitwise-not (wall:bit wall))))
+              (union! set1 set2)
+              (set-cell:walls c1 (bitwise-and walls wall-mask))
+              (= (set-size set1) ncells)))))
+   walls))
 
 
 ;;; Some simple DFS routines useful for determining path length 
