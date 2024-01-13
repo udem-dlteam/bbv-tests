@@ -172,6 +172,7 @@ class Run(db.Entity):
     compiler = Required('Compiler', reverse='runs')
     compiler_optimizations = Required(bool)
     version_limit = Required(int)
+    safe_arithmetic = Required(bool)
     primitives = Set('PrimitiveCount', reverse='run')
     perf_events = Set('PerfEvent', reverse='run')
     other_measures = Set('OtherMeasure', reverse='run')
@@ -383,13 +384,14 @@ def extract_executable_from_compiler_output(content):
     return re.search(r"\*\*\*executable: (.+)", content).group(1)
 
 
-def compile_gambit(gambitdir, file, vlimit, compiler_optimizations, timeout=None):
+def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
     env = os.environ.copy()
 
 
     optimization_flag = "-O3" if compiler_optimizations else ""
+    arithmetic_flag = "-U" if not safe_arithmetic else ""
 
-    command = f"{COMPILE_SCRIPT} -S gambit -D {gambitdir} -V {vlimit} {optimization_flag} -P -f {file}"
+    command = f"{COMPILE_SCRIPT} -S gambit -D {gambitdir} -V {vlimit} {arithmetic_flag} {optimization_flag} -P -f {file}"
 
     output = run_command(command, timeout, env)
 
@@ -407,11 +409,12 @@ def compile_gambit(gambitdir, file, vlimit, compiler_optimizations, timeout=None
     return executable, primitive_count
 
 
-def compile_bigloo(file, vlimit, compiler_optimizations, timeout=None):
+def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
     def get_command(primitive_count):
         optimization_flag = "-O3" if compiler_optimizations else ""
         primitive_count_flag = '-P' if primitive_count else ''
-        return f"{COMPILE_SCRIPT} -S bigloo -V {vlimit} {optimization_flag} {primitive_count_flag} -f {file}"
+        arithmetic_flag = '-U' if not safe_arithmetic else ''
+        return f"{COMPILE_SCRIPT} -S bigloo -V {vlimit} {arithmetic_flag} {optimization_flag} {primitive_count_flag} -f {file}"
 
     # First execution with primitive count
     command_with_primitives = get_command(True)
@@ -441,14 +444,14 @@ def compile_bigloo(file, vlimit, compiler_optimizations, timeout=None):
     return executable, primitive_count
 
 
-def compile(compiler_execution_data, file, vlimit, compiler_optimizations, timeout=None):
+def compile(compiler_execution_data, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
     gambitdir = compiler_execution_data.get('gambitdir')
     use_bigloo = compiler_execution_data.get('use_bigloo')
 
     if use_bigloo:
-        return compile_bigloo(file, vlimit, compiler_optimizations, timeout)
+        return compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
     elif gambitdir:
-        return compile_gambit(gambitdir, file, vlimit, compiler_optimizations, timeout)
+        return compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
     else:
         raise NotImplementedError
 
@@ -581,7 +584,7 @@ def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
     raise NotImplementedError
 
 @db_session
-def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetitions, compiler_optimizations, force_execution=False, timeout=None):
+def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_arithmetic, repetitions, compiler_optimizations, force_execution=False, timeout=None):
     system, _ = System.get_or_create_current_system()
     compiler = get_or_create_bigloo_or_gambit(gambitdir, use_bigloo)
 
@@ -594,7 +597,8 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetiti
 
     for v in version_limits:
         logger.info(f'- benchmark: {file}\n'
-                    f'- version limit:{v}')
+                    f'- version limit: {v}\n'
+                    f'- safe arithmetic: {safe_arithmetic}')
 
         base_arguments = benchmark_args.get(benchmark.name)
         if base_arguments is None:
@@ -608,6 +612,7 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetiti
                                    system=system,
                                    compiler=compiler,
                                    version_limit=v,
+                                   safe_arithmetic=safe_arithmetic,
                                    compiler_optimizations=compiler_optimizations,
                                    arguments=base_arguments)
             if existing_run:
@@ -620,10 +625,11 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetiti
                   system=system,
                   compiler=compiler,
                   version_limit=v,
+                  safe_arithmetic=safe_arithmetic,
                   compiler_optimizations=compiler_optimizations,
                   arguments=base_arguments)
 
-        executable, primitive_count = compile(compiler_execution_data, file, v, compiler_optimizations, timeout)
+        executable, primitive_count = compile(compiler_execution_data, file, v, safe_arithmetic, compiler_optimizations, timeout)
 
         align_stack_step = 3
         for rep in range(repetitions):
@@ -713,7 +719,7 @@ def ensure_directory_exists(filepath):
         os.makedirs(dir_name)
 
 
-def choose_path(base, output, system_name, compiler_name,
+def choose_path(base, output, system_name, compiler_name, safe_arithmetic,
                 valid_chars="-_.()" + string.ascii_letters + string.digits):
     path = pathlib.Path(output or '.').resolve()
     suffix = path.suffix
@@ -722,8 +728,10 @@ def choose_path(base, output, system_name, compiler_name,
         # No extension means the output is a folder where to output the plot
         logger.debug(f"output into folder {path}")
 
+        arithmetic_segment = "safe" if safe_arithmetic else "unsafe"
+
         # build default filename
-        filename = f"{base}_{compiler_name}_{system_name}.png"
+        filename = f"{base}_{compiler_name}_{system_name}_{arithmetic_segment}.png"
 
         # sanitize filename
         filename = sanitize_filename(filename)
@@ -738,10 +746,10 @@ def choose_path(base, output, system_name, compiler_name,
         raise ValueError(f"output must be a folder of .png target, got {output}")
 
 
-def choose_barchart_output_path(output, system_name, compiler_name, benchmark, perf_event_names, primitive_names):
+def choose_barchart_output_path(output, system_name, compiler_name, safe_arithmetic, benchmark, perf_event_names, primitive_names):
     primitive_segment = f"_{len(primitive_names)}primitives" if primitive_names else ""
     base = f"{benchmark}_{'_'.join(sorted(perf_event_names))}{primitive_segment}"
-    return choose_path(base, output, system_name, compiler_name)
+    return choose_path(base, output, system_name, compiler_name, safe_arithmetic)
 
 
 def select_primitives_names(runs, primitive_names_or_amount):
@@ -773,7 +781,7 @@ def get_compiler_from_name(compiler_name):
 
 
 @db_session
-def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, primitive_names_or_amount, other_measure_names, output):
+def plot_benchmarks(system_name, compiler_name, benchmark, safe_arithmetic, perf_event_names, primitive_names_or_amount, other_measure_names, output):
     system = get_system_from_name_or_default(system_name)
     compiler = get_compiler_from_name(compiler_name)
 
@@ -781,12 +789,14 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
     runs = select(
         r for r in Run
         if r.system == system and r.compiler == compiler and r.benchmark.name == benchmark
+           and r.safe_arithmetic == safe_arithmetic
            and (not r.compiler_optimizations or r.version_limit == 0)
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
             if r2.system == system and r2.compiler == compiler
             and r2.benchmark.name == benchmark
             and r2.version_limit == r.version_limit
+            and r2.safe_arithmetic == safe_arithmetic
             and r2.compiler_optimizations == r.compiler_optimizations)))\
         .order_by(Run.version_limit)
 
@@ -801,6 +811,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
     output_path = choose_barchart_output_path(output=output,
                                      system_name=system.name,
                                      compiler_name=compiler.name,
+                                     safe_arithmetic=safe_arithmetic,
                                      benchmark=benchmark,
                                      perf_event_names=perf_event_names,
                                      primitive_names=primitive_names)
@@ -972,12 +983,12 @@ def plot_data(data, output_path):
 # Correlation analysis
 ##############################################################################
 
-def choose_analysis_output_path(output, system_name, compiler_name):
-    return choose_path(f'analysis', output, system_name, compiler_name)
+def choose_analysis_output_path(output, system_name, compiler_name, safe_arithmetic):
+    return choose_path(f'analysis', output, system_name, compiler_name, safe_arithmetic)
 
 
-def choose_specific_metric_output_path(output, metric, system_name, compiler_name):
-    return choose_path(f'{metric}_analysis', output, system_name, compiler_name)
+def choose_specific_metric_output_path(output, metric, system_name, compiler_name, safe_arithmetic):
+    return choose_path(f'{metric}_analysis', output, system_name, compiler_name, safe_arithmetic)
 
 def get_row_name(run):
     base = ""
@@ -1035,7 +1046,7 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, p
     return df.div(df.iloc[0])
 
 
-def analyze_specific_metric(output, system, compiler, runs, perf_attributes, other_attributes):
+def analyze_specific_metric(output, system, compiler, safe_arithmetic, runs, perf_attributes, other_attributes):
     def _get_result(run, attr, kind):
         if kind is PerfEvent:
             events = select(p for p in PerfEvent if p.event == attr and p.run == run)[:]
@@ -1053,7 +1064,8 @@ def analyze_specific_metric(output, system, compiler, runs, perf_attributes, oth
         output_path = choose_specific_metric_output_path(output=output,
                                                          metric=event,
                                                          system_name=system.name,
-                                                         compiler_name=compiler.name)
+                                                         compiler_name=compiler.name,
+                                                         safe_arithmetic=safe_arithmetic)
 
         benchmarks = list(set(r.benchmark.name for r in runs))
 
@@ -1122,13 +1134,14 @@ def analyze_specific_metric(output, system, compiler, runs, perf_attributes, oth
 
 
 @db_session
-def analyze(benchmark_names, system_name, compiler_name, output):
+def analyze(benchmark_names, system_name, compiler_name, safe_arithmetic, output):
     system = get_system_from_name_or_default(system_name)
     compiler = get_compiler_from_name(compiler_name)
 
     output_path = choose_analysis_output_path(output=output,
                                               system_name=system.name,
-                                              compiler_name=compiler.name)
+                                              compiler_name=compiler.name,
+                                              safe_arithmetic=safe_arithmetic)
 
     # Select benchmarks for analysis
     if benchmark_names is None:
@@ -1155,6 +1168,7 @@ def analyze(benchmark_names, system_name, compiler_name, output):
         if r.system == system and r.compiler == compiler
         and r.version_limit == 0
         and r.benchmark.name in benchmarks_filter
+        and r.safe_arithmetic == safe_arithmetic
         #and (not r.compiler_optimizations or r.version_limit == 0)
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
@@ -1162,6 +1176,7 @@ def analyze(benchmark_names, system_name, compiler_name, output):
             and r2.version_limit == 0
             and r2.benchmark == r.benchmark
             and r2.version_limit == r.version_limit
+            and r2.safe_arithmetic == safe_arithmetic
             and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
 
     runs = [r for r in runs if r.benchmark.name not in ("mbrot", "array1", "sumfp", "sum")]
@@ -1184,7 +1199,7 @@ def analyze(benchmark_names, system_name, compiler_name, output):
 
     logger.info(f"other measures in analysis: {', '.join(perf_attributes)}")
 
-    analyze_specific_metric(output, system, compiler, runs, perf_attributes, other_attributes)
+    analyze_specific_metric(output, system, compiler, safe_arithmetic, runs, perf_attributes, other_attributes)
 
     data_points = {}
 
@@ -1231,9 +1246,9 @@ def analyze(benchmark_names, system_name, compiler_name, output):
 # Perf data distribution
 ##############################################################################
 
-def choose_distribution_output_path(output, system_name, compiler_name, benchmark, version_limit, perf_event):
+def choose_distribution_output_path(output, system_name, compiler_name, safe_arithmetic, benchmark, version_limit, perf_event):
     base = f"distribution_{benchmark}_V{version_limit}_{perf_event}"
-    return choose_path(base, output, system_name, compiler_name)
+    return choose_path(base, output, system_name, compiler_name, safe_arithmetic)
 
 @db_session
 def perf_distribution(system_name,
@@ -1338,6 +1353,14 @@ if __name__ == "__main__":
                                   type=int,
                                   help="BBV versions limits")
 
+    benchmark_parser.add_argument('-u', '--unsafe',
+                                  dest="safe_arithmetic",
+                                  metavar='U',
+                                  action='store_false',
+                                  default=True,
+                                  type=bool,
+                                  help="Execute benchmark with unsafe arithmetic")
+
     benchmark_parser.add_argument('-r', '--repetitions',
                                   dest="repetitions",
                                   metavar='N',
@@ -1379,6 +1402,14 @@ if __name__ == "__main__":
                              default="gambit",
                              help="plot benchmark of this compiler")
 
+    plot_parser.add_argument('-u', '--unsafe',
+                             dest="safe_arithmetic",
+                             metavar='U',
+                             action='store_false',
+                             default=True,
+                             type=bool,
+                             help="benchmarks with unsafe arithmetic")
+
     plot_parser.add_argument('-e', '--perf-events',
                              nargs="+",
                              default=(),
@@ -1413,6 +1444,14 @@ if __name__ == "__main__":
                              dest="compiler_name",
                              default="gambit",
                              help="analyze benchmarks of this compiler")
+
+    analysis_parser.add_argument('-u', '--unsafe',
+                                 dest="safe_arithmetic",
+                                 metavar='U',
+                                 action='store_false',
+                                 default=True,
+                                 type=bool,
+                                 help="Benchmark with unsafe arithmetic")
 
     analysis_parser.add_argument('-b', '--benchmarks',
                                  dest="benchmark_names",
@@ -1469,6 +1508,7 @@ if __name__ == "__main__":
                                use_bigloo=args.use_bigloo,
                                file=args.file,
                                version_limits=args.version_limits,
+                               safe_arithmetic=safe_arithmetic,
                                repetitions=args.repetitions,
                                compiler_optimizations=args.compiler_optimizations,
                                force_execution=args.force_execution,
@@ -1477,6 +1517,7 @@ if __name__ == "__main__":
         plot_benchmarks(benchmark=args.benchmark,
                         compiler_name=args.compiler_name,
                         system_name=args.system_name,
+                        safe_arithmetic=safe_arithmetic,
                         perf_event_names=args.perf_event_names,
                         primitive_names_or_amount=args.primitive_names_or_amount,
                         other_measure_names=args.other_measure_names,
@@ -1486,6 +1527,7 @@ if __name__ == "__main__":
             system_name=args.system_name,
             compiler_name=args.compiler_name,
             benchmark_names=args.benchmark_names,
+            safe_arithmetic=safe_arithmetic,
             output=args.output)
     elif args.command == 'perf_distribution':
         perf_distribution(system_name=args.system_name,
