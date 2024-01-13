@@ -83,6 +83,11 @@
 (define-macro (SFXodd? x)        `(MAPop SFX odd? ,x))
 (define-macro (SFXeven? x)       `(MAPop SFX even? ,x))
 
+(define-macro (SFXbit-lsh x y)   `(MAPop SFX bit-lsh ,x ,y))
+(define-macro (SFXbit-and x y)   `(MAPop SFX bit-and ,x ,y))
+(define-macro (SFXbit-or x y)    `(MAPop SFX bit-or ,x ,y))
+(define-macro (SFXbit-not x)     `(MAPop SFX bit-not ,x))
+
 (define-macro (FL+ x y)         `(FLop + ,x ,y))
 (define-macro (FL- x . rest)    `(FLop - ,x ,@rest))
 (define-macro (FL* x y)         `(FLop * ,x ,y))
@@ -115,6 +120,11 @@
 (define-macro (FXzero? x)       `(FXop zero? ,x))
 (define-macro (FXodd? x)        `(FXop odd? ,x))
 (define-macro (FXeven? x)       `(FXop even? ,x))
+
+(define-macro (FXbit-lsh x y)   `(MAPop FX arithmetic-shift-left ,x ,y))
+(define-macro (FXbit-and x y)   `(MAPop FX and ,x ,y))
+(define-macro (FXbit-or x y)    `(MAPop FX ior ,x ,y))
+(define-macro (FXbit-not x)     `(MAPop FX not ,x))
 
 (define-macro (FLONUM? x) `(PRIMop flonum? ,x))
 (define-macro (FIXNUM? x) `(PRIMop fixnum? ,x))
@@ -232,6 +242,48 @@
         (else
          (PRIMop modulo ,a ,b))))))
 
+(define-macro (BBVbit-lsh x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       (cond
+        ((and (FIXNUM? ,a) (FIXNUM? ,b))
+         (FXbit-lsh ,a ,b))
+        (else
+         (DEAD-END "bit-lsh type error"))))))
+
+(define-macro (BBVbit-and x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       (cond
+        ((and (FIXNUM? ,a) (FIXNUM? ,b))
+         (FXbit-and ,a ,b))
+        (else
+         (DEAD-END "bit-and type error"))))))
+
+(define-macro (BBVbit-or x y)
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+       (cond
+        ((and (FIXNUM? ,a) (FIXNUM? ,b))
+         (FXbit-or ,a ,b))
+        (else
+         (DEAD-END "bit-or type error"))))))
+
+(define-macro (BBVbit-not x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (cond
+        ((FIXNUM? ,a)
+         (FXbit-not ,a))
+        (else
+         (DEAD-END "bit-not type error"))))))
+
 (define-macro (BBV= x y) `(BBVcmp = ,x ,y))
 (define-macro (BBV< x y) `(BBVcmp < ,x ,y))
 (define-macro (BBV<= x y) `(BBVcmp <= ,x ,y))
@@ -334,6 +386,7 @@
 (define-macro (Scddr x) `(Scdr (Scdr ,x)))
 (define-macro (Scdddr x) `(Scdr (Scdr (Scdr ,x))))
 (define-macro (Scaddr x) `(Scar (Scdr (Scdr ,x))))
+(define-macro (Scadar x) `(Scar (Scdr (Scar ,x))))
 (define-macro (Scdadr x) `(Scdr (Scar (Scdr ,x))))
 (define-macro (Scadddr x) `(Scar (Scdr (Scdr (Scdr ,x)))))
 
@@ -604,6 +657,16 @@
                      (cons (f (Scar lst)) (map2 f (Scdr lst)))
                      '()))))
        (map2 f lst))))
+
+(define-macro (Sfor-each2 f lst) ;; 2 parameter for-each
+  `(let ((f ,f) (lst ,lst))
+     (letrec ((for-each2
+               (lambda (f lst)
+                 (and (pair? lst)
+                      (begin
+                        (f (Scar lst))
+                        (for-each2 f (Scdr lst)))))))
+       (for-each2 f lst))))
 
 (define-macro (Sreverse lst)
   `(let ((lst ,lst))
