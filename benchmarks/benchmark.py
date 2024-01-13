@@ -172,7 +172,6 @@ class Run(db.Entity):
     compiler = Required('Compiler', reverse='runs')
     compiler_optimizations = Required(bool)
     version_limit = Required(int)
-    merge_strategy = Required(str)
     primitives = Set('PrimitiveCount', reverse='run')
     perf_events = Set('PerfEvent', reverse='run')
     other_measures = Set('OtherMeasure', reverse='run')
@@ -384,14 +383,13 @@ def extract_executable_from_compiler_output(content):
     return re.search(r"\*\*\*executable: (.+)", content).group(1)
 
 
-def compile_gambit(gambitdir, file, vlimit, merge_strategy, compiler_optimizations, timeout=None):
+def compile_gambit(gambitdir, file, vlimit, compiler_optimizations, timeout=None):
     env = os.environ.copy()
 
-    env["GAMBITDIR"] = gambitdir
 
-    optimization_flag = "-O" if compiler_optimizations else ""
+    optimization_flag = "-O3" if compiler_optimizations else ""
 
-    command = f"{COMPILE_SCRIPT} -g -V {vlimit} -M {merge_strategy} {optimization_flag} -P {file}"
+    command = f"{COMPILE_SCRIPT} -S gambit -D {gambitdir} -V {vlimit} {optimization_flag} -P -f {file}"
 
     output = run_command(command, timeout, env)
 
@@ -409,11 +407,11 @@ def compile_gambit(gambitdir, file, vlimit, merge_strategy, compiler_optimizatio
     return executable, primitive_count
 
 
-def compile_bigloo(file, vlimit, merge_strategy, compiler_optimizations, timeout=None):
+def compile_bigloo(file, vlimit, compiler_optimizations, timeout=None):
     def get_command(primitive_count):
-        optimization_flag = "-O" if compiler_optimizations else ""
+        optimization_flag = "-O3" if compiler_optimizations else ""
         primitive_count_flag = '-P' if primitive_count else ''
-        return f"{COMPILE_SCRIPT} -b -V {vlimit} -M {merge_strategy} {optimization_flag} {primitive_count_flag} {file}"
+        return f"{COMPILE_SCRIPT} -S bigloo -V {vlimit} {optimization_flag} {primitive_count_flag} -f {file}"
 
     # First execution with primitive count
     command_with_primitives = get_command(True)
@@ -443,14 +441,14 @@ def compile_bigloo(file, vlimit, merge_strategy, compiler_optimizations, timeout
     return executable, primitive_count
 
 
-def compile(compiler_execution_data, file, vlimit, merge_strategy, compiler_optimizations, timeout=None):
+def compile(compiler_execution_data, file, vlimit, compiler_optimizations, timeout=None):
     gambitdir = compiler_execution_data.get('gambitdir')
     use_bigloo = compiler_execution_data.get('use_bigloo')
 
     if use_bigloo:
-        return compile_bigloo(file, vlimit, merge_strategy, compiler_optimizations, timeout)
+        return compile_bigloo(file, vlimit, compiler_optimizations, timeout)
     elif gambitdir:
-        return compile_gambit(gambitdir, file, vlimit, merge_strategy, compiler_optimizations, timeout)
+        return compile_gambit(gambitdir, file, vlimit, compiler_optimizations, timeout)
     else:
         raise NotImplementedError
 
@@ -583,7 +581,7 @@ def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
     raise NotImplementedError
 
 @db_session
-def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetitions, merge_strategy, compiler_optimizations, force_execution=False, timeout=None):
+def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetitions, compiler_optimizations, force_execution=False, timeout=None):
     system, _ = System.get_or_create_current_system()
     compiler = get_or_create_bigloo_or_gambit(gambitdir, use_bigloo)
 
@@ -596,20 +594,20 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetiti
 
     for v in version_limits:
         logger.info(f'- benchmark: {file}\n'
-                    f'- merge strategy:{merge_strategy}\n'
                     f'- version limit:{v}')
 
         base_arguments = benchmark_args.get(benchmark.name)
         if base_arguments is None:
             logger.warn(f"no CLI argument for {repr(benchmark.name)}")
             base_arguments = default_arguments
+        if compiler.name == 'gambit':
+            base_arguments = f"-:m100M {base_arguments}"
 
         if not force_execution:
             existing_run = Run.get(benchmark=benchmark,
                                    system=system,
                                    compiler=compiler,
                                    version_limit=v,
-                                   merge_strategy=merge_strategy,
                                    compiler_optimizations=compiler_optimizations,
                                    arguments=base_arguments)
             if existing_run:
@@ -622,11 +620,10 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, repetiti
                   system=system,
                   compiler=compiler,
                   version_limit=v,
-                  merge_strategy=merge_strategy,
                   compiler_optimizations=compiler_optimizations,
                   arguments=base_arguments)
 
-        executable, primitive_count = compile(compiler_execution_data, file, v, merge_strategy, compiler_optimizations, timeout)
+        executable, primitive_count = compile(compiler_execution_data, file, v, compiler_optimizations, timeout)
 
         align_stack_step = 3
         for rep in range(repetitions):
@@ -780,7 +777,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
     system = get_system_from_name_or_default(system_name)
     compiler = get_compiler_from_name(compiler_name)
 
-    # Select only the latest runs for a given version limit and merge strategy
+    # Select only the latest runs for a given version limit
     runs = select(
         r for r in Run
         if r.system == system and r.compiler == compiler and r.benchmark.name == benchmark
@@ -790,9 +787,8 @@ def plot_benchmarks(system_name, compiler_name, benchmark, perf_event_names, pri
             if r2.system == system and r2.compiler == compiler
             and r2.benchmark.name == benchmark
             and r2.version_limit == r.version_limit
-            and r2.merge_strategy == r.merge_strategy
             and r2.compiler_optimizations == r.compiler_optimizations)))\
-        .order_by(Run.merge_strategy).order_by(Run.version_limit)
+        .order_by(Run.version_limit)
 
     logger.debug(f"found {len(runs)} (only latest)")
 
@@ -895,7 +891,7 @@ def plot_data(data, output_path):
     data_no_bbv_optim = [d for d in data if d[0].version_limit == 0
                                             and d[0].compiler_optimizations][:1]
     data_with_bbv = [d for d in data if d[0].version_limit > 0]
-    data_with_bbv.sort(key=lambda d: (d[0].version_limit, d[0].merge_strategy))
+    data_with_bbv.sort(key=lambda d: d[0].version_limit)
 
     data = data_no_bbv_no_optim + data_no_bbv_optim + data_with_bbv
 
@@ -903,7 +899,7 @@ def plot_data(data, output_path):
         if run.version_limit == 0:
             base = "No BBV"
         else:
-            base = f"{run.merge_strategy} {run.version_limit}"
+            base = f"{run.version_limit}"
 
         if run.compiler_optimizations:
             base += "/optim"
@@ -976,12 +972,12 @@ def plot_data(data, output_path):
 # Correlation analysis
 ##############################################################################
 
-def choose_analysis_output_path(output, merge_strategy, system_name, compiler_name):
-    return choose_path(f'analysis_{merge_strategy}', output, system_name, compiler_name)
+def choose_analysis_output_path(output, system_name, compiler_name):
+    return choose_path(f'analysis', output, system_name, compiler_name)
 
 
-def choose_specific_metric_output_path(output, metric, merge_strategy, system_name, compiler_name):
-    return choose_path(f'{metric}_analysis_{merge_strategy}', output, system_name, compiler_name)
+def choose_specific_metric_output_path(output, metric, system_name, compiler_name):
+    return choose_path(f'{metric}_analysis', output, system_name, compiler_name)
 
 def get_row_name(run):
     base = ""
@@ -1039,7 +1035,7 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, p
     return df.div(df.iloc[0])
 
 
-def analyze_specific_metric(output, merge_strategy, system, compiler, runs, perf_attributes, other_attributes):
+def analyze_specific_metric(output, system, compiler, runs, perf_attributes, other_attributes):
     def _get_result(run, attr, kind):
         if kind is PerfEvent:
             events = select(p for p in PerfEvent if p.event == attr and p.run == run)[:]
@@ -1056,7 +1052,6 @@ def analyze_specific_metric(output, merge_strategy, system, compiler, runs, perf
                  [(p, lambda run, attr: _get_result(run, attr, OtherMeasure)) for p in other_attributes]:
         output_path = choose_specific_metric_output_path(output=output,
                                                          metric=event,
-                                                         merge_strategy=merge_strategy,
                                                          system_name=system.name,
                                                          compiler_name=compiler.name)
 
@@ -1111,7 +1106,7 @@ def analyze_specific_metric(output, merge_strategy, system, compiler, runs, perf
         for text in heatmap_ax.texts:
             text.set_size(7)
 
-        plt.title(f"Mean ratio for {repr(event)} with {repr(merge_strategy)} strategy", fontsize=16, fontweight='bold')
+        plt.title(f"Mean ratio for {repr(event)}", fontsize=16, fontweight='bold')
 
         ax.xaxis.tick_top()
         plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
@@ -1127,12 +1122,11 @@ def analyze_specific_metric(output, merge_strategy, system, compiler, runs, perf
 
 
 @db_session
-def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compiler_name, output):
+def analyze(benchmark_names, system_name, compiler_name, output):
     system = get_system_from_name_or_default(system_name)
     compiler = get_compiler_from_name(compiler_name)
 
     output_path = choose_analysis_output_path(output=output,
-                                              merge_strategy=merge_strategy,
                                               system_name=system.name,
                                               compiler_name=compiler.name)
 
@@ -1149,8 +1143,7 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
             benchmarks_filter.remove(benchmark_name)
             logger.warning(f"benchmark does not exist: {repr(benchmark_name)}")
         elif not exists(r for r in Run if r.benchmark == bench
-                      and r.system == system and r.compiler == compiler
-                      and r.merge_strategy == merge_strategy):
+                      and r.system == system and r.compiler == compiler):
             benchmarks_filter.remove(benchmark_name)
             logger.warning(f"benchmark does not exist for the provided settings: {repr(benchmark_name)}")
 
@@ -1160,13 +1153,13 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     runs = list(select(
         r for r in Run
         if r.system == system and r.compiler == compiler
-        and (r.merge_strategy == merge_strategy or r.version_limit == 0)
+        and r.version_limit == 0
         and r.benchmark.name in benchmarks_filter
         #and (not r.compiler_optimizations or r.version_limit == 0)
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
             if r2.system == system and r2.compiler == compiler
-            and (r2.merge_strategy == merge_strategy or r2.version_limit == 0)
+            and r2.version_limit == 0
             and r2.benchmark == r.benchmark
             and r2.version_limit == r.version_limit
             and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
@@ -1191,7 +1184,7 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
 
     logger.info(f"other measures in analysis: {', '.join(perf_attributes)}")
 
-    analyze_specific_metric(output, merge_strategy, system, compiler, runs, perf_attributes, other_attributes)
+    analyze_specific_metric(output, system, compiler, runs, perf_attributes, other_attributes)
 
     data_points = {}
 
@@ -1219,7 +1212,7 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
     for text in heatmap_ax.texts:
         text.set_size(7)
 
-    plt.title(f"Mean ratio for {repr(merge_strategy)} strategy", fontsize=16, fontweight='bold')
+    plt.title(f"Mean ratio", fontsize=16, fontweight='bold')
 
     ax.xaxis.tick_top()
     plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
@@ -1238,13 +1231,12 @@ def analyze_merge_strategy(merge_strategy, benchmark_names, system_name, compile
 # Perf data distribution
 ##############################################################################
 
-def choose_distribution_output_path(output, merge_strategy, system_name, compiler_name, benchmark, version_limit, perf_event):
-    base = f"distribution_{benchmark}_{merge_strategy}{version_limit}_{perf_event}"
+def choose_distribution_output_path(output, system_name, compiler_name, benchmark, version_limit, perf_event):
+    base = f"distribution_{benchmark}_V{version_limit}_{perf_event}"
     return choose_path(base, output, system_name, compiler_name)
 
 @db_session
-def perf_distribution(merge_strategy,
-                      system_name,
+def perf_distribution(system_name,
                       compiler_name,
                       benchmark_name,
                       event,
@@ -1253,7 +1245,7 @@ def perf_distribution(merge_strategy,
     system = get_system_from_name_or_default(system_name)
     compiler = get_compiler_from_name(compiler_name)
 
-    output_path = choose_distribution_output_path(output, merge_strategy, system.name,
+    output_path = choose_distribution_output_path(output, system.name,
                                                   compiler.name, benchmark_name, version_limit, event)
 
     benchmark = Benchmark.get(name=benchmark_name)
@@ -1261,8 +1253,7 @@ def perf_distribution(merge_strategy,
     run = Run.select(lambda r: r.system == system and
                      r.compiler == compiler and
                      r.benchmark == benchmark and
-                     r.version_limit == version_limit and
-                     r.merge_strategy == merge_strategy).order_by(desc(Run.timestamp)).first()
+                     r.version_limit == version_limit).order_by(desc(Run.timestamp)).first()
 
     # sorted = lambda x: x
     values = sorted([event.value for event in select(e for e in PerfEvent if e.event == event and e.run == run)])
@@ -1360,12 +1351,6 @@ if __name__ == "__main__":
                                   type=float,
                                   help="Compilation timeout (in secondes)")
 
-    benchmark_parser.add_argument('-m', '--merge-strategy',
-                                  required=True,
-                                  metavar="STRATEGY",
-                                  dest='merge_strategy',
-                                  help='BBV merge strategies')
-
     benchmark_parser.add_argument('-O', '--compiler-optimizations',
                                   dest='compiler_optimizations',
                                   action='store_true',
@@ -1420,11 +1405,6 @@ if __name__ == "__main__":
     # Parser for comparing merge strategy with correlation matrices
     analysis_parser = subparsers.add_parser('analysis', help='Plot correlation matrice for a merge strategy')
 
-    analysis_parser.add_argument('-m', '--merge-strategy',
-                             required=True,
-                             dest="merge_strategy",
-                             help="merge strategy to analyze")
-
     analysis_parser.add_argument('-s', '--systen',
                              dest="system_name",
                              help="analyze benchmarks from this system")
@@ -1444,11 +1424,6 @@ if __name__ == "__main__":
                                 help="where to output the chart (file or folder)")
 
     perf_distribution_parser = subparsers.add_parser('perf_distribution', help='Plot perf distribution histogram')
-
-    perf_distribution_parser.add_argument('-m', '--merge-strategy',
-                                          dest="merge_strategy",
-                                          default='linear',
-                                          help="merge strategy to plot")
 
     perf_distribution_parser.add_argument('-s', '--systen',
                                           dest="system_name",
@@ -1495,7 +1470,6 @@ if __name__ == "__main__":
                                file=args.file,
                                version_limits=args.version_limits,
                                repetitions=args.repetitions,
-                               merge_strategy=args.merge_strategy,
                                compiler_optimizations=args.compiler_optimizations,
                                force_execution=args.force_execution,
                                timeout=args.timeout)
@@ -1508,15 +1482,13 @@ if __name__ == "__main__":
                         other_measure_names=args.other_measure_names,
                         output=args.output)
     elif args.command == 'analysis':
-        analyze_merge_strategy(
-            merge_strategy=args.merge_strategy,
+        analyze(
             system_name=args.system_name,
             compiler_name=args.compiler_name,
             benchmark_names=args.benchmark_names,
             output=args.output)
     elif args.command == 'perf_distribution':
-        perf_distribution(merge_strategy=args.merge_strategy,
-                          system_name=args.system_name,
+        perf_distribution(system_name=args.system_name,
                           compiler_name=args.compiler_name,
                           benchmark_name=args.benchmark_name,
                           event=args.event,
