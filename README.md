@@ -49,12 +49,15 @@ On M2 macOS, it might be needed to disable the unistring support with:
 
 ### To compile with another Bigloo version:
 
-  ./compile -D $pdir --bigloo tests/recursive/fib.scm
-  
+```
+./compile -S bigloo -D $pdir -V 4 -f tests/recursive/fib.scm
+```
+
 ### To compile with statistics
 
-  BIGLOOOPT="-copt -DSAW_BBV_STATS=1" ./compile --bigloo tests/recursive/fib.scm
-  BIGLOOOPT="-copt -DSAW_BBV_STATS=1" ./compile -D $pdir --bigloo tests/paper/macro/boyer.scm
+```
+./compile -S bigloo -D $pdir -V 4 -f tests/recursive/fib.scm -P
+```
 
 This generates an output such as:
 
