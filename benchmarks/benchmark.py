@@ -458,27 +458,19 @@ def compile(compiler_execution_data, file, vlimit, safe_arithmetic, compiler_opt
         raise NotImplementedError
 
 
-def run_benchmark(executable, arguments):
+def run_benchmark(executable, arguments, timeout=None):
     # Run program to measure time only
     time_command = f"perf stat -e {PerfResultParser.time_event} {executable} {arguments}"
-    logger.info(time_command)
-    time_output = subprocess.run(time_command, shell=True, capture_output=True)
-    time_output_stderr = time_output.stderr.decode()
-    time_output_stdout = time_output.stdout.decode()
-    logger.debug(time_output_stderr)
-    logger.debug(time_output_stdout)
+    time_output = run_command(time_command, timeout)
 
     # Run program with all perf stat events on
     other_events = ' '.join(f"-e {e}" for e in PerfResultParser.event_names)
     other_command = f"perf stat {other_events} {executable} {arguments}"
-    logger.info(other_command)
-    other_output = subprocess.run(other_command, shell=True, capture_output=True)
-    other_output_stderr = other_output.stderr.decode()
-    logger.debug(other_output_stderr)
+    other_output = run_command(other_command, timeout)
 
     # parse and join outputs
-    time_parser = PerfResultParser(time_output_stderr)
-    other_perf_parser = PerfResultParser(other_output_stderr)
+    time_parser = PerfResultParser(time_output)
+    other_perf_parser = PerfResultParser(other_output)
 
     other_perf_parser.update(time_parser)
 
@@ -490,7 +482,7 @@ def run_benchmark(executable, arguments):
 
     return other_perf_parser, scheme_parser
 
-default_arguments = "repeat: 20"
+default_arguments = "repeat: 10"
 
 benchmark_args = {
     "ack": "repeat: 50 m: 3 n: 9",
@@ -518,6 +510,7 @@ benchmark_args = {
     "conform": "repeat: 1",
     "maze": "repeat: 1",
     "peval": "repeat: 1",
+    "slatex": "repeat: 1",
 }
 
 def get_gambit_program_size(executable, benchmark):
@@ -641,7 +634,7 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
         align_stack_step = 3
         for rep in range(repetitions):
             arguments = f"{base_arguments} align-stack: {rep * align_stack_step}"
-            perf_results, scheme_stats = run_benchmark(executable, arguments)
+            perf_results, scheme_stats = run_benchmark(executable, arguments, timeout)
             for event, (value, variance) in perf_results.items():
                 PerfEvent(event=event, value=int(value), run=run)
 
@@ -1288,7 +1281,8 @@ def perf_distribution(system_name,
 # CSV dump
 ##############################################################################
     
-def choose_csv_output_path(output, system_name, compiler_name):
+
+def choose_csv_output_path(output, system_name, compiler_name, measure):
     path = pathlib.Path(output or '.').resolve()
     suffix = path.suffix
 
@@ -1297,7 +1291,7 @@ def choose_csv_output_path(output, system_name, compiler_name):
         logger.debug(f"output into folder {path}")
 
         # build default filename
-        filename = f"dump_{compiler_name}_{system_name}.csv"
+        filename = f"dump_{compiler_name}_{system_name}_{measure}.csv"
 
         # sanitize filename
         filename = sanitize_filename(filename)
@@ -1313,11 +1307,11 @@ def choose_csv_output_path(output, system_name, compiler_name):
 
 
 @db_session
-def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
+def to_csv(system_name, compiler_name, benchmark_names, version_limits, measure, output):
     system = get_system_from_name_or_default(system_name)
     compiler = get_compiler_from_name(compiler_name)
 
-    output_path = choose_csv_output_path(output, system_name, compiler_name)
+    output_path = choose_csv_output_path(output, system_name, compiler_name, measure)
 
     runs = list(select(
         r for r in Run
@@ -1360,14 +1354,20 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
     for name in benchmark_names:
         data.append([name] + [math.nan] * (len(column_names) - 1))
 
-    def average_runtime(run):
-        task_clocks = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
-        return statistics.mean(task_clocks)
+    def average_measure(run):
+        if measure == "task-clock":
+            results = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
+        elif measure == "typechecks":
+            primitive_counts = select(e for e in PrimitiveCount if e.run == run)
+            results = [p.value for p in primitive_counts if p.is_typecheck]
+        else:
+            raise NotImplementedError(f"measure: {measure}")
+        return statistics.mean(results)
 
     for run in runs:
         row = benchmark_names.index(run.benchmark.name)
         col = column_names.index(get_run_column_name(run))
-        data[row][col] = average_runtime(run)
+        data[row][col] = average_measure(run)
 
     with open(output_path, 'w') as f:
         csvwriter = csv.writer(f)
@@ -1613,6 +1613,12 @@ if __name__ == "__main__":
                             type=int,
                             help="BBV versions limits")
 
+    csv_parser.add_argument('-m', '--measure',
+                            dest='measure',
+                            metavar='M',
+                            default='task-clock',
+                            help="The measurment to output")
+
     csv_parser.add_argument('-o', '--output',
                             dest="output",
                             help="where to output the csv (file or folder)")
@@ -1664,6 +1670,7 @@ if __name__ == "__main__":
                compiler_name=args.compiler_name,
                benchmark_names=args.benchmark_names,
                version_limits=args.version_limits,
+               measure=args.measure,
                output=args.output)
     else:
         parser.print_help()
