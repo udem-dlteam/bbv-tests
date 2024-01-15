@@ -478,7 +478,7 @@ def run_benchmark(executable, arguments, timeout=None):
         if event not in other_perf_parser:
             logger.info(f"Could not find perf stat event {repr(event)} when running {executable}")
 
-    scheme_parser = SchemeStatsParser(time_output_stdout)
+    scheme_parser = SchemeStatsParser(time_output)
 
     return other_perf_parser, scheme_parser
 
