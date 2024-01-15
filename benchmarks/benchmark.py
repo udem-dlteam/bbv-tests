@@ -3,6 +3,7 @@
 import argparse
 import ast
 import collections
+import csv
 import datetime
 import itertools
 import locale
@@ -17,6 +18,7 @@ import shlex
 import statistics
 import string
 import subprocess
+import sys
 import time
 
 try:
@@ -1281,7 +1283,96 @@ def perf_distribution(system_name,
     plt.bar(range(len(values)), values)
 
     plt.savefig(output_path)
+
+##############################################################################
+# CSV dump
+##############################################################################
     
+def choose_csv_output_path(output, system_name, compiler_name):
+    path = pathlib.Path(output or '.').resolve()
+    suffix = path.suffix
+
+    if not suffix:
+                # No extension means the output is a folder where to output the plot
+        logger.debug(f"output into folder {path}")
+
+        # build default filename
+        filename = f"dump_{compiler_name}_{system_name}.csv"
+
+        # sanitize filename
+        filename = sanitize_filename(filename)
+
+        path = path / filename
+        logger.info(f"output to file {path}")
+        return path
+    elif suffix == ".csv":
+        logger.info(f"output to file {path}")
+        return path
+    else:
+        raise ValueError(f"output must be a folder of .csv target, got {output}")
+
+
+@db_session
+def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
+    system = get_system_from_name_or_default(system_name)
+    compiler = get_compiler_from_name(compiler_name)
+
+    output_path = choose_csv_output_path(output, system_name, compiler_name)
+
+    runs = list(select(
+        r for r in Run
+        if r.system == system
+        and r.compiler == compiler
+        and r.benchmark.name in benchmark_names
+        and r.version_limit in version_limits
+        and r.timestamp == max(select(
+            r2.timestamp for r2 in Run
+            if r2.system == system
+            and r2.compiler == compiler
+            and r2.version_limit == r.version_limit
+            and r2.benchmark == r.benchmark
+            and r2.version_limit == r.version_limit
+            and r2.safe_arithmetic == r.safe_arithmetic
+            and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
+
+
+    def get_column_name(limit, optim, safe):
+        name = f"V={limit}"
+        if optim or not safe:
+            name += "("
+            if optim: name += "O"
+            if not safe: name += "S"
+            name += ")"
+        return name
+    
+    def get_run_column_name(run):
+        return get_column_name(run.version_limit,
+                               run.compiler_optimizations,
+                               run.safe_arithmetic)
+
+    benchmark_names = sorted(benchmark_names)
+
+    column_names = [""]
+    column_names += [get_column_name(l, o, s) for s in (True, False)
+                                              for o in (False, True)
+                                              for l in version_limits]
+    data = []
+    for name in benchmark_names:
+        data.append([name] + [math.nan] * (len(column_names) - 1))
+
+    def average_runtime(run):
+        task_clocks = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
+        return statistics.mean(task_clocks)
+
+    for run in runs:
+        row = benchmark_names.index(run.benchmark.name)
+        col = column_names.index(get_run_column_name(run))
+        data[row][col] = average_runtime(run)
+
+    with open(output_path, 'w') as f:
+        csvwriter = csv.writer(f)
+        csvwriter.writerow(column_names)
+        csvwriter.writerows(data)
 
 ##############################################################################
 # Command line interface
@@ -1493,6 +1584,39 @@ if __name__ == "__main__":
                                           dest="output",
                                           help="where to output the histogram (file or folder)")
 
+    # Parser for dumping results in CSV
+    csv_parser = subparsers.add_parser('csv', help='Dumps benchmark data in csv')
+
+    csv_parser.add_argument('-s', '--systen',
+                            metavar="SYSTEM",
+                            dest="system_name",
+                            help="Benchmarks system")
+
+    csv_parser.add_argument('-c', '--compiler',
+                            metavar="COMPILER",
+                            dest="compiler_name",
+                            default="gambit",
+                            help="Benchmark compiler")
+
+    csv_parser.add_argument('-b', '--benchmarks',
+                            metavar="BENCHMARK",
+                            required=True,
+                            nargs="+",
+                            dest="benchmark_names",
+                            help="benchmarks to dump in csv")
+
+    csv_parser.add_argument('-l', '--limit',
+                            dest="version_limits",
+                            metavar="LIMIT",
+                            nargs="+",
+                            default=None,
+                            type=int,
+                            help="BBV versions limits")
+
+    csv_parser.add_argument('-o', '--output',
+                            dest="output",
+                            help="where to output the csv (file or folder)")
+
 
     args = parser.parse_args()
 
@@ -1535,6 +1659,12 @@ if __name__ == "__main__":
                           event=args.event,
                           version_limit=args.version_limit,
                           output=args.output)
+    elif args.command == 'csv':
+        to_csv(system_name=args.system_name,
+               compiler_name=args.compiler_name,
+               benchmark_names=args.benchmark_names,
+               version_limits=args.version_limits,
+               output=args.output)
     else:
         parser.print_help()
 
