@@ -504,6 +504,9 @@ benchmark_args = {
     "triangl": "repeat: 20 i: 22 depth: 1",
     "almabench": "repeat: 1 K: 36525",
     "fft": "repeat: 1 n: 1048576",
+    "primes": "repeat: 1000000",
+    "rev": "repeat: 100000000",
+    "vlen": "repeat: 100000000",
     "boyer": "repeat: 1",
     "earley": "repeat: 1",
     "compiler": "repeat: 1",
@@ -1149,6 +1152,8 @@ def analyze(benchmark_names, system_name, compiler_name, safe_arithmetic, output
     else:
         benchmarks_filter = benchmark_names
 
+    benchmarks_filter.remove('conform')
+
     for benchmark_name in benchmarks_filter[:]:
         bench = Benchmark.get(name=benchmark_name)
 
@@ -1156,7 +1161,7 @@ def analyze(benchmark_names, system_name, compiler_name, safe_arithmetic, output
             benchmarks_filter.remove(benchmark_name)
             logger.warning(f"benchmark does not exist: {repr(benchmark_name)}")
         elif not exists(r for r in Run if r.benchmark == bench
-                      and r.system == system and r.compiler == compiler):
+                        and r.system == system and r.compiler.name == compiler_name):
             benchmarks_filter.remove(benchmark_name)
             logger.warning(f"benchmark does not exist for the provided settings: {repr(benchmark_name)}")
 
@@ -1165,19 +1170,18 @@ def analyze(benchmark_names, system_name, compiler_name, safe_arithmetic, output
     # Select only the latest runs for a each benchmark
     runs = list(select(
         r for r in Run
-        if r.system == system and r.compiler == compiler
-        and r.version_limit == 0
+        if r.system == system and r.compiler.name == compiler_name
         and r.benchmark.name in benchmarks_filter
         and r.safe_arithmetic == safe_arithmetic
-        #and (not r.compiler_optimizations or r.version_limit == 0)
+        and r.compiler_optimizations
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
-            if r2.system == system and r2.compiler == compiler
-            and r2.version_limit == 0
+            if r2.system == system and r2.compiler.name == compiler_name
+            and r2.version_limit == r.version_limit
             and r2.benchmark == r.benchmark
             and r2.version_limit == r.version_limit
             and r2.safe_arithmetic == safe_arithmetic
-            and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
+            and r2.compiler_optimizations))).order_by(Run.benchmark))
 
     runs = [r for r in runs if r.benchmark.name not in ("mbrot", "array1", "sumfp", "sum")]
 
