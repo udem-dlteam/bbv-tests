@@ -1335,7 +1335,7 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, measure,
         if optim or not safe:
             name += "("
             if optim: name += "O"
-            if not safe: name += "S"
+            if not safe: name += "U"
             name += ")"
         return name
     
