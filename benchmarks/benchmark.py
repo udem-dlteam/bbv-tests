@@ -148,7 +148,7 @@ class PrimitiveCount(db.Entity):
     def is_typecheck(self):
         typechecks = (
                 # Gambit
-                "##fixnum?", '##flonum?', "##vector?", "##pair?", "##box?", "##procedure?",
+                "##fixnum?", '##flonum?', "##vector?", "##box?", "##procedure?",
                 "##bignum?", "##ratnum?", "##boolean?", "##string?", "##char?",
                 "##bytevector?", "##u8vector?", "##u16vector?", "##u32vector?",
                 "##u64vector?", "##s8vector?", "##s16vector?", "##s32vector?",
@@ -1335,7 +1335,7 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, measure,
         if optim or not safe:
             name += "("
             if optim: name += "O"
-            if not safe: name += "S"
+            if not safe: name += "U"
             name += ")"
         return name
     
