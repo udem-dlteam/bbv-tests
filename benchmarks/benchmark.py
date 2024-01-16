@@ -1282,7 +1282,7 @@ def perf_distribution(system_name,
 ##############################################################################
     
 
-def choose_csv_output_path(output, system_name, compiler_name, measure):
+def choose_csv_output_path(output, system_name, compiler_name):
     path = pathlib.Path(output or '.').resolve()
     suffix = path.suffix
 
@@ -1291,7 +1291,7 @@ def choose_csv_output_path(output, system_name, compiler_name, measure):
         logger.debug(f"output into folder {path}")
 
         # build default filename
-        filename = f"dump_{compiler_name}_{system_name}_{measure}.csv"
+        filename = f"results_{compiler_name}_{system_name}.csv"
 
         # sanitize filename
         filename = sanitize_filename(filename)
@@ -1307,28 +1307,27 @@ def choose_csv_output_path(output, system_name, compiler_name, measure):
 
 
 @db_session
-def to_csv(system_name, compiler_name, benchmark_names, version_limits, measure, output):
+def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
     system = get_system_from_name_or_default(system_name)
     compiler = get_compiler_from_name(compiler_name)
 
-    output_path = choose_csv_output_path(output, system_name, compiler_name, measure)
+    output_path = choose_csv_output_path(output, system_name, compiler_name)
 
     runs = list(select(
         r for r in Run
         if r.system == system
-        and r.compiler == compiler
+        and r.compiler.name == compiler_name # TODO switch back to using compiler when no commit-split
         and r.benchmark.name in benchmark_names
         and r.version_limit in version_limits
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
             if r2.system == system
-            and r2.compiler == compiler
+            and r2.compiler.name == compiler_name
             and r2.version_limit == r.version_limit
             and r2.benchmark == r.benchmark
             and r2.version_limit == r.version_limit
             and r2.safe_arithmetic == r.safe_arithmetic
             and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
-
 
     def get_column_name(limit, optim, safe):
         name = f"V={limit}"
@@ -1344,34 +1343,59 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, measure,
                                run.compiler_optimizations,
                                run.safe_arithmetic)
 
-    benchmark_names = sorted(benchmark_names)
+    def is_macro(name):
+        return name in ("almabench", "compiler", "earley", "peval",
+                        "conform", "maze", "boyer", "slatex")
 
-    column_names = [""]
+    benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
+
+    column_names = ["Benchmark"]
     column_names += [get_column_name(l, o, s) for s in (True, False)
                                               for o in (False, True)
                                               for l in version_limits]
     data = []
-    for name in benchmark_names:
-        data.append([name] + [math.nan] * (len(column_names) - 1))
 
-    def average_measure(run):
-        if measure == "task-clock":
-            results = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
-        elif measure == "typechecks":
-            primitive_counts = select(e for e in PrimitiveCount if e.run == run)
-            results = [p.value for p in primitive_counts if p.is_typecheck]
-        else:
-            raise NotImplementedError(f"measure: {measure}")
+    def get_measure_data(title, get_measure):
+
+        measure_data = []
+        measure_data.append([f"{title} - {compiler_name.title()}"])
+        measure_data.append(column_names)
+
+        for name in benchmark_names:
+            measure_data.append([name] + [math.nan] * (len(column_names) - 1))
+
+        for run in runs:
+            row = benchmark_names.index(run.benchmark.name)
+            col = column_names.index(get_run_column_name(run))
+            measure_data[row + 2][col] = get_measure(run)
+
+        return measure_data
+
+    # task-clock
+    def average_time(run):
+        results = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
         return statistics.mean(results)
+    
+    data += get_measure_data("Execution time", average_time)
 
-    for run in runs:
-        row = benchmark_names.index(run.benchmark.name)
-        col = column_names.index(get_run_column_name(run))
-        data[row][col] = average_measure(run)
+    # primitive count
+
+    def sum_checks(run):
+        primitive_counts = select(e for e in PrimitiveCount if e.run == run)
+        results = [p.value for p in primitive_counts if p.is_typecheck]
+        return sum(results)
+
+    data += get_measure_data("Runtime checks", sum_checks)
+
+    # program size
+
+    def average_checks(run):
+        return OtherMeasure.get(name='program-size', run=run).value
+
+    data += get_measure_data("Program size", average_checks)
 
     with open(output_path, 'w') as f:
         csvwriter = csv.writer(f)
-        csvwriter.writerow(column_names)
         csvwriter.writerows(data)
 
 ##############################################################################
@@ -1613,12 +1637,6 @@ if __name__ == "__main__":
                             type=int,
                             help="BBV versions limits")
 
-    csv_parser.add_argument('-m', '--measure',
-                            dest='measure',
-                            metavar='M',
-                            default='task-clock',
-                            help="The measurment to output")
-
     csv_parser.add_argument('-o', '--output',
                             dest="output",
                             help="where to output the csv (file or folder)")
@@ -1670,7 +1688,6 @@ if __name__ == "__main__":
                compiler_name=args.compiler_name,
                benchmark_names=args.benchmark_names,
                version_limits=args.version_limits,
-               measure=args.measure,
                output=args.output)
     else:
         parser.print_help()
