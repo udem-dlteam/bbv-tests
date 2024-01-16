@@ -148,7 +148,7 @@ class PrimitiveCount(db.Entity):
     def is_typecheck(self):
         typechecks = (
                 # Gambit
-                "##fixnum?", '##flonum?', "##vector?", "##box?", "##procedure?",
+                "##fixnum?", '##flonum?', "##vector?", "##pair?", "##box?", "##procedure?",
                 "##bignum?", "##ratnum?", "##boolean?", "##string?", "##char?",
                 "##bytevector?", "##u8vector?", "##u16vector?", "##u32vector?",
                 "##u64vector?", "##s8vector?", "##s16vector?", "##s32vector?",
