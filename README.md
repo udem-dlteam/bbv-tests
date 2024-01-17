@@ -4,7 +4,7 @@ Collection of programs to test BBV
 
 ## To compile with Bigloo
 
-  ./compile --bigloo tests/recursive/fib.scm
+  ../compile -v -S bigloo -V 1 -f ../tests/recursive/fib.scm
 
 ### To install Bigloo
 
@@ -22,7 +22,7 @@ On M2 macOS, it might be needed to disable the unistring support with:
 
 ### To compile with another Bigloo version:
 
-  ./compile -D $pdir --bigloo tests/recursive/fib.scm
+  ../compile -v -D $pdir -S bigloo -V 4 -f ../tests/recursive/fib.scm
   
 ### To compile with statistics
 
