@@ -1458,7 +1458,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             and r2.compiler_optimizations))).order_by(Run.benchmark))
 
     def get_col_name(run):
-        loc = run.benchmark.content.count("\n")
+        loc = run.benchmark.content.count("\n")        
+        loc = round(math.ceil(loc / 10) * 10)
         return f"{run.benchmark.name} ({loc:,} LOC)"
 
     def get_version_limit_name(v):
