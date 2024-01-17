@@ -1457,19 +1457,22 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             and r2.safe_arithmetic
             and r2.compiler_optimizations))).order_by(Run.benchmark))
 
-    column_names = benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
+    def get_col_name(run):
+        loc = run.benchmark.content.count("\n")
+        return f"{run.benchmark.name} ({loc:,} LOC)"
 
     def get_version_limit_name(v):
         return "No SBBV" if v == 0 else str(v) + " "
 
+    column_names = list(set(get_col_name(r) for r in runs))
     row_names = [get_version_limit_name(v) for v in set(r.version_limit for r in runs)]
 
     base_runs = sorted((r for r in runs if r.version_limit == 0),
-                       key=lambda r: benchmark_names.index(r.benchmark.name))
+                       key=lambda r: column_names.index(get_col_name(r)))
 
     def get_pos(run):
         row = row_names.index(get_version_limit_name(run.version_limit))
-        column = column_names.index(run.benchmark.name)
+        column = column_names.index(get_col_name(run))
 
         return row, column
 
@@ -1487,13 +1490,19 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             data[row][col] = measure(run) / base
 
         df = pd.DataFrame(data, columns=column_names, index=row_names)
+        
+        # Reorder columns according to last entry
+        cols = df.columns.tolist()
+        cols.sort(key=lambda c: df.at[row_names[-1], c])
+
+        df = df[cols]
 
         fig, ax = plt.subplots(figsize=(15, 5))
 
         vmin = min(v for r in data for v in r)
         vmax = max(v for r in data for v in r)
 
-        heatmap_ax = sns.heatmap(df, annot=True, fmt='.2g', cmap="coolwarm",
+        heatmap_ax = sns.heatmap(df, annot=True, fmt='.2f', cmap="coolwarm",
                                  linewidths=.5, vmin=vmin, vmax=vmax, center=1)
         ax.xaxis.tick_top()
         plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
