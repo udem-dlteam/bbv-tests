@@ -740,13 +740,13 @@
                  (DEAD-END "make-vector type error"))))))
 
 (define-macro (Svector-ref s i)
-  `(Svector-ref-with-FX>=0-FX< ,s ,i)
-;;  `(Svector-ref-with-in-bounds ,s ,i)
+;;  `(Svector-ref-with-FX>=0-FX< ,s ,i)
+  `(Svector-ref-with-in-bounds ,s ,i)
 )
 
 (define-macro (Svector-set! s i x)
-  `(Svector-set!-with-FX>=0-FX< ,s ,i ,x)
-;;  `(Svector-set!-with-in-bounds ,s ,i ,x)
+;;  `(Svector-set!-with-FX>=0-FX< ,s ,i ,x)
+  `(Svector-set!-with-in-bounds ,s ,i ,x)
 )
 
 (define-macro (Svector-ref-with-FX>=0-FX< v i)
@@ -827,13 +827,13 @@
                  (DEAD-END "make-string type error"))))))
 
 (define-macro (Sstring-ref s i)
-  `(Sstring-ref-with-FX>=0-FX< ,s ,i)
-;;  `(Sstring-ref-with-in-bounds ,s ,i)
+;;  `(Sstring-ref-with-FX>=0-FX< ,s ,i)
+  `(Sstring-ref-with-in-bounds ,s ,i)
 )
 
 (define-macro (Sstring-set! s i x)
-  `(Sstring-set!-with-FX>=0-FX< ,s ,i ,x)
-;;  `(Sstring-set!-with-in-bounds ,s ,i ,x)
+;;  `(Sstring-set!-with-FX>=0-FX< ,s ,i ,x)
+  `(Sstring-set!-with-in-bounds ,s ,i ,x)
 )
 
 (define-macro (Sstring-ref-with-FX>=0-FX< s i)
