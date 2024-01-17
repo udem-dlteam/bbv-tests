@@ -2,9 +2,36 @@
 
 Collection of programs to test BBV
 
-## To compile with Bigloo
+## To compile
 
-  ../compile -v -S bigloo -V 1 -f ../tests/recursive/fib.scm
+use the `compile` script:
+
+```
+Usage: ./compile [options]
+Options:
+  -f <filename>     File to compile
+  -S <system>       Specify the system ('gambit' or 'bigloo')
+  -D <dir>          Specify compiler directory
+  -V <limit>        Set the version limit
+  -O <level>        Set optimization level (1, 2, 3)
+  -U                Use unsafe arithmetic
+  -P                Count primitive usage
+  -G                Generate CFG
+  -W                View CFG in pdf viewer
+  -I                Use igsc (gambit only)
+  -c                Clean up tests
+  -h                Display this help and exit
+  -v                Execute this script in verbose mode
+```
+
+#### Note on compilation
+
+- At the moment, these is a single optimization level, both `-O2` and `-O3` will fallback to `-O1`.
+
+- Bigloo and gambit behave differently with `-P`. Gambit will use its GVM interpreter and iwll output primitive count. In the case of Bigloo, the resulting executable must be ran to get primitive count.
+
+- If Bigloo is installed from the instructions below, it is not required to provide it with a `-D` parameter.
+
 
 ### To install Bigloo
 
@@ -22,12 +49,15 @@ On M2 macOS, it might be needed to disable the unistring support with:
 
 ### To compile with another Bigloo version:
 
-  ../compile -v -D $pdir -S bigloo -V 4 -f ../tests/recursive/fib.scm
-  
+```
+./compile -S bigloo -D $pdir -V 4 -f tests/recursive/fib.scm
+```
+
 ### To compile with statistics
 
-  BIGLOOOPT="-copt -DSAW_BBV_STATS=1" ./compile --bigloo tests/recursive/fib.scm
-  BIGLOOOPT="-copt -DSAW_BBV_STATS=1" ./compile -D $pdir --bigloo tests/paper/macro/boyer.scm
+```
+./compile -S bigloo -D $pdir -V 4 -f tests/recursive/fib.scm -P
+```
 
 This generates an output such as:
 
@@ -46,10 +76,3 @@ This generates an output such as:
 (sub/ov 0)
 (mul/ov 0)
 ```
-
-### To control the number of versions per basic block:
-
-  export BIGLOOBBVVERSIONLIMIT=num 
-  
-Example:
-  BIGLOOBBVVERSIONLIMIT=4 BIGLOODIR=$pdir BIGLOOOPT="-copt -DSAW_BBV_STATS=1" ./compile --bigloo tests/recursive/fib.scm
