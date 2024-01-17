@@ -163,7 +163,15 @@ class PrimitiveCount(db.Entity):
                 # Overflow checks
                 "##fx+?",            "add/ov",
                 "##fx-?",            "sub/ov",
-                "##fx*?",            "mul/ov",)
+                "##fx*?",            "mul/ov",
+                "##fxabs?",
+                "##fxarithmetic-shift-left?",
+                "##fxarithmetic-shift-right?",
+                "##fxarithmetic-shift?",
+                "##fxsquare?",
+                "##fxwraparithmetic-shift-left?",
+                "##fxwraparithmetic-shift?",
+                "##fxwraplogical-shift-right?",)
         typechecks = typechecks + tuple(n.replace("##", "") for n in typechecks) + \
                                   tuple(n.replace("##", "$") for n in typechecks)
         return self.name in typechecks
