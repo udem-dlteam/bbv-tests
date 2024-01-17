@@ -3,7 +3,7 @@
 /*    -------------------------------------------------------------    */
 /*    Author      :  Manuel Serrano                                    */
 /*    Creation    :  Thu Mar 16 18:48:21 1995                          */
-/*    Last change :  Tue Jan 16 19:54:25 2024 (serrano)                */
+/*    Last change :  Wed Jan 17 15:25:13 2024 (serrano)                */
 /*    -------------------------------------------------------------    */
 /*    Bigloo's stuff                                                   */
 /*=====================================================================*/
@@ -31,10 +31,13 @@ static long saw_nullp = 0;
 static long saw_procedurep = 0;
 static long saw_vectorp = 0;
 static long saw_fixnump = 0;
+static long saw_booleanp = 0;
 static long saw_flonump = 0;
+static long saw_bignump = 0;
 static long saw_stringlength = 0;
 static long saw_vectorlength = 0;
 static long saw_stringp = 0;
+static long saw_symbolp = 0;
 static long saw_charp = 0;
 
 #  undef BGL_RTL_IFNE
@@ -118,11 +121,17 @@ static long saw_charp = 0;
 #  define PROCEDUREP(o) \
      (saw_procedurep++, POINTERP(o) && (TYPE(o) == PROCEDURE_TYPE))
 
+#undef BOOLEANP
+#define BOOLEANP(o) (saw_booleanp++, (((long)o == (long)BTRUE) || ((long)o == (long)BFALSE)))
+
 #  undef INTEGERP
 #  define INTEGERP(o) (saw_fixnump++, ((((long)o) & TAG_MASK) == TAG_INT))
 
 #  undef FLONUMP
 #  define FLONUMP(c) (saw_flonump++, ((c && ((((long)c)&TAG_MASK) == TAG_REAL))))
+
+#undef BIGNUMP
+#define BIGNUMP(o) (saw_bignump++, (POINTERP(o) && (TYPE(o) == BIGNUM_TYPE)))
 
 #  undef STRING_LENGTH
 #  define STRING_LENGTH(s) (saw_stringlength++, (STRING(s).length))
@@ -157,6 +166,13 @@ static long saw_charp = 0;
 #   define STRINGP(c) (saw_stringp++, (POINTERP(c) && (TYPE(c) == STRING_TYPE)))
 #endif
 
+#undef SYMBOLP
+#if (defined(TAG_SYMBOL))
+#  define SYMBOLP(c) (saw_symbolp++, ((c && ((((long)c)&TAG_MASK) == TAG_SYMBOL))))
+#else   
+#  define SYMBOLP(o) (saw_symbolp++, (POINTERP(o) && (TYPE(o) == SYMBOL_TYPE)))
+#endif   
+
 #undef CHARP
 #define CHARP(o) (saw_charp++, BGL_CNSTP(o, BCHARH, BGL_CNST_SHIFT_CHAR))
 
@@ -165,8 +181,9 @@ int bbv_saw_statistics() {
    fprintf(stderr, "(ifne %ld)\n", saw_ifne + saw_ifeq);
    fprintf(stderr, "(eq %ld)\n", saw_eq);
    fprintf(stderr, "(lefx %ld)\n", saw_le);
-   fprintf(stderr, "(gtfx %ld)\n", saw_gt);
    fprintf(stderr, "(ltfx %ld)\n", saw_lt);
+   fprintf(stderr, "(gtfx %ld)\n", saw_gt);
+   fprintf(stderr, "(gefx %ld)\n", saw_ge);
    fprintf(stderr, "(addfx %ld)\n", saw_add);
    fprintf(stderr, "(subfx %ld)\n", saw_sub);
    fprintf(stderr, "(mulfx %ld)\n", saw_mul);
@@ -178,10 +195,13 @@ int bbv_saw_statistics() {
    fprintf(stderr, "(null? %ld)\n", saw_nullp);
    fprintf(stderr, "(procedure? %ld)\n", saw_procedurep);
    fprintf(stderr, "(vector? %ld)\n", saw_vectorp);
+   fprintf(stderr, "(boolean? %ld)\n", saw_booleanp);
    fprintf(stderr, "(fixnum? %ld)\n", saw_fixnump);
    fprintf(stderr, "(flonum? %ld)\n", saw_flonump);
+   fprintf(stderr, "(bignum? %ld)\n", saw_bignump);
    fprintf(stderr, "(string-length %ld)\n", saw_stringlength);
    fprintf(stderr, "(vector-length %ld)\n", saw_vectorlength);
+   fprintf(stderr, "(symbol? %ld)\n", saw_symbolp);
    fprintf(stderr, "(string? %ld)\n", saw_stringp);
    fprintf(stderr, "(char? %ld)\n", saw_charp);
    return 0;
