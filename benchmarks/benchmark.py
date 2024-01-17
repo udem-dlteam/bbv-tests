@@ -147,15 +147,33 @@ class PrimitiveCount(db.Entity):
     @property
     def is_typecheck(self):
         typechecks = (
-                # Gambit
-                "##fixnum?", '##flonum?', "##vector?", "##pair?", "##box?", "##procedure?",
-                "##bignum?", "##ratnum?", "##boolean?", "##string?", "##char?",
-                "##bytevector?", "##u8vector?", "##u16vector?", "##u32vector?",
-                "##u64vector?", "##s8vector?", "##s16vector?", "##s32vector?",
-                "##s64vector?", "##f8vector?", "##f16vector?", "##f32vector?",
-                "##f64vector?", "##null?")
+                # Gambit             # Bigloo
+                # Typechecks
+                "##fixnum?",
+                '##flonum?',
+                "##vector?",
+                "##pair?",         
+                "##procedure?",
+                "##bignum?",
+                "##boolean?",
+                "##string?",
+                "##symbol?",
+                "##char?",
+                "##null?",
+                # Overflow checks
+                "##fx+?",            "add/ov",
+                "##fx-?",            "sub/ov",
+                "##fx*?",            "mul/ov",
+                "##fxabs?",
+                "##fxarithmetic-shift-left?",
+                "##fxarithmetic-shift-right?",
+                "##fxarithmetic-shift?",
+                "##fxsquare?",
+                "##fxwraparithmetic-shift-left?",
+                "##fxwraparithmetic-shift?",
+                "##fxwraplogical-shift-right?",)
         typechecks = typechecks + tuple(n.replace("##", "") for n in typechecks) + \
-            tuple(n.replace("##", "$") for n in typechecks)
+                                  tuple(n.replace("##", "$") for n in typechecks)
         return self.name in typechecks
 
 class PerfEvent(db.Entity):
@@ -1152,8 +1170,6 @@ def analyze(benchmark_names, system_name, compiler_name, safe_arithmetic, output
     else:
         benchmarks_filter = benchmark_names
 
-    benchmarks_filter.remove('conform')
-
     for benchmark_name in benchmarks_filter[:]:
         bench = Benchmark.get(name=benchmark_name)
 
@@ -1310,6 +1326,26 @@ def choose_csv_output_path(output, system_name, compiler_name):
         raise ValueError(f"output must be a folder of .csv target, got {output}")
 
 
+def is_macro(name):
+    return name in ("almabench", "compiler", "earley", "peval",
+                    "conform", "maze", "boyer", "slatex")
+
+
+def average_time(run):
+    results = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
+    return statistics.mean(results)
+
+
+def sum_checks(run):
+    primitive_counts = select(e for e in PrimitiveCount if e.run == run)
+    results = [p.value for p in primitive_counts if p.is_typecheck]
+    return sum(results)
+
+def run_program_size(run):
+        return OtherMeasure.get(name='program-size', run=run).value
+
+
+
 @db_session
 def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
     system = get_system_from_name_or_default(system_name)
@@ -1347,10 +1383,6 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
                                run.compiler_optimizations,
                                run.safe_arithmetic)
 
-    def is_macro(name):
-        return name in ("almabench", "compiler", "earley", "peval",
-                        "conform", "maze", "boyer", "slatex")
-
     benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
 
     column_names = ["Benchmark"]
@@ -1376,31 +1408,148 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
         return measure_data
 
     # task-clock
-    def average_time(run):
-        results = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
-        return statistics.mean(results)
-    
     data += get_measure_data("Execution time", average_time)
 
     # primitive count
 
-    def sum_checks(run):
-        primitive_counts = select(e for e in PrimitiveCount if e.run == run)
-        results = [p.value for p in primitive_counts if p.is_typecheck]
-        return sum(results)
-
     data += get_measure_data("Runtime checks", sum_checks)
 
     # program size
-
-    def average_checks(run):
-        return OtherMeasure.get(name='program-size', run=run).value
-
-    data += get_measure_data("Program size", average_checks)
+    data += get_measure_data("Program size", run_program_size)
 
     with open(output_path, 'w') as f:
         csvwriter = csv.writer(f)
         csvwriter.writerows(data)
+
+##############################################################################
+# Heatmaps
+##############################################################################
+
+
+def choose_heatmap_output_path(output, measure, system_name, compiler_name):
+    path = pathlib.Path(output or '.').resolve()
+    suffix = path.suffix
+
+    if not suffix:
+        # No extension means the output is a folder where to output the plot
+        logger.debug(f"output into folder {path}")
+
+        # build default filename
+        filename = f"heatmap_{measure}_{compiler_name}_{system_name}.png"
+
+        # sanitize filename
+        filename = sanitize_filename(filename)
+
+        path = path / filename
+        logger.info(f"output to file {path}")
+        return path
+    elif suffix == ".png":
+        logger.info(f"output to file {path}")
+        return path
+    else:
+        raise ValueError(f"output must be a folder of .png target, got {output}")
+
+
+@db_session
+def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, output):
+    system = get_system_from_name_or_default(system_name)
+    compiler = get_compiler_from_name(compiler_name)
+
+    if benchmark_names is None:
+        benchmark_names = list(select(b.name for b in Benchmark).distinct())
+
+    # Select only the latest runs for a each benchmark
+    runs = list(select(
+        r for r in Run
+        if r.system == system and r.compiler.name == compiler_name
+        and r.benchmark.name in benchmark_names
+        and r.version_limit in version_limits
+        and r.safe_arithmetic
+        and r.compiler_optimizations
+        and r.timestamp == max(select(
+            r2.timestamp for r2 in Run
+            if r2.system == system and r2.compiler.name == compiler_name
+            and r2.version_limit == r.version_limit
+            and r2.benchmark == r.benchmark
+            and r2.version_limit == r.version_limit
+            and r2.safe_arithmetic
+            and r2.compiler_optimizations))).order_by(Run.benchmark))
+
+    def get_col_name(run):
+        loc = run.benchmark.content.count("\n")        
+        loc = round(math.ceil(loc / 10) * 10)
+        return f"{run.benchmark.name} ({loc:,} LOC)"
+
+    def get_version_limit_name(v):
+        return "No SBBV" if v == 0 else str(v) + " "
+
+    column_names = list(set(get_col_name(r) for r in runs))
+    row_names = [get_version_limit_name(v) for v in set(r.version_limit for r in runs)]
+
+    base_runs = sorted((r for r in runs if r.version_limit == 0),
+                       key=lambda r: column_names.index(get_col_name(r)))
+
+    def get_pos(run):
+        row = row_names.index(get_version_limit_name(run.version_limit))
+        column = column_names.index(get_col_name(run))
+
+        return row, column
+
+    def init_data():
+        return [[math.nan] * len(column_names) for _ in range(len(row_names))]
+
+    def one_heatmap(path_base, measure):
+
+        base_data = [measure(r) for r in base_runs]
+        data = init_data()
+
+        for run in runs:
+            row, col = get_pos(run)
+            base = base_data[col]
+            data[row][col] = measure(run) / base
+
+        df = pd.DataFrame(data, columns=column_names, index=row_names)
+        
+        # Reorder columns according to last entry
+        cols = df.columns.tolist()
+        cols.sort(key=lambda c: df.at[row_names[-1], c])
+
+        df = df[cols]
+
+        fig, ax = plt.subplots(figsize=(15, 5))
+
+        vmin = min(v for r in data for v in r)
+        vmax = max(v for r in data for v in r)
+
+        heatmap_ax = sns.heatmap(df, annot=True, fmt='.2f', cmap="coolwarm",
+                                 linewidths=.5, vmin=vmin, vmax=vmax, center=1)
+        ax.xaxis.tick_top()
+        plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
+        plt.yticks(rotation=0, rotation_mode="anchor", ha='right')
+
+        ax.xaxis.set_label_position('top')
+        plt.xlabel('Benchmark')
+        plt.ylabel('Version limit')
+
+        plt.tight_layout()
+
+        output_path = choose_heatmap_output_path(output, path_base, compiler_name, system_name)
+
+        plt.tight_layout()
+
+        ensure_directory_exists(output_path)
+        plt.savefig(output_path)
+
+    # Execution time
+    one_heatmap("task_clock", average_time)
+
+    # Checks
+    one_heatmap("checks", sum_checks)
+
+    # Program size
+    one_heatmap("program_size", run_program_size)
+
+    
 
 ##############################################################################
 # Command line interface
@@ -1645,6 +1794,38 @@ if __name__ == "__main__":
                             dest="output",
                             help="where to output the csv (file or folder)")
 
+    # Parser for dumping results in CSV
+    heatmap_parser = subparsers.add_parser('heatmap', help='Create heatmap')
+
+    heatmap_parser.add_argument('-s', '--systen',
+                            metavar="SYSTEM",
+                            dest="system_name",
+                            help="Benchmarks system")
+
+    heatmap_parser.add_argument('-c', '--compiler',
+                            metavar="COMPILER",
+                            dest="compiler_name",
+                            default="gambit",
+                            help="Benchmark compiler")
+    
+    heatmap_parser.add_argument('-b', '--benchmarks',
+                            metavar="BENCHMARK",
+                            nargs="+",
+                            dest="benchmark_names",
+                            help="benchmarks")
+
+    heatmap_parser.add_argument('-l', '--limit',
+                            dest="version_limits",
+                            metavar="LIMIT",
+                            nargs="+",
+                            default=None,
+                            type=int,
+                            help="BBV versions limits")
+
+    heatmap_parser.add_argument('-o', '--output',
+                            dest="output",
+                            help="where to output the png (file or folder)")
+
 
     args = parser.parse_args()
 
@@ -1693,6 +1874,12 @@ if __name__ == "__main__":
                benchmark_names=args.benchmark_names,
                version_limits=args.version_limits,
                output=args.output)
+    elif args.command == 'heatmap':
+        make_heatmap(system_name=args.system_name,
+                      compiler_name=args.compiler_name,
+                      benchmark_names=args.benchmark_names,
+                      version_limits=args.version_limits,
+                      output=args.output)
     else:
         parser.print_help()
 
