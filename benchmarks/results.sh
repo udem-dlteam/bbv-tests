@@ -21,5 +21,6 @@ python benchmark.py csv -s arctic -c gambit -b ${benchmarks[@]} -l $version_limi
 python benchmark.py csv -s arctic -c bigloo -b ${benchmarks[@]} -l $version_limits
 
 python benchmark.py heatmap -c gambit -s arctic -l $version_limits -b ${benchmarks[@]}
+python benchmark.py heatmap -c bigloo -s arctic -l $version_limits -b ${benchmarks[@]}
 
 deactivate
