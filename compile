@@ -233,7 +233,7 @@ case "$SYSTEM" in
     PATH="$COMPILER_DIR/bin:$PATH"
 
     BIGLOO_OPTIONS="-srfi arithmetic$ARITHMETIC -w -unsafe -saw -o $OUTPUT_FILE_EXE"
-    BIGLOOBBVVLENGTH=
+    BIGLOOBBVVLENGTH=false
     BIGLOOBBVVERSIONLIMIT=
 
     if [ "$OPTIM_LEVEL" = "0" ]; then
