@@ -147,15 +147,25 @@ class PrimitiveCount(db.Entity):
     @property
     def is_typecheck(self):
         typechecks = (
-                # Gambit
-                "##fixnum?", '##flonum?', "##vector?", "##pair?", "##box?", "##procedure?",
-                "##bignum?", "##ratnum?", "##boolean?", "##string?", "##char?",
-                "##bytevector?", "##u8vector?", "##u16vector?", "##u32vector?",
-                "##u64vector?", "##s8vector?", "##s16vector?", "##s32vector?",
-                "##s64vector?", "##f8vector?", "##f16vector?", "##f32vector?",
-                "##f64vector?", "##null?")
+                # Gambit             # Bigloo
+                # Typechecks
+                "##fixnum?",
+                '##flonum?',
+                "##vector?",
+                "##pair?",         
+                "##procedure?",
+                "##bignum?",
+                "##boolean?",
+                "##string?",
+                "##symbol?",
+                "##char?",
+                "##null?",
+                # Overflow checks
+                "##fx+?",            "add/ov",
+                "##fx-?",            "sub/ov",
+                "##fx*?",            "mul/ov",)
         typechecks = typechecks + tuple(n.replace("##", "") for n in typechecks) + \
-            tuple(n.replace("##", "$") for n in typechecks)
+                                  tuple(n.replace("##", "$") for n in typechecks)
         return self.name in typechecks
 
 class PerfEvent(db.Entity):
