@@ -1386,8 +1386,8 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
     benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
 
     column_names = ["Benchmark"]
-    column_names += [get_column_name(l, o, s) for s in (True, False)
-                                              for o in (False, True)
+    column_names += [get_column_name(l, o, s) for s in (True,)
+                                              for o in (True,)
                                               for l in version_limits]
     data = []
 
@@ -1498,21 +1498,29 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     def init_data():
         return [[math.nan] * len(column_names) for _ in range(len(row_names))]
 
-    def one_heatmap(path_base, measure):
+    def one_heatmap(path_base, measure, best=False):
+        heatmap_row_names = row_names.copy()
 
         base_data = [measure(r) for r in base_runs]
         data = init_data()
 
+        if best:
+            heatmap_row_names.append("Best")
+            data.append([math.nan] * len(column_names))
+
         for run in runs:
             row, col = get_pos(run)
             base = base_data[col]
-            data[row][col] = measure(run) / base
+            res = measure(run) / base
+            data[row][col] = res
+            if best:
+                data[-1][col] = min(res, data[-1][col]) if data[-1][col] != math.nan else res
 
-        df = pd.DataFrame(data, columns=column_names, index=row_names)
+        df = pd.DataFrame(data, columns=column_names, index=heatmap_row_names)
         
         # Reorder columns according to last entry
         cols = df.columns.tolist()
-        cols.sort(key=lambda c: df.at[row_names[-1], c])
+        cols.sort(key=lambda c: df.at[heatmap_row_names[-1], c])
 
         df = df[cols]
 
@@ -1541,7 +1549,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.savefig(output_path)
 
     # Execution time
-    one_heatmap("task_clock", average_time)
+    one_heatmap("task_clock", average_time, best=True)
 
     # Checks
     one_heatmap("checks", sum_checks)
