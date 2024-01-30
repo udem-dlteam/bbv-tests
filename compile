@@ -202,12 +202,12 @@ case "$SYSTEM" in
              (%%%)
              (##include \"$SCRIPT_DIR/gambit/bbv.scm\")"
     # Remove extra spaces
-    PRELUDE=$(echo "$PRELUDE" | sed ':a;N;$!ba;s/\n/ /g' | sed 's/  */ /g')
+    PRELUDE=$(echo "$PRELUDE" | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | sed 's/  */ /g')
 
 
     POSTLUDE="(##include \"$SCRIPT_DIR/gambit/main.scm\")"
     # Remove extra spaces
-    POSTLUDE=$(echo "$POSTLUDE" | sed ':a;N;$!ba;s/\n/ /g' | sed 's/  */ /g')
+    POSTLUDE=$(echo "$POSTLUDE" | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | sed 's/  */ /g')
 
     FLAGS="-keep-temp -gvm -exe -o $OUTPUT_FILE_EXE"
 
