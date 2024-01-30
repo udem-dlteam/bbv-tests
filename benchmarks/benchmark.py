@@ -1335,6 +1335,10 @@ def average_time(run):
     results = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
     return statistics.mean(results)
 
+def stdev_time(run):
+    results = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
+    return statistics.stdev(results)
+
 
 def sum_checks(run):
     primitive_counts = select(e for e in PrimitiveCount if e.run == run)
@@ -1342,8 +1346,7 @@ def sum_checks(run):
     return sum(results)
 
 def run_program_size(run):
-        return OtherMeasure.get(name='program-size', run=run).value
-
+    return OtherMeasure.get(name='program-size', run=run).value
 
 
 @db_session
@@ -1369,29 +1372,33 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
             and r2.safe_arithmetic == r.safe_arithmetic
             and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
 
-    def get_column_name(limit, optim, safe):
+    def get_column_name(limit, optim, safe, postfix=''):
         name = f"V={limit}"
         if optim or not safe:
             name += "("
             if optim: name += "O"
             if not safe: name += "U"
             name += ")"
-        return name
+        return name + postfix
+
+    stdev_postfix = ' stdev'
     
-    def get_run_column_name(run):
+    def get_run_column_name(run, postfix=''):
         return get_column_name(run.version_limit,
                                run.compiler_optimizations,
-                               run.safe_arithmetic)
+                               run.safe_arithmetic,
+                               postfix=postfix)
 
     benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
 
     column_names = ["Benchmark"]
-    column_names += [get_column_name(l, o, s) for s in (True,)
-                                              for o in (True,)
-                                              for l in version_limits]
+    column_names += [get_column_name(l, o, s, postfix=p) for s in (True,)
+                                                        for o in (True,)
+                                                        for l in version_limits
+                                                        for p in ('', stdev_postfix)]
     data = []
 
-    def get_measure_data(title, get_measure):
+    def get_measure_data(title, get_measure, get_stdev=lambda r: 0):
 
         measure_data = []
         measure_data.append([f"{title} - {compiler_name.title()}"])
@@ -1402,13 +1409,15 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
 
         for run in runs:
             row = benchmark_names.index(run.benchmark.name)
-            col = column_names.index(get_run_column_name(run))
-            measure_data[row + 2][col] = get_measure(run)
+            res_col = column_names.index(get_run_column_name(run))
+            stdev_col = column_names.index(get_run_column_name(run, postfix=stdev_postfix))
+            measure_data[row + 2][res_col] = get_measure(run)
+            measure_data[row + 2][stdev_col] = get_stdev(run)
 
         return measure_data
 
     # task-clock
-    data += get_measure_data("Execution time", average_time)
+    data += get_measure_data("Execution time", average_time, stdev_time)
 
     # primitive count
 
@@ -1549,7 +1558,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.savefig(output_path)
 
     # Execution time
-    one_heatmap("task_clock", average_time, best=True)
+    one_heatmap("task_clock", average_time, best=False)
 
     # Checks
     one_heatmap("checks", sum_checks)
