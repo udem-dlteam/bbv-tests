@@ -923,4 +923,4 @@
 (define-macro (DEAD-END msg)
   `(PRIMop dead-end))
 
-(##include "lib.scm")
+;;(##include "lib.scm")

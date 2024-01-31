@@ -139,7 +139,7 @@ if [ "$COMPILER_DIR" = "" ]; then
   if [ "$SYSTEM" = "bigloo" ]; then
     COMPILER_DIR="$SCRIPT_DIR/bigloo/local"
   elif [ "$SYSTEM" = "gambit" ]; then
-    COMPILER_DIR="$SCRIPT_DIR/gambit/gambit"
+    COMPILER_DIR="$SCRIPT_DIR/gambit/bbv-gambit"
   fi
 fi
 
@@ -153,6 +153,7 @@ fi
 
 INPUT_FILE_NO_EXT="${INPUT_FILE%.scm}"
 OUTPUT_FILE_BASE="$INPUT_FILE_NO_EXT.${SYSTEM}.V${VERSION_LIMIT}.O${OPTIM_LEVEL}.$SAFETY_MODE"
+OUTPUT_FILE_C="$OUTPUT_FILE_BASE.c"
 OUTPUT_FILE_EXE="$OUTPUT_FILE_BASE.exe"
 OUTPUT_FILE_CFG_DOT="$OUTPUT_FILE_BASE.cfg"
 
@@ -198,18 +199,20 @@ case "$SYSTEM" in
                (version-limit $VERSION_LIMIT)
                (inlining-limit $INLINING_LIMIT))
              (define-macro (%%%)
-               (eval '(define arithmetic '$ARITHMETIC)))
+               (eval '(define arithmetic '$ARITHMETIC))
+               #f)
              (%%%)
              (##include \"$SCRIPT_DIR/gambit/bbv.scm\")"
     # Remove extra spaces
-    PRELUDE=$(echo "$PRELUDE" | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | sed 's/  */ /g')
-
+# no need to do this!
+#    PRELUDE=$(echo "$PRELUDE" | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | sed 's/  */ /g')
 
     POSTLUDE="(##include \"$SCRIPT_DIR/gambit/main.scm\")"
     # Remove extra spaces
-    POSTLUDE=$(echo "$POSTLUDE" | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | sed 's/  */ /g')
+# no need to do this!
+#    POSTLUDE=$(echo "$POSTLUDE" | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/ /g' | sed 's/  */ /g')
 
-    FLAGS="-keep-temp -gvm -exe -o $OUTPUT_FILE_EXE"
+    FLAGS="-keep-temp -gvm"
 
     if [ "$GENERATE_CFG" = "1" ]; then
       FLAGS="$FLAGS -cfg"
@@ -219,7 +222,10 @@ case "$SYSTEM" in
     fi
 
     # Compilation
-    $GAMBITCOMP -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS $INPUT_FILE
+    $GAMBITCOMP -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE
+    $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
+    $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
+    $GAMBITCOMP -exe -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
 
     if [ "$GENERATE_CFG" = "1" ]; then
       mv $INPUT_FILE_NO_EXT.cfg $OUTPUT_FILE_CFG_DOT
