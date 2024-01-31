@@ -283,7 +283,7 @@ class PrimitivesCountParser:
 
 
 class PerfResultParser:
-    time_event = 'task-clock'
+    time_event = 'duration_time'
     event_names = [
         time_event,
         "cycles",
@@ -1333,11 +1333,11 @@ def is_macro(name):
 
 
 def average_time(run):
-    results = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
+    results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
     return statistics.mean(results)
 
 def stdev_time(run):
-    results = select(e.value for e in PerfEvent if e.event == 'task-clock' and e.run == run)
+    results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
     return statistics.stdev(results)
 
 
@@ -1417,11 +1417,10 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
 
         return measure_data
 
-    # task-clock
+    # Time
     data += get_measure_data("Execution time", average_time, stdev_time)
 
     # primitive count
-
     data += get_measure_data("Runtime checks", sum_checks)
 
     # program size
@@ -1559,7 +1558,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.savefig(output_path)
 
     # Execution time
-    one_heatmap("task_clock", average_time, best=False)
+    one_heatmap("time", average_time, best=False)
 
     # Checks
     one_heatmap("checks", sum_checks)

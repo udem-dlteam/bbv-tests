@@ -4,7 +4,7 @@ files=$(find ../tests/paper -type f -name "*.scm")
 
 . ./venv/bin/activate
 
-gambit=../../gambit
+gambit=../../bbv-gambit
 
 for limit in 0 1 2 3 4 5 6 7 8 9 10 20; do
   for file in ${files[@]}; do
