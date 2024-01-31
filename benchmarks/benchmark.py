@@ -411,20 +411,21 @@ def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizati
     optimization_flag = "-O3" if compiler_optimizations else ""
     arithmetic_flag = "-U" if not safe_arithmetic else ""
 
-    command = f"{COMPILE_SCRIPT} -S gambit -D {gambitdir} -V {vlimit} {arithmetic_flag} {optimization_flag} -P -f {file}"
+    command = f"{COMPILE_SCRIPT} -S gambit -D {gambitdir} -V {vlimit} {arithmetic_flag} {optimization_flag} -f {file}"
+    command_with_primitives = f"{command} -P"
 
-    output = run_command(command, timeout, env)
-
-    executable = extract_executable_from_compiler_output(output)
-
-    logger.info(f"executable created at: {executable}")
-
-    primitive_count = PrimitivesCountParser(output)
+    output_with_primitives = run_command(command_with_primitives, timeout, env)
+    primitive_count = PrimitivesCountParser(output_with_primitives)
 
     if not primitive_count:
         logger.warning("Failed to parse primitive count")
     else:
         logger.debug(f"Primitive count: {dict(primitive_count)}")
+
+    output = run_command(command, timeout, env)
+    executable = extract_executable_from_compiler_output(output)
+
+    logger.info(f"executable created at: {executable}")    
 
     return executable, primitive_count
 
