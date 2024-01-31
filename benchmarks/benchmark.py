@@ -178,7 +178,7 @@ class PrimitiveCount(db.Entity):
 
 class PerfEvent(db.Entity):
     event = Required(str)
-    value = Required(int, size=64)
+    value = Required(float)
     run = Required('Run')
 
 class OtherMeasure(db.Entity):
@@ -283,9 +283,10 @@ class PrimitivesCountParser:
 
 
 class PerfResultParser:
-    time_event = 'duration_time'
+    time_event = 'real-time'
+    _time_event_real_name = 'time elapsed'
     event_names = [
-        time_event,
+        "task-clock",
         "cycles",
         "instructions",
         "branches",
@@ -318,6 +319,8 @@ class PerfResultParser:
             raise ValueError(f"wrong 'perf stat' output (is perf installed?)")
 
         self.events = {}
+
+        self.events[self.time_event] = self._get_value(perf_output, self._time_event_real_name)
         
         for e in self.event_names:
             if (result := self._get_value(perf_output, e)) is not None:
@@ -362,9 +365,11 @@ class PerfResultParser:
                 
                 value, variance = match.groups()
                 logger.debug(f"found perf stat event {name} ({value} +- {variance})")
-                return (cls._string_to_number(value), cls._string_to_number(variance))
+                value_number = cls._string_to_number(value)
+                variance_number = cls._string_to_number(variance)
+                logger.debug(f"converted to ({value_number} +- {variance_number})")
+                return value_number, variance_number
 
-        #logger.debug(f"could not find perf stat event {name}")
         return None
 
 class SchemeStatsParser:
@@ -479,7 +484,7 @@ def compile(compiler_execution_data, file, vlimit, safe_arithmetic, compiler_opt
 
 def run_benchmark(executable, arguments, timeout=None):
     # Run program to measure time only
-    time_command = f"perf stat -e {PerfResultParser.time_event} {executable} {arguments}"
+    time_command = f"perf stat {executable} {arguments}"
     time_output = run_command(time_command, timeout)
 
     # Run program with all perf stat events on
@@ -658,7 +663,7 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
             arguments = f"{base_arguments} align-stack: {rep * align_stack_step}"
             perf_results, scheme_stats = run_benchmark(executable, arguments, timeout)
             for event, (value, variance) in perf_results.items():
-                PerfEvent(event=event, value=int(value), run=run)
+                PerfEvent(event=event, value=value, run=run)
 
             for name, value in scheme_stats.items():
                 logger.info(f"saving scheme stat {repr(name)}: {value}")
