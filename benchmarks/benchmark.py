@@ -1518,7 +1518,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     def init_data():
         return [[math.nan] * len(column_names) for _ in range(len(row_names))]
 
-    def one_heatmap(path_base, measure, best=False):
+    def one_heatmap(path_base, measure, best=False, only_macro=False):
         heatmap_row_names = row_names.copy()
 
         base_data = [measure(r) for r in base_runs]
@@ -1537,6 +1537,11 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                 data[-1][col] = min(res, data[-1][col]) if data[-1][col] != math.nan else res
 
         df = pd.DataFrame(data, columns=column_names, index=heatmap_row_names)
+
+        if only_macro:
+            cols = df.columns.tolist()
+            cols = [n for n in cols if is_macro(n.split()[0])]
+            df = df[cols]
         
         # Reorder columns according to last entry
         #cols = df.columns.tolist()
@@ -1546,8 +1551,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         fig, ax = plt.subplots(figsize=(15, 5))
 
-        vmin = min(v for r in data for v in r)
-        vmax = max(v for r in data for v in r)
+        vmin = df.min().min()
+        vmax = df.max().max()
 
         heatmap_ax = sns.heatmap(df, annot=True, fmt='.2f', cmap="coolwarm",
                                  linewidths=.5, vmin=vmin, vmax=vmax, center=1)
@@ -1569,7 +1574,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.savefig(output_path)
 
     # Execution time
-    one_heatmap("time", average_time, best=False)
+    one_heatmap("time", average_time, only_macro=True)
 
     # Checks
     one_heatmap("checks", sum_checks)
