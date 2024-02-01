@@ -1343,8 +1343,7 @@ def average_time(run):
 
 def stdev_time(run):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
-    return statistics.stdev(results)
-
+    return 0 if len(results) == 1 else statistics.stdev(results)
 
 def sum_checks(run):
     primitive_counts = select(e for e in PrimitiveCount if e.run == run)
@@ -1487,7 +1486,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             and r2.benchmark == r.benchmark
             and r2.version_limit == r.version_limit
             and r2.safe_arithmetic
-            and r2.compiler_optimizations))).order_by(Run.benchmark))
+            and r2.compiler_optimizations))))
 
     def get_col_name(run):
         loc = run.benchmark.content.count("\n")        
@@ -1497,7 +1496,14 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     def get_version_limit_name(v):
         return "No SBBV" if v == 0 else str(v) + " "
 
-    column_names = list(set(get_col_name(r) for r in runs))
+    runs.sort(key=lambda r: (is_macro(r.benchmark.name), r.benchmark.name))
+
+    column_names = [] 
+    for r in runs:
+        col_name = get_col_name(r)
+        if col_name not in column_names:
+            column_names.append(col_name)
+
     row_names = [get_version_limit_name(v) for v in set(r.version_limit for r in runs)]
 
     base_runs = sorted((r for r in runs if r.version_limit == 0),
@@ -1533,10 +1539,10 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         df = pd.DataFrame(data, columns=column_names, index=heatmap_row_names)
         
         # Reorder columns according to last entry
-        cols = df.columns.tolist()
-        cols.sort(key=lambda c: df.at[heatmap_row_names[-1], c])
+        #cols = df.columns.tolist()
+        #cols.sort(key=lambda c: (not is_macro(c), c))
 
-        df = df[cols]
+        #df = df[cols]
 
         fig, ax = plt.subplots(figsize=(15, 5))
 
