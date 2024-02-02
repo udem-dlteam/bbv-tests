@@ -513,7 +513,7 @@ benchmark_args = {
     "bague": "repeat: 1",
     "fib": "repeat: 3 n: 39",
     "fibfp": "repeat: 2 n: 39.0",
-    "tak": "repeat: 5000 x: 18 y: 12 z: 6",
+    "tak": "repeat: 10000 x: 18 y: 12 z: 6",
     "takl": "repeat: 1000 x: 18 y: 12 z: 6",
     "diviter": "repeat: 100000 ",
     "divrec": "repeat: 100000 ",
@@ -1397,7 +1397,7 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
     benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
 
     column_names = ["Benchmark"]
-    column_names += [get_column_name(l, o, s, postfix=p) for s in (True,)
+    column_names += [get_column_name(l, o, s, postfix=p) for s in (True,False)
                                                         for o in (True,)
                                                         for l in version_limits
                                                         for p in ('', stdev_postfix)]
