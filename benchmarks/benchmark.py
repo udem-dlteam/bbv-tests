@@ -1506,9 +1506,6 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
     row_names = [get_version_limit_name(v) for v in set(r.version_limit for r in runs)]
 
-    base_runs = sorted((r for r in runs if r.version_limit == 0),
-                       key=lambda r: column_names.index(get_col_name(r)))
-
     def get_pos(run):
         row = row_names.index(get_version_limit_name(run.version_limit))
         column = column_names.index(get_col_name(run))
@@ -1518,7 +1515,13 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     def init_data():
         return [[math.nan] * len(column_names) for _ in range(len(row_names))]
 
-    def one_heatmap(path_base, measure, best=False, only_macro=False):
+    def one_heatmap(path_base, measure, best=False, only_macro=False, base_runs=None):
+        if base_runs is None:
+            base_runs = [r for r in runs if r.version_limit == 0]
+        
+        base_runs = sorted(base_runs,
+                           key=lambda r: column_names.index(get_col_name(r)))
+
         heatmap_row_names = row_names.copy()
 
         base_data = [measure(r) for r in base_runs]
@@ -1581,6 +1584,25 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
     # Program size
     one_heatmap("program_size", run_program_size)
+
+    # Execution time vs unsafe
+    unsafe_base_runs = list(select(
+        r for r in Run
+        if r.system == system and r.compiler.name == compiler_name
+        and r.benchmark.name in benchmark_names
+        and r.version_limit == 0
+        and not r.safe_arithmetic
+        and r.compiler_optimizations
+        and r.timestamp == max(select(
+            r2.timestamp for r2 in Run
+            if r2.system == system and r2.compiler.name == compiler_name
+            and r2.version_limit == r.version_limit
+            and r2.benchmark == r.benchmark
+            and r2.version_limit == 0
+            and not r2.safe_arithmetic
+            and r2.compiler_optimizations))))
+    if unsafe_base_runs:
+        one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)
 
     
 
