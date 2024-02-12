@@ -167,29 +167,29 @@
 ;   (parent #f)   ; For DFS spanning tree construction.
 ;   (mark #f))    ; For marking the solution path.
 
-(define (make-wall owner neighbor bit)
-  (vector 'wall owner neighbor bit))
+(define-macro (make-wall owner neighbor bit)
+  `(vector 'wall ,owner ,neighbor ,bit))
 
-(define (wall:owner o)          (Svector-ref o 1))
-(define (set-wall:owner o v)    (Svector-set! o 1 v))
-(define (wall:neighbor o)       (Svector-ref o 2))
-(define (set-wall:neighbor o v) (Svector-set! o 2 v))
-(define (wall:bit o)            (Svector-ref o 3))
-(define (set-wall:bit o v)      (Svector-set! o 3 v))
+(define-macro (wall:owner o)          `(Svector-ref ,o 1))
+(define-macro (set-wall:owner o v)    `(Svector-set! ,o 1 ,v))
+(define-macro (wall:neighbor o)       `(Svector-ref ,o 2))
+(define-macro (set-wall:neighbor o v) `(Svector-set! ,o 2 ,v))
+(define-macro (wall:bit o)            `(Svector-ref ,o 3))
+(define-macro (set-wall:bit o v)      `(Svector-set! ,o 3 ,v))
 
-(define (make-cell reachable id)
-  (vector 'cell reachable id -1 #f #f))
+(define-macro (make-cell reachable id)
+  `(vector 'cell ,reachable ,id -1 #f #f))
 
-(define (cell:reachable o)       (Svector-ref o 1))
-(define (set-cell:reachable o v) (Svector-set! o 1 v))
-(define (cell:id o)              (Svector-ref o 2))
-(define (set-cell:id o v)        (Svector-set! o 2 v))
-(define (cell:walls o)           (Svector-ref o 3))
-(define (set-cell:walls o v)     (Svector-set! o 3 v))
-(define (cell:parent o)          (Svector-ref o 4))
-(define (set-cell:parent o v)    (Svector-set! o 4 v))
-(define (cell:mark o)            (Svector-ref o 5))
-(define (set-cell:mark o v)      (Svector-set! o 5 v))
+(define-macro (cell:reachable o)       `(Svector-ref ,o 1))
+(define-macro (set-cell:reachable o v) `(Svector-set! ,o 1 ,v))
+(define-macro (cell:id o)              `(Svector-ref ,o 2))
+(define-macro (set-cell:id o v)        `(Svector-set! ,o 2 ,v))
+(define-macro (cell:walls o)           `(Svector-ref ,o 3))
+(define-macro (set-cell:walls o v)     `(Svector-set! ,o 3 ,v))
+(define-macro (cell:parent o)          `(Svector-ref ,o 4))
+(define-macro (set-cell:parent o v)    `(Svector-set! ,o 4 ,v))
+(define-macro (cell:mark o)            `(Svector-ref ,o 5))
+(define-macro (set-cell:mark o v)      `(Svector-set! ,o 5 ,v))
 
 ;;; Iterates in reverse order.
 
@@ -239,7 +239,7 @@
                   (wall-mask (SFXbit-not (wall:bit wall))))
               (union! set1 set2)
               (set-cell:walls c1 (SFXbit-and walls wall-mask))
-              (= (set-size set1) ncells)))))
+              (SFX= (set-size set1) ncells)))))
    walls))
 
 
@@ -324,20 +324,19 @@
 ;   ncols
 ;   elts)
 
-(define (make-harr nrows ncols elts)
-  (vector 'harr nrows ncols elts))
+(define-macro (make-harr nrows ncols elts)
+  `(vector 'harr ,nrows ,ncols ,elts))
 
-(define (harr:nrows o)       (Svector-ref o 1))
-(define (set-harr:nrows o v) (Svector-set! o 1 v))
-(define (harr:ncols o)       (Svector-ref o 2))
-(define (set-harr:ncols o v) (Svector-set! o 2 v))
-(define (harr:elts o)        (Svector-ref o 3))
-(define (set-harr:elts o v)  (Svector-set! o 3 v))
+(define-macro (harr:nrows o)       `(Svector-ref ,o 1))
+(define-macro (set-harr:nrows o v) `(Svector-set! ,o 1 ,v))
+(define-macro (harr:ncols o)       `(Svector-ref ,o 2))
+(define-macro (set-harr:ncols o v) `(Svector-set! ,o 2 ,v))
+(define-macro (harr:elts o)        `(Svector-ref ,o 3))
+(define-macro (set-harr:elts o v)  `(Svector-set! ,o 3 ,v))
 
-(define (harr r c)
-  (make-harr r c (Smake-vector1 (SFX* r c))))
-
-
+(define-macro (harr r c)
+  `(let ((r ,r) (c ,c))
+    (make-harr r c (Smake-vector1 (SFX* r c)))))
 
 (define (href ha x y)
   (let ((r (SFXquotient y 2))
