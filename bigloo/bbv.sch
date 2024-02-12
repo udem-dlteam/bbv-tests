@@ -907,5 +907,48 @@
                  `(PRIMop substring ,a ,b ,c)
                  (DEAD-END "substring type error"))))))
 
+(define-macro (Sdefine-record name . fields)
+  (let ((make-func-name (string->symbol (string-append "make-" (symbol->string name))))
+        (test-func-name (string->symbol (string-append (symbol->string name) "?")))
+        (get-accessor-name
+          (lambda (field)
+            (string->symbol
+              (string-append (symbol->string name)
+                             ":"
+                             (symbol->string field)))))
+        (get-mutator-name
+          (lambda (field)
+            (string->symbol
+              (string-append "set-"
+                             (symbol->string name)
+                             ":"
+                            (symbol->string field))))))
+    `(begin
+       ;; constructor macro
+       (define-macro (,make-func-name . fields)
+         `(vector ',',name ,@fields))
+
+       (define-macro (,test-func-name obj)
+         `(vector? ,obj))
+
+       ;; accessors and mutators for each field
+       ,@(apply append
+          (map
+            (lambda (field index)
+              (let ((accessor-name (get-accessor-name field))
+                    (mutator-name (get-mutator-name field)))
+              `((define-macro (,accessor-name o)
+                  `(let ((o ,o))
+                    (if (,',test-func-name o)
+                      (vector-ref o ,,index)
+                      (DEAD-END "record type error"))))
+                (define-macro (,mutator-name o v)
+                  `(let ((o ,o) (v ,v))
+                    (if (,',test-func-name o)
+                      (vector-set! o ,,index v)
+                      (DEAD-END "record type error")))))))
+            fields
+            (iota (length fields) 1))))))
+
 (register-exit-function! (lambda (status) (bbv-saw-statistics) status))
 

@@ -536,6 +536,8 @@ benchmark_args = {
     "compiler": "repeat: 1",
     "conform": "repeat: 1",
     "maze": "repeat: 1",
+    "maze-record": "repeat: 1",
+    "maze-vector": "repeat: 1",
     "peval": "repeat: 1",
     "slatex": "repeat: 1",
 }
