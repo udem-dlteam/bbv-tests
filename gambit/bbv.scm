@@ -924,44 +924,70 @@
   `(PRIMop dead-end))
 
 (define-macro (Sdefine-record name . fields)
-  (let ((make-func-name (string->symbol (string-append "make-" (symbol->string name))))
-        (test-func-name (string->symbol (string-append (symbol->string name) "?")))
-        (get-accessor-name
+  (let* ((macro? (memq macro: fields))
+         (fields (filter (lambda (x) (not (eq? x macro:))) fields))
+         (make-func-name (string->symbol (string-append "make-" (symbol->string name))))
+         (test-func-name (string->symbol (string-append (symbol->string name) "?")))
+         (get-accessor-name
           (lambda (field)
             (string->symbol
               (string-append (symbol->string name)
                              ":"
                              (symbol->string field)))))
-        (get-mutator-name
+         (get-mutator-name
           (lambda (field)
             (string->symbol
               (string-append "set-"
                              (symbol->string name)
                              ":"
                             (symbol->string field))))))
-    `(begin
-       ;; constructor macro
-       (define-macro (,make-func-name . fields)
-         `(vector ',',name ,@fields))
+    (if macro?
+        `(begin
+          ;; constructor macro
+          (define-macro (,make-func-name . fields)
+            `(vector ',',name ,@fields))
 
-       (define-macro (,test-func-name obj)
-         `(vector? ,obj))
+          (define-macro (,test-func-name obj)
+            `(vector? ,obj))
 
-       ;; accessors and mutators for each field
-       ,@(apply append
-          (map
-            (lambda (field index)
-              (let ((accessor-name (get-accessor-name field))
-                    (mutator-name (get-mutator-name field)))
-              `((define-macro (,accessor-name o)
-                  `(let ((o ,o))
-                    (if (,',test-func-name o)
-                      (vector-ref o ,,index)
-                      (DEAD-END "record type error"))))
-                (define-macro (,mutator-name o v)
-                  `(let ((o ,o) (v ,v))
-                    (if (,',test-func-name o)
-                      (vector-set! o ,,index v)
-                      (DEAD-END "record type error")))))))
-            fields
-            (iota (length fields) 1))))))
+          ;; accessors and mutators for each field
+          ,@(apply append
+              (map
+                (lambda (field index)
+                  (let ((accessor-name (get-accessor-name field))
+                        (mutator-name (get-mutator-name field)))
+                  `((define-macro (,accessor-name o)
+                      `(let ((o ,o))
+                        (if (,',test-func-name o)
+                          (vector-ref o ,,index)
+                          (DEAD-END "record type error"))))
+                    (define-macro (,mutator-name o v)
+                      `(let ((o ,o) (v ,v))
+                        (if (,',test-func-name o)
+                          (vector-set! o ,,index v)
+                          (DEAD-END "record type error")))))))
+                fields
+                (iota (length fields) 1))))
+        `(begin
+          ;; constructor procedure
+          (define (,make-func-name ,@fields)
+            (vector ',name ,@fields))
+
+          (define ,test-func-name vector?)
+
+          ;; accessors and mutators for each field
+          ,@(apply append
+              (map
+                (lambda (field index)
+                  (let ((accessor-name (get-accessor-name field))
+                        (mutator-name (get-mutator-name field)))
+                  `((define (,accessor-name o)
+                      (if (,test-func-name o)
+                        (vector-ref o ,index)
+                        (DEAD-END "record type error")))
+                    (define (,mutator-name o v)
+                      (if (,test-func-name o)
+                        (vector-set! o ,index v)
+                        (DEAD-END "record type error"))))))
+                fields
+                (iota (length fields) 1)))))))

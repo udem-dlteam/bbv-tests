@@ -156,11 +156,13 @@
 ;;; - bitwise logical functions
 
 (Sdefine-record wall
+  macro:
   owner         ; Cell that owns this wall.
   neighbor      ; The other cell bordering this wall.
   bit)          ; Integer -- a bit identifying this wall in OWNER's cell.
 
 (Sdefine-record cell
+  macro:
   reachable     ; Union/find set -- all reachable cells.
   id            ; Identifying info (e.g., the coords of the cell).
   walls         ; A bitset telling which walls are still standing.
@@ -299,6 +301,7 @@
 
 
 (Sdefine-record harr
+  macro:
   nrows
   ncols
   elts)
