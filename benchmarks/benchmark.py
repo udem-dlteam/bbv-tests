@@ -535,6 +535,8 @@ benchmark_args = {
     "earley": "repeat: 1",
     "compiler": "repeat: 1",
     "conform": "repeat: 1",
+    "conform-record": "repeat: 1",
+    "conform-vector": "repeat: 1",
     "maze": "repeat: 1",
     "maze-record": "repeat: 1",
     "maze-vector": "repeat: 1",
@@ -1336,7 +1338,9 @@ def choose_csv_output_path(output, system_name, compiler_name):
 
 def is_macro(name):
     return name in ("almabench", "compiler", "earley", "peval",
-                    "conform", "maze", "maze-vector", "maze-record", "boyer", "slatex")
+                    "conform", "conform-vector", "conform-record",
+                    "maze", "maze-vector", "maze-record",
+                    "boyer", "slatex")
 
 
 def average_time(run):
@@ -1469,8 +1473,6 @@ def choose_heatmap_output_path(output, measure, system_name, compiler_name):
 def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, output):
     system = get_system_from_name_or_default(system_name)
     compiler = get_compiler_from_name(compiler_name)
-
-    print(benchmark_names)
 
     if benchmark_names is None:
         benchmark_names = list(select(b.name for b in Benchmark).distinct())
