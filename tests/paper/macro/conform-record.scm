@@ -76,22 +76,22 @@
 ; Selectors
 
 (define name internal-node-name)
-(define (make-edge-getter selector)
-  (lambda (node)
+(define-macro (make-edge-getter selector)
+  `(lambda (node)
     (if (or (none-node? node) (any-node? node))
         (fatal-error "Can't get edges from the ANY or NONE nodes")
-        (selector node))))
+        (,selector node))))
 (define red-edges (make-edge-getter internal-node-red-edges))
 (define green-edges (make-edge-getter internal-node-green-edges))
 (define blue-edges (make-edge-getter internal-node-blue-edges))
 
 ; Mutators
 
-(define (make-edge-setter mutator!)
-  (lambda (node value)
+(define-macro (make-edge-setter mutator!)
+  `(lambda (node value)
     (cond ((any-node? node) (fatal-error "Can't set edges from the ANY node"))
           ((none-node? node) 'OK)
-          (else (mutator! node value)))))
+          (else (,mutator! node value)))))
 (define set-red-edges! (make-edge-setter set-internal-node-red-edges!))
 (define set-green-edges! (make-edge-setter set-internal-node-green-edges!))
 (define set-blue-edges! (make-edge-setter set-internal-node-blue-edges!))
