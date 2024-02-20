@@ -928,19 +928,27 @@
          (fields (filter (lambda (x) (not (eq? x macro:))) fields))
          (make-func-name (string->symbol (string-append "make-" (symbol->string name))))
          (test-func-name (string->symbol (string-append (symbol->string name) "?")))
+         (get-field-name
+          (lambda (field)
+            (if (pair? field) (car field) field)))
+         (field-names (map get-field-name fields))
          (get-accessor-name
           (lambda (field)
-            (string->symbol
-              (string-append (symbol->string name)
-                             ":"
-                             (symbol->string field)))))
+            (if (pair? field)
+                (cadr field)
+                (string->symbol
+                  (string-append (symbol->string name)
+                                ":"
+                                (symbol->string field))))))
          (get-mutator-name
           (lambda (field)
-            (string->symbol
-              (string-append "set-"
-                             (symbol->string name)
-                             ":"
-                            (symbol->string field))))))
+            (if (pair? field)
+                (caddr field)
+                (string->symbol
+                  (string-append "set-"
+                                (symbol->string name)
+                                ":"
+                                (symbol->string field)))))))
     (if macro?
         `(begin
           ;; constructor macro
@@ -970,8 +978,8 @@
                 (iota (length fields) 1))))
         `(begin
           ;; constructor procedure
-          (define (,make-func-name ,@fields)
-            (vector ',name ,@fields))
+          (define (,make-func-name ,@field-names)
+            (vector ',name ,@field-names))
 
           (define ,test-func-name vector?)
 

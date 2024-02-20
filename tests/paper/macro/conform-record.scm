@@ -51,19 +51,11 @@
 ;; GRAPH NODES
 
 (Sdefine-record internal-node
-  name
-  green-edges
-  blue-edges
-  red-edges)
-
-(define internal-node-name internal-node:name)
-(define internal-node-green-edges internal-node:green-edges)
-(define internal-node-red-edges internal-node:red-edges)
-(define internal-node-blue-edges internal-node:blue-edges)
-(define set-internal-node-name! set-internal-node:name)
-(define set-internal-node-green-edges! set-internal-node:green-edges)
-(define set-internal-node-red-edges! set-internal-node:red-edges)
-(define set-internal-node-blue-edges! set-internal-node:blue-edges)
+  macro:
+  (name internal-node-name set-internal-node-name!)
+  (green-edges internal-node-green-edges set-internal-node-green-edges!)
+  (blue-edges internal-node-blue-edges set-internal-node-blue-edges!)
+  (red-edges internal-node-red-edges set-internal-node-red-edges!))
 
 (define (make-node name . blue-edges)   ; User's constructor
   (let ((name (if (symbol? name) (Ssymbol->string name) name))
@@ -71,11 +63,10 @@
     (make-internal-node name '() '() blue-edges)))
 
 (define (copy-node node)
-  (make-internal-node (name node) '() '() (blue-edges node)))
+  (make-internal-node (internal-node-name node) '() '() (blue-edges node)))
 
 ; Selectors
 
-(define name internal-node-name)
 (define-macro (make-edge-getter selector)
   `(lambda (node)
     (if (or (none-node? node) (any-node? node))
@@ -99,25 +90,9 @@
 ;; BLUE EDGES
 
 (Sdefine-record blue-edge
-  operation
-  arg-node
-  res-node)
-
-(define blue-edge-operation blue-edge:operation)
-(define blue-edge-arg-node blue-edge:arg-node)
-(define blue-edge-res-node blue-edge:res-node)
-(define set-blue-edge-operation! set-blue-edge:operation)
-(define set-blue-edge-arg-node! set-blue-edge:arg-node)
-(define set-blue-edge-res-node! set-blue-edge:res-node)
-
-; Selectors
-(define operation blue-edge-operation)
-(define arg-node blue-edge-arg-node)
-(define res-node blue-edge-res-node)
-
-; Mutators
-(define set-arg-node! set-blue-edge-arg-node!)
-(define set-res-node! set-blue-edge-res-node!)
+  (operation operation set-operation!)
+  (arg-node arg-node set-arg-node!)
+  (res-node res-node set-res-node!))
 
 ; Higher level operations on blue edges
 
@@ -133,25 +108,15 @@
 ;; GRAPHS
 
 (Sdefine-record internal-graph
-  nodes
-  already-met
-  already-joined)
-
-(define internal-graph-nodes internal-graph:nodes)
-(define internal-graph-already-met internal-graph:already-met)
-(define internal-graph-already-joined internal-graph:already-joined)
-(define set-internal-graph-nodes! set-internal-graph:nodes)
+  macro:
+  (nodes graph-nodes set-internal-graph-nodes!)
+  (already-met already-met set-already-met!)
+  (already-joined already-joined set-already-joined!))
 
 ; Constructor
 
 (define (make-graph . nodes)
   (make-internal-graph nodes (make-empty-table) (make-empty-table)))
-
-; Selectors
-
-(define graph-nodes internal-graph-nodes)
-(define already-met internal-graph-already-met)
-(define already-joined internal-graph-already-joined)
 
 ; Higher level functions on graphs
 
@@ -310,8 +275,8 @@
         (Smap2 (lambda (class)
                (sort-list class
                           (lambda (node1 node2)
-                            (SFX< (Sstring-length (name node1))
-                               (Sstring-length (name node2))))))
+                            (SFX< (Sstring-length (internal-node-name node1))
+                               (Sstring-length (internal-node-name node2))))))
              classes)
         (let ((this-node (Scar nodes)))
           (define (add-node classes)
@@ -376,7 +341,7 @@
         ((conforms? node2 node1) node1)
         (else
          (let ((result
-                (make-node (Sstring-append "(" (name node1) " ^ " (name node2) ")"))))
+                (make-node (Sstring-append "(" (internal-node-name node1) " ^ " (internal-node-name node2) ")"))))
            (add-graph-nodes! graph result)
            (insert! (already-met graph) node1 node2 result)
            (set-blue-edges! result
@@ -397,7 +362,7 @@
         ((conforms? node2 node1) node2)
         (else
          (let ((result
-                (make-node (Sstring-append "(" (name node1) " v " (name node2) ")"))))
+                (make-node (Sstring-append "(" (internal-node-name node1) " v " (internal-node-name node2) ")"))))
            (add-graph-nodes! graph result)
            (insert! (already-joined graph) node1 node2 result)
            (set-blue-edges! result
@@ -459,7 +424,7 @@
       (begin
         (setup)
         (loop (FX- n 1)
-              (map name
+              (map (lambda (n) (internal-node-name n))
                 (graph-nodes (make-lattice (make-graph a b c d any-node none-node)))))))))
 
 (define (check result)
