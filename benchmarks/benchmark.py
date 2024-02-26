@@ -1525,7 +1525,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                                         only_macro=False,
                                         subtract_unsafe_run=False,
                                         unsafe_runs=None,
-                                        base_runs=None):
+                                        base_runs=None,
+                                        include_geometric_mean=True):
         if base_runs is None:
             base_runs = [r for r in runs if r.version_limit == 0]
 
@@ -1571,6 +1572,14 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             cols = df.columns.tolist()
             cols = [n for n in cols if is_macro(n.split()[0])]
             df = df[cols]
+
+        if include_geometric_mean:
+            means = [statistics.geometric_mean(x for x in row if not math.isnan(x)) for i, row in df.iterrows()]
+            geo_df = pd.DataFrame(means,
+                         columns=["Geometric Mean"],
+                         index=heatmap_row_names)
+            df = df.join(geo_df)
+
         
         # Reorder columns according to last entry
         #cols = df.columns.tolist()
@@ -1585,6 +1594,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         heatmap_ax = sns.heatmap(df, annot=True, fmt='.2f', cmap="coolwarm",
                                  linewidths=.5, vmin=vmin, vmax=vmax, center=1)
+
         ax.xaxis.tick_top()
         plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
         plt.yticks(rotation=0, rotation_mode="anchor", ha='right')
@@ -1592,6 +1602,11 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         ax.xaxis.set_label_position('top')
         plt.xlabel('Benchmark')
         plt.ylabel('Version limit')
+
+        if include_geometric_mean:
+            ax.axvline(df.shape[1]-1, color='white', lw=3)
+            labels = ax.get_xticklabels()
+            labels[-1].set_fontweight('bold')
 
         plt.tight_layout()
 
@@ -1605,8 +1620,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     # Execution time
     one_heatmap("time", average_time, only_macro=True)
 
-    # Checks
-    one_heatmap("checks", sum_checks)
+    # old way to compute checks
+    # one_heatmap("checks", sum_checks)
 
     # Program size
     one_heatmap("program_size", run_program_size)
@@ -1630,7 +1645,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
     if unsafe_base_runs:
         one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)
-        one_heatmap("checks_vs_unsafe", sum_checks, subtract_unsafe_run=True, unsafe_runs=unsafe_base_runs)
+        one_heatmap("checks", sum_checks, subtract_unsafe_run=True, unsafe_runs=unsafe_base_runs)
     
 
 ##############################################################################
