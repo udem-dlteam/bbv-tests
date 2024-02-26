@@ -1521,16 +1521,37 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     def init_data():
         return [[math.nan] * len(column_names) for _ in range(len(row_names))]
 
-    def one_heatmap(path_base, measure, best=False, only_macro=False, base_runs=None):
+    def one_heatmap(path_base, measure, best=False,
+                                        only_macro=False,
+                                        subtract_unsafe_run=False,
+                                        unsafe_runs=None,
+                                        base_runs=None,
+                                        include_geometric_mean=True):
         if base_runs is None:
             base_runs = [r for r in runs if r.version_limit == 0]
+
+        if unsafe_runs:
+            unsafe_base_runs = sorted([r for r in unsafe_runs if r.version_limit == 0],
+                                      key=lambda r: column_names.index(get_col_name(r)))
+        else:
+            unsafe_base_runs = None
+
+        if subtract_unsafe_run:
+            def _measure(run, base_run):
+                base_unsafe_run = next(r for r in unsafe_base_runs if run.benchmark == r.benchmark)
+                base_unsafe_measure = measure(base_unsafe_run)
+                return (measure(run) - base_unsafe_measure) / (measure(base_run) - base_unsafe_measure)
+
+        else:
+            def _measure(run, base_run):
+                return measure(run) / measure(base_run)
+
         
         base_runs = sorted(base_runs,
                            key=lambda r: column_names.index(get_col_name(r)))
 
         heatmap_row_names = row_names.copy()
 
-        base_data = [measure(r) for r in base_runs]
         data = init_data()
 
         if best:
@@ -1539,8 +1560,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         for run in runs:
             row, col = get_pos(run)
-            base = base_data[col]
-            res = measure(run) / base
+            base = base_runs[col]
+            res = _measure(run, base)
             data[row][col] = res
             if best:
                 data[-1][col] = min(res, data[-1][col]) if data[-1][col] != math.nan else res
@@ -1551,6 +1572,14 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             cols = df.columns.tolist()
             cols = [n for n in cols if is_macro(n.split()[0])]
             df = df[cols]
+
+        if include_geometric_mean:
+            means = [statistics.geometric_mean(x for x in row if not math.isnan(x)) for i, row in df.iterrows()]
+            geo_df = pd.DataFrame(means,
+                         columns=["Geometric Mean"],
+                         index=heatmap_row_names)
+            df = df.join(geo_df)
+
         
         # Reorder columns according to last entry
         #cols = df.columns.tolist()
@@ -1565,6 +1594,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         heatmap_ax = sns.heatmap(df, annot=True, fmt='.2f', cmap="coolwarm",
                                  linewidths=.5, vmin=vmin, vmax=vmax, center=1)
+
         ax.xaxis.tick_top()
         plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
         plt.yticks(rotation=0, rotation_mode="anchor", ha='right')
@@ -1572,6 +1602,11 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         ax.xaxis.set_label_position('top')
         plt.xlabel('Benchmark')
         plt.ylabel('Version limit')
+
+        if include_geometric_mean:
+            ax.axvline(df.shape[1]-1, color='white', lw=3)
+            labels = ax.get_xticklabels()
+            labels[-1].set_fontweight('bold')
 
         plt.tight_layout()
 
@@ -1585,8 +1620,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     # Execution time
     one_heatmap("time", average_time, only_macro=True)
 
-    # Checks
-    one_heatmap("checks", sum_checks)
+    # old way to compute checks
+    # one_heatmap("checks", sum_checks)
 
     # Program size
     one_heatmap("program_size", run_program_size)
@@ -1607,9 +1642,10 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             and r2.version_limit == 0
             and not r2.safe_arithmetic
             and r2.compiler_optimizations))))
+
     if unsafe_base_runs:
         one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)
-
+        one_heatmap("checks", sum_checks, subtract_unsafe_run=True, unsafe_runs=unsafe_base_runs)
     
 
 ##############################################################################
