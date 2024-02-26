@@ -594,10 +594,12 @@ def get_bigloo_program_size(executable):
     return int(match.group(1), 16)
 
 def get_program_size(executable, benchmark, compiler):
-    if compiler.name == 'gambit':
+    if 'gambit' in compiler.name:
         return get_gambit_program_size(executable, benchmark)
-    else:
+    elif 'bigloo' in compiler.name:
         return get_bigloo_program_size(executable)
+    else:
+        raise ValueError("unknown compiler, cannot retrieve size")
 
 def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
     if gambitdir:
