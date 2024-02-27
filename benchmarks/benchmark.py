@@ -1659,7 +1659,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     
 
 def find_correlations(system, compiler, runs, output):
-    runs = [r for r in runs if run_is_macro(r)]
+    runs = [r for r in runs if run_is_macro(r) and r.version_limit > 0]
 
     def get_base_run(run, safe=True):
         base_runs = Run.select(compiler=run.compiler,
@@ -1769,6 +1769,8 @@ def find_correlations(system, compiler, runs, output):
     plt.yticks(rotation=0, rotation_mode="anchor", ha='right')
 
     ax.xaxis.set_label_position('top')
+
+    plt.title(f"Correlation matrix - {runs[0].compiler.name}", fontsize=32, fontweight='bold')
 
     plt.tight_layout()
 
