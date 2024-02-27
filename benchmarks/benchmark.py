@@ -551,8 +551,10 @@ def get_gambit_program_size(executable, benchmark):
     logger.debug(objdump_output)
     lines = objdump_output.splitlines()
 
-    start_marker = f"<___H_{benchmark.name}>"
-    end_marker = f"<___LNK_{benchmark.name}>"
+    marker_name = benchmark.name.replace("-", "_2d_") # TODO: support all special characters
+
+    start_marker = f"<___H_{marker_name}>"
+    end_marker = f"<___LNK_{marker_name}>"
 
     logger.debug(f"looking for {start_marker} and {end_marker}")
 
