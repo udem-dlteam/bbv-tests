@@ -1346,6 +1346,9 @@ def is_macro(name):
                     "maze", "maze-vector", "maze-record",
                     "boyer", "slatex")
 
+def run_is_macro(run):
+    return is_macro(run.benchmark.name)
+
 
 def average_time(run):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
@@ -1361,7 +1364,8 @@ def sum_checks(run):
     return sum(results)
 
 def run_program_size(run):
-    return OtherMeasure.get(name='program-size', run=run).value
+    m = OtherMeasure.get(name='program-size', run=run)
+    return m.value if m else math.nan
 
 
 @db_session
@@ -1650,7 +1654,134 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     if unsafe_base_runs:
         one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)
         one_heatmap("checks", sum_checks, subtract_unsafe_run=True, unsafe_runs=unsafe_base_runs)
+
+    find_correlations(system, compiler, runs, output)
     
+
+def find_correlations(system, compiler, runs, output):
+    runs = [r for r in runs if run_is_macro(r)]
+
+    def get_base_run(run, safe=True):
+        base_runs = Run.select(compiler=run.compiler,
+                       system=run.system,
+                       benchmark=run.benchmark,
+                       version_limit=0,
+                       compiler_optimizations=run.compiler_optimizations,
+                       safe_arithmetic=safe)
+
+        return max(base_runs, key=lambda r: r.timestamp)
+
+    measures = {}
+
+    def register(f, name=None):
+        if isinstance(f, str):
+            return lambda g: register(g, name=f)
+        else:
+            measures[name or f.__name__] = f
+            return f
+
+    def execution_time(run):
+        return statistics.mean(t.value for t in PerfEvent.select(run=run, event='real-time'))
+
+    @register("execution_time")
+    def etime(run):
+        return execution_time(run) / execution_time(get_base_run(run))
+
+    @register
+    def size_factor(run):
+        return run_program_size(run) / run_program_size(get_base_run(run))
+
+    @register
+    def version_limit(run):
+        return run.version_limit
+
+    def get_perf_event(run, event_name):
+        perf_events = list(PerfEvent.select(run=run, event=event_name))
+        if not perf_events:
+            return math.nan
+        else:
+            return statistics.mean(p.value for p in perf_events)
+
+    for event in PerfResultParser.event_names:
+        @register(f"perf:{event}")
+        def perf(run, event=event):
+            base = get_perf_event(get_base_run(run), event)
+            value = get_perf_event(run, event)
+            if base == 0:
+                base += 1
+            return value / base
+
+    def get_prim_count(run, prim_name):
+        prim_counts = list(PrimitiveCount.select(run=run, name=prim_name))
+        if not prim_counts:
+            return 0
+        else:
+            return statistics.mean(p.value for p in prim_counts)
+
+    prim_names = list(select(prim.name for prim in PrimitiveCount).distinct())
+    for prim_name in prim_names:
+        @register(f"primitive:{prim_name}")
+        def prim(run, prim_name=prim_name):
+            base = get_prim_count(get_base_run(run), prim_name)
+            value = get_prim_count(run, prim_name)
+            if base == 0:
+                base += 1
+                value += 1
+            return value / base
+
+    def get_other(run, name):
+        measures = list(OtherMeasure.select(run=run, name=name))
+        if not measures:
+            return math.nan
+        else:
+            return statistics.mean(m.value for m in measures)
+
+    other_names = list(select(prim.name for prim in OtherMeasure).distinct())
+    for other_name in other_names:
+        @register(f"other:{other_name}")
+        def prim(run, other_name=other_name):
+            base = get_other(get_base_run(run), other_name)
+            value = get_other(run, other_name)
+            if base == 0:
+                base += 1
+                value += 1
+            return value / base
+
+
+    col_names = list(measures)
+
+    data = [[measures[n](r) for n in col_names] for r in runs]
+
+    df = pd.DataFrame(data, columns=col_names)
+
+    corr = df.corr().dropna(axis=0, how='all').dropna(axis=1, how='all')
+
+    fig, ax = plt.subplots(figsize=(50, 20))
+
+    vmin = corr.min().min()
+    vmax = corr.max().max()
+
+    heatmap_ax = sns.heatmap(corr, annot=True, fmt='.2f', cmap="coolwarm",
+                                linewidths=.5, vmin=vmin, vmax=vmax, center=0)
+
+    ax.xaxis.tick_top()
+    plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
+    plt.yticks(rotation=0, rotation_mode="anchor", ha='right')
+
+    ax.xaxis.set_label_position('top')
+
+    plt.tight_layout()
+
+    output_path = choose_heatmap_output_path(output,
+                                             "correlation",
+                                             runs[0].compiler.name,
+                                             runs[0].system.name)
+
+    plt.tight_layout()
+
+    ensure_directory_exists(output_path)
+    plt.savefig(output_path)
+
 
 ##############################################################################
 # Command line interface
