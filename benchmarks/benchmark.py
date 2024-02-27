@@ -1761,7 +1761,7 @@ def find_correlations(system, compiler, runs, output):
     vmin = corr.min().min()
     vmax = corr.max().max()
 
-    heatmap_ax = sns.heatmap(corr, annot=True, fmt='.2f', cmap="coolwarm",
+    heatmap_ax = sns.heatmap(corr, annot=True, fmt='.2f', cmap="coolwarm_r",
                                 linewidths=.5, vmin=vmin, vmax=vmax, center=0)
 
     ax.xaxis.tick_top()
