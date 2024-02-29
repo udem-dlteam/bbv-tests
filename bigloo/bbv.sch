@@ -42,7 +42,10 @@
       ((atan2) `(atan-2fl ,@args))
       (else `(,op ,@args))))
 
-(define (unknown x . rest) ((car (list (lambda () x)))))
+(define (unknown x . rest)
+   (cond-expand
+      (bbvcountprimitve ((car (list (lambda () (if (pair? rest) (car rest) x))))))
+      (else ((car (list (lambda () x)))))))
 
 (define-macro-arithmetic (MAPop kind op . args)
   (cond
