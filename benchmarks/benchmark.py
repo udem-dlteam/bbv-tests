@@ -139,6 +139,35 @@ class Benchmark(db.Entity):
     timestamp = Required(int)
     runs = Set('Run')
 
+TYPECHECK_NAMES = (
+        # Gambit             # Bigloo
+        # Typechecks
+        "##fixnum?",
+        '##flonum?',
+        "##vector?",
+        "##pair?",         
+        "##procedure?",
+        "##bignum?",
+        "##boolean?",
+        "##string?",
+        "##symbol?",
+        "##char?",
+        "##null?",
+        # Overflow checks
+        "##fx+?",            "add/ov",
+        "##fx-?",            "sub/ov",
+        "##fx*?",            "mul/ov",
+        "##fxabs?",
+        "##fxarithmetic-shift-left?",
+        "##fxarithmetic-shift-right?",
+        "##fxarithmetic-shift?",
+        "##fxsquare?",
+        "##fxwraparithmetic-shift-left?",
+        "##fxwraparithmetic-shift?",
+        "##fxwraplogical-shift-right?",)
+TYPECHECK_NAMES = TYPECHECK_NAMES + tuple(n.replace("##", "") for n in TYPECHECK_NAMES) + \
+                                    tuple(n.replace("##", "$") for n in TYPECHECK_NAMES)
+
 class PrimitiveCount(db.Entity):
     name = Required(str)
     value = Required(int, size=64)
@@ -146,45 +175,36 @@ class PrimitiveCount(db.Entity):
 
     @property
     def is_typecheck(self):
-        typechecks = (
-                # Gambit             # Bigloo
-                # Typechecks
-                "##fixnum?",
-                '##flonum?',
-                "##vector?",
-                "##pair?",         
-                "##procedure?",
-                "##bignum?",
-                "##boolean?",
-                "##string?",
-                "##symbol?",
-                "##char?",
-                "##null?",
-                # Overflow checks
-                "##fx+?",            "add/ov",
-                "##fx-?",            "sub/ov",
-                "##fx*?",            "mul/ov",
-                "##fxabs?",
-                "##fxarithmetic-shift-left?",
-                "##fxarithmetic-shift-right?",
-                "##fxarithmetic-shift?",
-                "##fxsquare?",
-                "##fxwraparithmetic-shift-left?",
-                "##fxwraparithmetic-shift?",
-                "##fxwraplogical-shift-right?",)
-        typechecks = typechecks + tuple(n.replace("##", "") for n in typechecks) + \
-                                  tuple(n.replace("##", "$") for n in typechecks)
-        return self.name in typechecks
+        return self.name in TYPECHECK_NAMES
 
 class PerfEvent(db.Entity):
     event = Required(str)
     value = Required(float)
-    run = Required('Run')
+    rep = Required('Repetition')
 
-class OtherMeasure(db.Entity):
+    @property
+    def run(self):
+        return self.rep.run
+
+class CompilerStatistics(db.Entity):
+    name = Required(str)
+    value = Required(float)
+    rep = Required('Repetition')
+
+    @property
+    def run(self):
+        return self.rep.run
+
+class StaticMeasure(db.Entity):
     name = Required(str)
     value = Required(float)
     run = Required('Run')
+
+class Repetition(db.Entity):
+    run = Required('Run')
+    perf_events = Set('PerfEvent', reverse='rep')
+    compiler_statistics = Set('CompilerStatistics', reverse='rep')
+    timestamp = Required(int, default=lambda: int(time.time()))
 
 class Run(db.Entity):
     benchmark = Required('Benchmark', reverse='runs')
@@ -193,9 +213,9 @@ class Run(db.Entity):
     compiler_optimizations = Required(bool)
     version_limit = Required(int)
     safe_arithmetic = Required(bool)
+    reps = Set('Repetition', reverse='run')
     primitives = Set('PrimitiveCount', reverse='run')
-    perf_events = Set('PerfEvent', reverse='run')
-    other_measures = Set('OtherMeasure', reverse='run')
+    static_measures = Set('StaticMeasure', reverse='run')
     arguments = Required(str)
     timestamp = Required(int, default=lambda: int(time.time()))
 
@@ -488,23 +508,23 @@ def run_benchmark(executable, arguments, timeout=None):
     time_output = run_command(time_command, timeout)
 
     # Run program with all perf stat events on
-    other_events = ' '.join(f"-e {e}" for e in PerfResultParser.event_names)
-    other_command = f"perf stat {other_events} {executable} {arguments}"
-    other_output = run_command(other_command, timeout)
+    all_events = ' '.join(f"-e {e}" for e in PerfResultParser.event_names)
+    all_command = f"perf stat {all_events} {executable} {arguments}"
+    all_output = run_command(all_command, timeout)
 
     # parse and join outputs
     time_parser = PerfResultParser(time_output)
-    other_perf_parser = PerfResultParser(other_output)
+    all_perf_parser = PerfResultParser(all_output)
 
-    other_perf_parser.update(time_parser)
+    all_perf_parser.update(time_parser)
 
     for event in PerfResultParser.event_names:
-        if event not in other_perf_parser:
+        if event not in all_perf_parser:
             logger.info(f"Could not find perf stat event {repr(event)} when running {executable}")
 
     scheme_parser = SchemeStatsParser(time_output)
 
-    return other_perf_parser, scheme_parser
+    return all_perf_parser, scheme_parser
 
 default_arguments = "repeat: 10"
 
@@ -667,15 +687,18 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
         executable, primitive_count = compile(compiler_execution_data, file, v, safe_arithmetic, compiler_optimizations, timeout)
 
         align_stack_step = 3
-        for rep in range(repetitions):
-            arguments = f"{base_arguments} align-stack: {rep * align_stack_step}"
+        for i in range(repetitions):
+            arguments = f"{base_arguments} align-stack: {i * align_stack_step}"
             perf_results, scheme_stats = run_benchmark(executable, arguments, timeout)
+
+            rep = Repetition(run=run)
+
             for event, (value, variance) in perf_results.items():
-                PerfEvent(event=event, value=value, run=run)
+                PerfEvent(event=event, value=value, rep=rep)
 
             for name, value in scheme_stats.items():
                 logger.info(f"saving scheme stat {repr(name)}: {value}")
-                OtherMeasure(name=name, value=value, run=run)
+                CompilerStatistics(name=name, value=value, rep=rep)
 
         typechecks = 0
 
@@ -684,22 +707,22 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
             typechecks += p.is_typecheck * value
 
         logger.debug(f"number of typechecks: {typechecks}")
-        OtherMeasure(name="typechecks", value=typechecks, run=run)
+        StaticMeasure(name="typechecks", value=typechecks, run=run)
 
         total_primitives = sum(primitive_count.values())
         logger.debug(f"executed primitives: {total_primitives}")
-        OtherMeasure(name='primitives', value=total_primitives, run=run)
+        StaticMeasure(name='primitives', value=total_primitives, run=run)
 
         if primitive_count.size_in_gvm_instructions:
             logger.debug(f"gvm instruction size: {primitive_count.size_in_gvm_instructions}")
-            OtherMeasure(name='gvm-size', value=primitive_count.size_in_gvm_instructions, run=run)
+            StaticMeasure(name='gvm-size', value=primitive_count.size_in_gvm_instructions, run=run)
         else:
             logger.debug("Did not find count for total GVM instructions")
 
         size = get_program_size(executable, benchmark, compiler)
         if size:
             logger.debug(f"program size: {size}")
-            OtherMeasure(name='program-size', value=size, run=run)
+            StaticMeasure(name='program-size', value=size, run=run)
         else:
             logger.warning(f"could not resolve size of {repr(executable)}")
 
@@ -816,7 +839,7 @@ def get_compiler_from_name(compiler_name):
 
 
 @db_session
-def plot_benchmarks(system_name, compiler_name, benchmark, safe_arithmetic, perf_event_names, primitive_names_or_amount, other_measure_names, output):
+def plot_benchmarks(system_name, compiler_name, benchmark, safe_arithmetic, perf_event_names, primitive_names_or_amount, static_measures_names, output):
     system = get_system_from_name_or_default(system_name)
     compiler = get_compiler_from_name(compiler_name)
 
@@ -842,7 +865,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, safe_arithmetic, perf
     if primitive_names:
         logger.info(f"primitives to plot: {', '.join(primitive_names)}")
 
-    data = extract_data_from_runs(runs, perf_event_names, primitive_names, other_measure_names)
+    data = extract_data_from_runs(runs, perf_event_names, primitive_names, static_measures_names)
     output_path = choose_barchart_output_path(output=output,
                                      system_name=system.name,
                                      compiler_name=compiler.name,
@@ -884,13 +907,13 @@ def get_perf_event_statistics(run, name, default=_sentinel):
     return sanitize_stats(name, values, default)
 
 
-def get_other_measure_statistics(run, name, default=_sentinel):
-    events = select(e for e in OtherMeasure if e.name == name and e.run == run)
+def get_static_measures_statistics(run, name, default=_sentinel):
+    events = select(e for e in StaticMeasure if e.name == name and e.run == run)
     values = [e.value for e in events]
     return sanitize_stats(name, values, default)
 
 
-def extract_data_from_runs(runs, perf_event_names, primitive_names, other_measure_names):
+def extract_data_from_runs(runs, perf_event_names, primitive_names, static_measures_names):
     data = []
 
     for run in runs:
@@ -908,14 +931,14 @@ def extract_data_from_runs(runs, perf_event_names, primitive_names, other_measur
                 logger.debug(f"{name} primitive not found, defaulting to 0")
                 primitive_counts[name] = ChartValue(0)
 
-        other_measures = {}
+        static_measures = {}
 
-        for name in other_measure_names:
-            if not (measure := OtherMeasure.get(run=run, name=name)):
+        for name in static_measures_names:
+            if not (measure := StaticMeasure.get(run=run, name=name)):
                 raise ValueError(f'Cannot find {repr(name)}')
-            other_measures[name] = ChartValue(measure.value)
+            static_measures[name] = ChartValue(measure.value)
 
-        data.append((run, perf_events, primitive_counts, other_measures))
+        data.append((run, perf_events, primitive_counts, static_measures))
 
     return data
 
@@ -924,12 +947,12 @@ def plot_data(data, output_path):
     # Compute colors
     n_perf_stats = max((len(p) for _, p, _, _ in data), default=0)
     n_primitive_stats = max((len(p) for _, _, p, _ in data), default=0)
-    n_other_measures = max((len(m) for _, _, _, m in data), default=0)
-    n_measurments = n_perf_stats + n_primitive_stats + n_other_measures
+    n_static_measures = max((len(m) for _, _, _, m in data), default=0)
+    n_measurments = n_perf_stats + n_primitive_stats + n_static_measures
 
     perf_colors = mpl.colormaps.get_cmap('winter')(np.linspace(0.3, 0.8, n_perf_stats))
     primitive_colors = mpl.colormaps.get_cmap('autumn')(np.linspace(0.3, 0.8, n_primitive_stats))
-    other_measure_colors = mpl.colormaps.get_cmap('summer')(np.linspace(0.3, 0.8, n_other_measures))
+    static_measures_colors = mpl.colormaps.get_cmap('summer')(np.linspace(0.3, 0.8, n_static_measures))
 
     # Format data for matplotlib
     data_no_bbv_no_optim = [d for d in data if d[0].version_limit == 0
@@ -994,7 +1017,7 @@ def plot_data(data, output_path):
     fig, ax = plt.subplots(layout='constrained')
 
     for (attribute, measurement), color in zip(measures.items(),
-                                               itertools.chain(perf_colors, primitive_colors, other_measure_colors)):
+                                               itertools.chain(perf_colors, primitive_colors, static_measures_colors)):
         offset = width * multiplier
         rects = ax.bar(x + offset, [m.value for m in measurement],
                        width=width, label=attribute, color=color,
@@ -1044,7 +1067,7 @@ def row_name_key(name):
     else:
         return int(name), False
 
-def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, pseudo_ratio_offset=1):
+def compute_ratio_dataframe(benchmark_runs, perf_attributes, static_attributes, pseudo_ratio_offset=1):
     benchmark_runs = list(benchmark_runs)
     rows = {}
 
@@ -1057,12 +1080,12 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, p
         for perf_attr in perf_attributes:
             row.append(get_perf_event_statistics(run, perf_attr).value)
 
-        for other_attr in other_attributes:
-            row.append(get_other_measure_statistics(run, other_attr).value)
+        for static_attr in static_attributes:
+            row.append(get_static_measures_statistics(run, static_attr).value)
 
     rows = {k: rows[k] for k in sorted(rows, key=row_name_key)}
 
-    df = pd.DataFrame(np.nan, index=rows.keys(), columns=perf_attributes + other_attributes)
+    df = pd.DataFrame(np.nan, index=rows.keys(), columns=perf_attributes + static_attributes)
 
     for i, row_data in rows.items():
         df.loc[i] = row_data
@@ -1081,12 +1104,12 @@ def compute_ratio_dataframe(benchmark_runs, perf_attributes, other_attributes, p
     return df.div(df.iloc[0])
 
 
-def analyze_specific_metric(output, system, compiler, safe_arithmetic, runs, perf_attributes, other_attributes):
+def analyze_specific_metric(output, system, compiler, safe_arithmetic, runs, perf_attributes, static_attributes):
     def _get_result(run, attr, kind):
         if kind is PerfEvent:
             events = select(p for p in PerfEvent if p.event == attr and p.run == run)[:]
-        elif kind is OtherMeasure:
-            events = select(p for p in OtherMeasure if p.name == attr and p.run == run)[:]
+        elif kind is StaticMeasure:
+            events = select(p for p in StaticMeasure if p.name == attr and p.run == run)[:]
         else:
             raise NotImplementedError
 
@@ -1095,7 +1118,7 @@ def analyze_specific_metric(output, system, compiler, safe_arithmetic, runs, per
         return ChartValue(mean, stdev)
     
     for event, get_result in [(p, lambda run, attr: _get_result(run, attr, PerfEvent)) for p in perf_attributes] + \
-                 [(p, lambda run, attr: _get_result(run, attr, OtherMeasure)) for p in other_attributes]:
+                 [(p, lambda run, attr: _get_result(run, attr, StaticMeasure)) for p in static_attributes]:
         output_path = choose_specific_metric_output_path(output=output,
                                                          metric=event,
                                                          system_name=system.name,
@@ -1227,19 +1250,17 @@ def analyze(benchmark_names, system_name, compiler_name, safe_arithmetic, output
 
     logger.info(f"perf attributes in analysis: {', '.join(perf_attributes)}")
 
-    other_attributes = list(select(m.name for m in OtherMeasure if m.run in runs).distinct())
+    static_attributes = list(select(m.name for m in StaticMeasure if m.run in runs).distinct())
 
-    other_attributes = [o for o in other_attributes if not o.startswith('scheme')]
+    logger.info(f"static measures in analysis: {', '.join(perf_attributes)}")
 
-    logger.info(f"other measures in analysis: {', '.join(perf_attributes)}")
-
-    analyze_specific_metric(output, system, compiler, safe_arithmetic, runs, perf_attributes, other_attributes)
+    analyze_specific_metric(output, system, compiler, safe_arithmetic, runs, perf_attributes, static_attributes)
 
     data_points = {}
 
     benchmarks_groups = itertools.groupby(runs, key=lambda r: r.benchmark.id)  # group runs by version
 
-    ratio_dataframes = [compute_ratio_dataframe(group, perf_attributes, other_attributes)
+    ratio_dataframes = [compute_ratio_dataframe(group, perf_attributes, static_attributes)
                         for _, group in benchmarks_groups]
 
     # Compute the mean along the third axis, ignoring NaN values
@@ -1364,7 +1385,7 @@ def sum_checks(run):
     return sum(results)
 
 def run_program_size(run):
-    m = OtherMeasure.get(name='program-size', run=run)
+    m = StaticMeasure.get(name='program-size', run=run)
     return m.value if m else math.nan
 
 
@@ -1731,19 +1752,19 @@ def find_correlations(system, compiler, runs, output):
                 value += 1
             return value / base
 
-    def get_other(run, name):
-        measures = list(OtherMeasure.select(run=run, name=name))
+    def get_static(run, name):
+        measures = list(StaticMeasure.select(run=run, name=name))
         if not measures:
             return math.nan
         else:
             return statistics.mean(m.value for m in measures)
 
-    other_names = list(select(prim.name for prim in OtherMeasure).distinct())
-    for other_name in other_names:
-        @register(f"other:{other_name}")
-        def prim(run, other_name=other_name):
-            base = get_other(get_base_run(run), other_name)
-            value = get_other(run, other_name)
+    static_names = list(select(prim.name for prim in StaticMeasure).distinct())
+    for static_name in static_names:
+        @register(f"static:{static_name}")
+        def prim(run, static_name=static_name):
+            base = get_static(get_base_run(run), static_name)
+            value = get_static(run, static_name)
             if base == 0:
                 base += 1
                 value += 1
@@ -1921,11 +1942,11 @@ if __name__ == "__main__":
                              dest="perf_event_names",
                              help="perf stat events to plot")
 
-    plot_parser.add_argument('-m', '--other-measures',
+    plot_parser.add_argument('-m', '--static-measures',
                              nargs="+",
                              default=(),
-                             dest="other_measure_names",
-                             help="other measures to plot")
+                             dest="static_measures_names",
+                             help="static measures to plot")
 
     plot_parser.add_argument('-p', '--primitives',
                              nargs="+",
@@ -2088,7 +2109,7 @@ if __name__ == "__main__":
                         safe_arithmetic=args.safe_arithmetic,
                         perf_event_names=args.perf_event_names,
                         primitive_names_or_amount=args.primitive_names_or_amount,
-                        other_measure_names=args.other_measure_names,
+                        static_measures_names=args.static_measures_names,
                         output=args.output)
     elif args.command == 'analysis':
         analyze(
