@@ -825,7 +825,7 @@ def plot_benchmarks(system_name, compiler_name, benchmark, safe_arithmetic, perf
         r for r in Run
         if r.system == system and r.compiler == compiler and r.benchmark.name == benchmark
            and r.safe_arithmetic == safe_arithmetic
-           and (not r.compiler_optimizations or r.version_limit == 0)
+        and r.compiler_optimizations
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
             if r2.system == system and r2.compiler == compiler
@@ -1712,11 +1712,13 @@ def find_correlations(system, compiler, runs, output):
             return value / base
 
     def get_prim_count(run, prim_name):
-        prim_counts = list(PrimitiveCount.select(run=run, name=prim_name))
-        if not prim_counts:
+        prim_count = PrimitiveCount.get(run=run, name=prim_name)
+        base = PrimitiveCount.get(run=get_base_run(run), name=prim_name)
+        base_value = base.value if base else 0
+        if not prim_count:
             return 0
         else:
-            return statistics.mean(p.value for p in prim_counts)
+            return prim_count.value - base_value
 
     prim_names = list(select(prim.name for prim in PrimitiveCount).distinct())
     for prim_name in prim_names:
