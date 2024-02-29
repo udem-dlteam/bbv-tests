@@ -551,8 +551,10 @@ def get_gambit_program_size(executable, benchmark):
     logger.debug(objdump_output)
     lines = objdump_output.splitlines()
 
-    start_marker = f"<___H_{benchmark.name}>"
-    end_marker = f"<___LNK_{benchmark.name}>"
+    marker_name = benchmark.name.replace("-", "_2d_") # TODO: support all special characters
+
+    start_marker = f"<___H_{marker_name}>"
+    end_marker = f"<___LNK_{marker_name}>"
 
     logger.debug(f"looking for {start_marker} and {end_marker}")
 
@@ -594,10 +596,12 @@ def get_bigloo_program_size(executable):
     return int(match.group(1), 16)
 
 def get_program_size(executable, benchmark, compiler):
-    if compiler.name == 'gambit':
+    if 'gambit' in compiler.name:
         return get_gambit_program_size(executable, benchmark)
-    else:
+    elif 'bigloo' in compiler.name:
         return get_bigloo_program_size(executable)
+    else:
+        raise ValueError("unknown compiler, cannot retrieve size")
 
 def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
     if gambitdir:
@@ -1342,6 +1346,9 @@ def is_macro(name):
                     "maze", "maze-vector", "maze-record",
                     "boyer", "slatex")
 
+def run_is_macro(run):
+    return is_macro(run.benchmark.name)
+
 
 def average_time(run):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
@@ -1357,7 +1364,8 @@ def sum_checks(run):
     return sum(results)
 
 def run_program_size(run):
-    return OtherMeasure.get(name='program-size', run=run).value
+    m = OtherMeasure.get(name='program-size', run=run)
+    return m.value if m else math.nan
 
 
 @db_session
@@ -1521,16 +1529,37 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     def init_data():
         return [[math.nan] * len(column_names) for _ in range(len(row_names))]
 
-    def one_heatmap(path_base, measure, best=False, only_macro=False, base_runs=None):
+    def one_heatmap(path_base, measure, best=False,
+                                        only_macro=False,
+                                        subtract_unsafe_run=False,
+                                        unsafe_runs=None,
+                                        base_runs=None,
+                                        include_geometric_mean=True):
         if base_runs is None:
             base_runs = [r for r in runs if r.version_limit == 0]
+
+        if unsafe_runs:
+            unsafe_base_runs = sorted([r for r in unsafe_runs if r.version_limit == 0],
+                                      key=lambda r: column_names.index(get_col_name(r)))
+        else:
+            unsafe_base_runs = None
+
+        if subtract_unsafe_run:
+            def _measure(run, base_run):
+                base_unsafe_run = next(r for r in unsafe_base_runs if run.benchmark == r.benchmark)
+                base_unsafe_measure = measure(base_unsafe_run)
+                return (measure(run) - base_unsafe_measure) / (measure(base_run) - base_unsafe_measure)
+
+        else:
+            def _measure(run, base_run):
+                return measure(run) / measure(base_run)
+
         
         base_runs = sorted(base_runs,
                            key=lambda r: column_names.index(get_col_name(r)))
 
         heatmap_row_names = row_names.copy()
 
-        base_data = [measure(r) for r in base_runs]
         data = init_data()
 
         if best:
@@ -1539,8 +1568,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         for run in runs:
             row, col = get_pos(run)
-            base = base_data[col]
-            res = measure(run) / base
+            base = base_runs[col]
+            res = _measure(run, base)
             data[row][col] = res
             if best:
                 data[-1][col] = min(res, data[-1][col]) if data[-1][col] != math.nan else res
@@ -1551,6 +1580,14 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             cols = df.columns.tolist()
             cols = [n for n in cols if is_macro(n.split()[0])]
             df = df[cols]
+
+        if include_geometric_mean:
+            means = [statistics.geometric_mean(x for x in row if not math.isnan(x)) for i, row in df.iterrows()]
+            geo_df = pd.DataFrame(means,
+                         columns=["Geometric Mean"],
+                         index=heatmap_row_names)
+            df = df.join(geo_df)
+
         
         # Reorder columns according to last entry
         #cols = df.columns.tolist()
@@ -1565,6 +1602,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         heatmap_ax = sns.heatmap(df, annot=True, fmt='.2f', cmap="coolwarm",
                                  linewidths=.5, vmin=vmin, vmax=vmax, center=1)
+
         ax.xaxis.tick_top()
         plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
         plt.yticks(rotation=0, rotation_mode="anchor", ha='right')
@@ -1572,6 +1610,11 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         ax.xaxis.set_label_position('top')
         plt.xlabel('Benchmark')
         plt.ylabel('Version limit')
+
+        if include_geometric_mean:
+            ax.axvline(df.shape[1]-1, color='white', lw=3)
+            labels = ax.get_xticklabels()
+            labels[-1].set_fontweight('bold')
 
         plt.tight_layout()
 
@@ -1585,8 +1628,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     # Execution time
     one_heatmap("time", average_time, only_macro=True)
 
-    # Checks
-    one_heatmap("checks", sum_checks)
+    # old way to compute checks
+    # one_heatmap("checks", sum_checks)
 
     # Program size
     one_heatmap("program_size", run_program_size)
@@ -1607,10 +1650,140 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             and r2.version_limit == 0
             and not r2.safe_arithmetic
             and r2.compiler_optimizations))))
+
     if unsafe_base_runs:
         one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)
+        one_heatmap("checks", sum_checks, subtract_unsafe_run=True, unsafe_runs=unsafe_base_runs)
 
+    find_correlations(system, compiler, runs, output)
     
+
+def find_correlations(system, compiler, runs, output):
+    runs = [r for r in runs if run_is_macro(r) and r.version_limit > 0]
+
+    def get_base_run(run, safe=True):
+        base_runs = Run.select(compiler=run.compiler,
+                       system=run.system,
+                       benchmark=run.benchmark,
+                       version_limit=0,
+                       compiler_optimizations=run.compiler_optimizations,
+                       safe_arithmetic=safe)
+
+        return max(base_runs, key=lambda r: r.timestamp)
+
+    measures = {}
+
+    def register(f, name=None):
+        if isinstance(f, str):
+            return lambda g: register(g, name=f)
+        else:
+            measures[name or f.__name__] = f
+            return f
+
+    def execution_time(run):
+        return statistics.mean(t.value for t in PerfEvent.select(run=run, event='real-time'))
+
+    @register("execution_time")
+    def etime(run):
+        return execution_time(run) / execution_time(get_base_run(run))
+
+    @register
+    def size_factor(run):
+        return run_program_size(run) / run_program_size(get_base_run(run))
+
+    @register
+    def version_limit(run):
+        return run.version_limit
+
+    def get_perf_event(run, event_name):
+        perf_events = list(PerfEvent.select(run=run, event=event_name))
+        if not perf_events:
+            return math.nan
+        else:
+            return statistics.mean(p.value for p in perf_events)
+
+    for event in PerfResultParser.event_names:
+        @register(f"perf:{event}")
+        def perf(run, event=event):
+            base = get_perf_event(get_base_run(run), event)
+            value = get_perf_event(run, event)
+            if base == 0:
+                base += 1
+            return value / base
+
+    def get_prim_count(run, prim_name):
+        prim_counts = list(PrimitiveCount.select(run=run, name=prim_name))
+        if not prim_counts:
+            return 0
+        else:
+            return statistics.mean(p.value for p in prim_counts)
+
+    prim_names = list(select(prim.name for prim in PrimitiveCount).distinct())
+    for prim_name in prim_names:
+        @register(f"primitive:{prim_name}")
+        def prim(run, prim_name=prim_name):
+            base = get_prim_count(get_base_run(run), prim_name)
+            value = get_prim_count(run, prim_name)
+            if base == 0:
+                base += 1
+                value += 1
+            return value / base
+
+    def get_other(run, name):
+        measures = list(OtherMeasure.select(run=run, name=name))
+        if not measures:
+            return math.nan
+        else:
+            return statistics.mean(m.value for m in measures)
+
+    other_names = list(select(prim.name for prim in OtherMeasure).distinct())
+    for other_name in other_names:
+        @register(f"other:{other_name}")
+        def prim(run, other_name=other_name):
+            base = get_other(get_base_run(run), other_name)
+            value = get_other(run, other_name)
+            if base == 0:
+                base += 1
+                value += 1
+            return value / base
+
+
+    col_names = list(measures)
+
+    data = [[measures[n](r) for n in col_names] for r in runs]
+
+    df = pd.DataFrame(data, columns=col_names)
+
+    corr = df.corr().dropna(axis=0, how='all').dropna(axis=1, how='all')
+
+    fig, ax = plt.subplots(figsize=(50, 20))
+
+    vmin = corr.min().min()
+    vmax = corr.max().max()
+
+    heatmap_ax = sns.heatmap(corr, annot=True, fmt='.2f', cmap="coolwarm_r",
+                                linewidths=.5, vmin=vmin, vmax=vmax, center=0)
+
+    ax.xaxis.tick_top()
+    plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
+    plt.yticks(rotation=0, rotation_mode="anchor", ha='right')
+
+    ax.xaxis.set_label_position('top')
+
+    plt.title(f"Correlation matrix - {runs[0].compiler.name}", fontsize=32, fontweight='bold')
+
+    plt.tight_layout()
+
+    output_path = choose_heatmap_output_path(output,
+                                             "correlation",
+                                             runs[0].compiler.name,
+                                             runs[0].system.name)
+
+    plt.tight_layout()
+
+    ensure_directory_exists(output_path)
+    plt.savefig(output_path)
+
 
 ##############################################################################
 # Command line interface
