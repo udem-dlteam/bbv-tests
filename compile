@@ -234,7 +234,8 @@ case "$SYSTEM" in
 
     PATH="$COMPILER_DIR/bin:$PATH"
 
-    BIGLOO_OPTIONS="-srfi arithmetic$ARITHMETIC -w -unsafe -saw -o $OUTPUT_FILE_EXE"
+    BIGLOO_SRFI="-srfi arithmetic$ARITHMETIC"
+    BIGLOO_OPTIONS="-w -unsafe -saw -o $OUTPUT_FILE_EXE"
     BIGLOOBBVVLENGTH=false
     BIGLOOBBVVERSIONLIMIT=
 
@@ -245,6 +246,7 @@ case "$SYSTEM" in
     fi
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -copt -DSAW_BBV_STATS=1"
+      BIGLOO_SRFI="$BIGLOO_SRFI -srfi bbvcountprimitve"
     fi
     if [ "$VERSION_LIMIT" = "0" ]; then
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -fno-saw-bbv"
@@ -253,6 +255,8 @@ case "$SYSTEM" in
       BIGLOOBBVVLENGTH=true
       BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT
     fi
+
+    BIGLOO_OPTIONS="$BIGLOO_SRFI $BIGLOO_OPTIONS"
 
     # Compilation
     (cd $SCRIPT_DIR/bigloo && \
