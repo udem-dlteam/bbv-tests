@@ -1384,6 +1384,13 @@ def sum_checks(run):
     results = [p.value for p in primitive_counts if p.is_typecheck]
     return sum(results)
 
+def sum_removable_checks(run):
+    unsafe_run = Run.get(compiler=run.compiler, system=run.system, safe_arithmetic=False,
+                         version_limit=0, compiler_optimizations=run.compiler_optimizations,
+                         benchmark=run.benchmark)
+
+    return sum_checks(run) - sum_checks(unsafe_run)
+
 def run_program_size(run):
     m = StaticMeasure.get(name='program-size', run=run)
     return m.value if m else math.nan
@@ -1460,7 +1467,7 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
     data += get_measure_data("Execution time", average_time, stdev_time)
 
     # primitive count
-    data += get_measure_data("Runtime checks", sum_checks)
+    data += get_measure_data("Runtime removable checks", sum_removable_checks)
 
     # program size
     data += get_measure_data("Program size", run_program_size)
