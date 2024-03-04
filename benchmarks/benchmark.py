@@ -1702,7 +1702,8 @@ def find_correlations(system, compiler, runs, output):
             return f
 
     def execution_time(run):
-        return statistics.mean(t.value for t in PerfEvent.select(run=run, event='real-time'))
+        times = list(select(p.value for p in PerfEvent if p.run == run and p.event == 'real-time'))
+        return statistics.mean(times)
 
     @register("execution_time")
     def etime(run):
@@ -1717,7 +1718,7 @@ def find_correlations(system, compiler, runs, output):
         return run.version_limit
 
     def get_perf_event(run, event_name):
-        perf_events = list(PerfEvent.select(run=run, event=event_name))
+        perf_events = list(select(p for p in PerfEvent if p.event == event_name and p.run == run))
         if not perf_events:
             return math.nan
         else:
