@@ -3,7 +3,7 @@
 /*    -------------------------------------------------------------    */
 /*    Author      :  Manuel Serrano                                    */
 /*    Creation    :  Thu Mar 16 18:48:21 1995                          */
-/*    Last change :  Wed Jan 17 15:25:13 2024 (serrano)                */
+/*    Last change :  Tue Mar  5 08:12:53 2024 (serrano)                */
 /*    -------------------------------------------------------------    */
 /*    Bigloo's stuff                                                   */
 /*=====================================================================*/
@@ -124,8 +124,27 @@ static long saw_charp = 0;
 #undef BOOLEANP
 #define BOOLEANP(o) (saw_booleanp++, (((long)o == (long)BTRUE) || ((long)o == (long)BFALSE)))
 
+static long fixnump_lines_length = 0;
+static long *fixnump_lines = 0L;
+static void fixnump_line_inc(long line) {
+   if (line >= fixnump_lines_length) {
+      if (fixnump_lines) {
+	 fixnump_lines = realloc(fixnump_lines, sizeof(long) * line * 2);
+      } else {
+	 fixnump_lines = malloc(sizeof(long) * line * 2);
+      }
+      memset(&fixnump_lines[fixnump_lines_length], 0, sizeof(long) * (line * 2 - fixnump_lines_length));
+      fixnump_lines_length = line * 2;
+   }
+   fixnump_lines[line]++;
+}
+
 #  undef INTEGERP
-#  define INTEGERP(o) (saw_fixnump++, ((((long)o) & TAG_MASK) == TAG_INT))
+#if (SAW_BBV_STATS >= 2)
+#  define INTEGERP(o) (saw_fixnump++, fixnump_line_inc(__LINE__), ((((long)o) & TAG_MASK) == TAG_INT))
+#else
+#  define INTEGERP(o) (saw_fixnump++, fixnump_line_inc(__LINE__), ((((long)o) & TAG_MASK) == TAG_INT))
+#endif
 
 #  undef FLONUMP
 #  define FLONUMP(c) (saw_flonump++, ((c && ((((long)c)&TAG_MASK) == TAG_REAL))))
@@ -177,6 +196,7 @@ static long saw_charp = 0;
 #define CHARP(o) (saw_charp++, BGL_CNSTP(o, BCHARH, BGL_CNST_SHIFT_CHAR))
 
 int bbv_saw_statistics() {
+   long i;
    fprintf(stderr, "***primitive-call-counter\n");
    fprintf(stderr, "(ifne %ld)\n", saw_ifne + saw_ifeq);
    fprintf(stderr, "(eq %ld)\n", saw_eq);
@@ -204,6 +224,17 @@ int bbv_saw_statistics() {
    fprintf(stderr, "(symbol? %ld)\n", saw_symbolp);
    fprintf(stderr, "(string? %ld)\n", saw_stringp);
    fprintf(stderr, "(char? %ld)\n", saw_charp);
+
+#if (SAW_BBV_STATS >= 2)
+   fprintf(stderr, "---------------------------\n");
+   fprintf(stderr, "fixnump:\n");
+   for (i = 0; i < fixnump_lines_length; i++) {
+      if (fixnump_lines[i] > 0) {
+	 fprintf(stderr, "  %5d: %d\n", i, fixnump_lines[i]);
+      }
+   }
+#endif
+   
    return 0;
 }
 #else

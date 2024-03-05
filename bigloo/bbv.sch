@@ -910,7 +910,7 @@
                  `(PRIMop substring ,a ,b ,c)
                  (DEAD-END "substring type error"))))))
 
-(define-macro (Sdefine-record name . fields)
+(define-macro (Sdefine-record-TBR-5mar2024 name . fields)
    (let ((make-func-name (symbol-append 'make- name))
 	 (test-func-name (symbol-append name '?))
 	 (get-accessor-name

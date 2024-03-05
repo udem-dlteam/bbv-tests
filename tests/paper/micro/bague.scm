@@ -1,5 +1,5 @@
 ;*=====================================================================*/
-;*    .../bigloo/work/bbv/bbv-tests/tests/bglstone/bague.scm           */
+;*    serrano/prgm/project/bbv-tests/tests/paper/micro/bague.scm       */
 ;*    -------------------------------------------------------------    */
 ;*    Author      :  Pierre Weis                                       */
 ;*    Creation    :  Fri Apr  1 10:00:21 1994                          */
