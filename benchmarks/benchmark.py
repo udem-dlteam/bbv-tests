@@ -1625,8 +1625,15 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         fig, ax = plt.subplots(figsize=(15, 5))
 
-        vmin = df.min().min()
-        vmax = df.max().max()
+        if path_base == 'time':
+            vmin, vmax = 0.65, 1.15
+        elif path_base == 'program_size':
+            vmin, vmax = 0.5, 9.5
+        elif path_base == 'checks':
+            vmin, vmax = 0.15, 1.25
+        else:
+            vmin = df.min().min()
+            vmax = df.max().max()
 
         heatmap_ax = sns.heatmap(df, annot=True, fmt='.2f', cmap="coolwarm",
                                  linewidths=.5, vmin=vmin, vmax=vmax, center=1)
@@ -1702,7 +1709,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         one_heatmap("checks", sum_checks, subtract_unsafe_run=True, base_runs=checks_base_runs,
                     unsafe_runs=unsafe_base_runs)
 
-    find_correlations(system, compiler, runs, output)
+    #find_correlations(system, compiler, runs, output)
     
 
 def find_correlations(system, compiler, runs, output):
