@@ -1630,7 +1630,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         elif path_base == 'program_size':
             vmin, vmax = 0.5, 9.5
         elif path_base == 'checks':
-            vmin, vmax = 0.15, 1.25
+            vmin, vmax = 0.15, 1.05
         else:
             vmin = df.min().min()
             vmax = df.max().max()
@@ -1690,19 +1690,19 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     checks_compiler_name = 'bbv-gambit'
     checks_base_runs = list(select(
         r for r in Run
-        if r.system == system and r.compiler.name == checks_compiler_name
+        if r.compiler.name == checks_compiler_name
         and r.benchmark.name in benchmark_names
         and r.version_limit == 0
         and r.safe_arithmetic
-        and r.compiler_optimizations
+        and not r.compiler_optimizations
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
-            if r2.system == system and r2.compiler.name == checks_compiler_name
+            if r.system == r2.system and r2.compiler.name == checks_compiler_name
             and r2.version_limit == r.version_limit
             and r2.benchmark == r.benchmark
             and r2.version_limit == 0
             and r2.safe_arithmetic
-            and r2.compiler_optimizations))))
+            and not r2.compiler_optimizations))))
 
     if unsafe_base_runs:
         one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)

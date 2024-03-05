@@ -191,11 +191,14 @@ case "$SYSTEM" in
     # Set optimization level
     if [ "$OPTIM_LEVEL" = "0" ]; then
       INLINING_LIMIT=0
+      OPTIM_DECLARATIONS="(not constant-fold) (not inline) (not lambda-lift)"
     else
+      OPTIM_DECLARATIONS=""
       INLINING_LIMIT=370
     fi
 
     PRELUDE="(declare
+               $OPTIM_DECLARATIONS
                (version-limit $VERSION_LIMIT)
                (inlining-limit $INLINING_LIMIT))
              (define-macro (%%%)
@@ -240,7 +243,7 @@ case "$SYSTEM" in
     BIGLOOBBVVERSIONLIMIT=
 
     if [ "$OPTIM_LEVEL" = "0" ]; then
-      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -O2 -fno-user-inlining"
+      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -O0 -fno-user-inlining"
     else
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -Obench"
     fi
