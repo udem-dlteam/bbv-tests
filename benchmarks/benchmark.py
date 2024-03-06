@@ -429,6 +429,11 @@ def extract_executable_from_compiler_output(content):
     return re.search(r"\*\*\*executable: (.+)", content).group(1)
 
 
+def extract_compile_time_from_compiler_output(content):
+    parser = PerfResultParser(content)
+    return parser[parser.time_event][0] # index 0 is value, 1 is variance
+
+
 def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
     env = os.environ.copy()
 
@@ -436,8 +441,8 @@ def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizati
     optimization_flag = "-O3" if compiler_optimizations else ""
     arithmetic_flag = "-U" if not safe_arithmetic else ""
 
-    command = f"{COMPILE_SCRIPT} -S gambit -D {gambitdir} -V {vlimit} {arithmetic_flag} {optimization_flag} -f {file}"
-    command_with_primitives = f"{command} -P"
+    base_command = f"{COMPILE_SCRIPT} -S gambit -D {gambitdir} -V {vlimit} {arithmetic_flag} {optimization_flag} -f {file}"
+    command_with_primitives = f"{base_command} -P"
 
     output_with_primitives = run_command(command_with_primitives, timeout, env)
     primitive_count = PrimitivesCountParser(output_with_primitives)
@@ -447,12 +452,14 @@ def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizati
     else:
         logger.debug(f"Primitive count: {dict(primitive_count)}")
 
-    output = run_command(command, timeout, env)
+    timed_command = f"perf stat {base_command}"
+    output = run_command(timed_command, timeout, env)
+    compile_time = extract_compile_time_from_compiler_output(output)
     executable = extract_executable_from_compiler_output(output)
 
     logger.info(f"executable created at: {executable}")    
 
-    return executable, primitive_count
+    return executable, primitive_count, compile_time
 
 
 def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
@@ -474,10 +481,10 @@ def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeou
     primitive_count = PrimitivesCountParser(executable_output)
 
     # Second execution without primitive count
-    command = get_command(False)
-
-    output = run_command(command, timeout)
-
+    base_command = get_command(False)
+    timed_command = f"perf stat {base_command}"
+    output = run_command(timed_command, timeout)
+    compile_time = extract_compile_time_from_compiler_output(output)
     executable = extract_executable_from_compiler_output(output)
 
     logger.info(f"executable created at: {executable}")
@@ -487,7 +494,7 @@ def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeou
     else:
         logger.debug(f"Primitive count: {dict(primitive_count)}")
 
-    return executable, primitive_count
+    return executable, primitive_count, compile_time
 
 
 def compile(compiler_execution_data, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
@@ -684,7 +691,10 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
                   compiler_optimizations=compiler_optimizations,
                   arguments=base_arguments)
 
-        executable, primitive_count = compile(compiler_execution_data, file, v, safe_arithmetic, compiler_optimizations, timeout)
+        executable, primitive_count, compile_time = compile(compiler_execution_data, file, v, safe_arithmetic, compiler_optimizations, timeout)
+
+        logger.debug(f"compilation time: {compile_time}")
+        StaticMeasure(name="compile-time", value=compile_time, run=run)
 
         align_stack_step = 3
         for i in range(repetitions):
