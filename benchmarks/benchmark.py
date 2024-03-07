@@ -1737,7 +1737,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         one_heatmap("checks", sum_checks, subtract_unsafe_run=True, base_runs=checks_base_runs,
                     unsafe_runs=unsafe_base_runs)
 
-    one_heatmap("compile_time", compile_time, absolute=True)
+    one_heatmap("compile_time", compile_time)
 
     #find_correlations(system, compiler, runs, output)
     
