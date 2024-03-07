@@ -3491,7 +3491,7 @@
 (define (run1)
   (most-distant-atom (pseudoknot)))
    
-(define (run #!key (n (unknown 30 1)))
+(define (run #!key (n (unknown 50 1)))
    (let loop ((n n) (result #f))
       (if (SFX> n 0)
 	  (loop (SFX- n 1) (run1))
