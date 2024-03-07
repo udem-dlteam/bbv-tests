@@ -16,6 +16,15 @@
 ;
 ;   "???" published in the "Journal of Functional Programming".
 
+(define k 0)
+(define (++)
+   (set! k (+fx k 1))
+   k)
+
+(define-macro (trace . l)
+   ;;`(fprint (current-error-port) (++) ": " ,@l)
+   #f)
+
 ; -- MATH UTILITIES -----------------------------------------------------------
 
 (define constant-pi          3.14159265358979323846)
@@ -29,11 +38,11 @@
         ((SFL< y 0.0)
          (if (SFL= x 0.0)
            constant-minus-pi/2
-           (SFL+ (SFLatan2 y x) constant-minus-pi)))
+           (SFL+ (SFLatan (SFL/ y x)) constant-minus-pi)))
         (else
          (if (SFL= x 0.0)
            constant-pi/2
-           (SFL+ (SFLatan2 y x) constant-pi)))))
+           (SFL+ (SFLatan (SFL/ y x)) constant-pi)))))
 
 ; -- POINTS -------------------------------------------------------------------
 
@@ -48,6 +57,7 @@
 (define (pt-z-set! pt val) (Svector-set! pt 2 val))
 
 (define (pt-sub p1 p2)
+   (trace "pt-sub p1=" p1 " p2=" p2)
   (make-pt (SFL- (pt-x p1) (pt-x p2))
            (SFL- (pt-y p1) (pt-y p2))
            (SFL- (pt-z p1) (pt-z p2))))
@@ -59,10 +69,12 @@
     (SFLsqrt (SFL+ (SFL* dx dx) (SFL+ (SFL* dy dy) (SFL* dz dz))))))
 
 (define (pt-phi p)
+   (trace "pt-phi p=" p)
   (let* ((x (pt-x p))
          (y (pt-y p))
          (z (pt-z p))
          (b (math-atan2 x z)))
+   (trace "pt-phi.2 " (SFL+ (SFL* (SFLcos b) z) (SFL* (SFLsin b) x)))
     (math-atan2 (SFL+ (SFL* (SFLcos b) z) (SFL* (SFLsin b) x)) y)))
 
 (define (pt-theta p)
@@ -86,6 +98,7 @@
 ; The components tx, ty, and tz are the translation vector.
 
 (define (make-tfo a b c d e f g h i tx ty tz)
+   (trace "make-tfo " a " " b " " c " " d " " e " " f " " g " " h)
   (vector a b c d e f g h i tx ty tz))
 
 (define (tfo-a tfo) (Svector-ref tfo 0))
@@ -151,6 +164,7 @@
 ; by A and B.
 
 (define (tfo-combine A B)
+   (trace "tfo-combine a=" A " b=" B)
   (make-tfo
    (SFL+ (SFL* (tfo-a A) (tfo-a B))
            (SFL* (tfo-b A) (tfo-d B))
@@ -196,6 +210,7 @@
 ; transformation matrix.
 
 (define (tfo-inv-ortho tfo)
+   (trace "tfo-inv-orth tfo=" tfo)
   (let* ((tx (tfo-tx tfo))
          (ty (tfo-ty tfo))
          (tz (tfo-tz tfo)))
@@ -218,6 +233,7 @@
 ; mapped to the Y axis and p3 gets mapped to the YZ plane.
 
 (define (tfo-align p1 p2 p3)
+   (trace "tfo-align tfo=" p1 " " p2 " " p3)
   (let* ((x1 (pt-x p1))       (y1 (pt-y p1))       (z1 (pt-z p1))
          (x3 (pt-x p3))       (y3 (pt-y p3))       (z3 (pt-z p3))
          (x31 (SFL- x3 x1)) (y31 (SFL- y3 y1)) (z31 (SFL- z3 z1))
@@ -253,6 +269,12 @@
          (z (SFL- (SFL+ (SFL- (SFL* x1 cosPsinT))
                             (SFL* y1 sinP))
                     (SFL* z1 cosPcosT))))
+     (trace "tfo-align.1 " x1 " " y1 " " z1)
+     (trace "tfo-align.2 " x31 " " y31 " " z31)
+     (trace "tfo-align.3 " rotpY " " Phi)
+     (trace "tfo-align.4 " sinP " " sinT " " cosP " " cosT)
+     (trace "tfo-align.10 " sinPsinT " " cosP " " sinPcosT)
+     (trace "tfo-align.30 " x " " y " " z)
     (make-tfo
      (SFL- (SFL* cosT cosR) (SFL* cosPsinT sinR))
      sinPsinT
@@ -2921,6 +2943,7 @@
       (get-var id (cdr lst)))))
 
 (define (make-relative-nuc tfo n)
+   (trace "make-relative-nuc tfo=" tfo " " n)
   (cond ((rA? n)
          (make-rA
            (nuc-dgf-base-tfo  n)
@@ -3465,8 +3488,14 @@
       (let ((x (Scar l)))
         (loop (if (SFL> x m) x m) (Scdr l))))))
 
-(define (run #!key (n (unknown 1 1)))
+(define (run1)
   (most-distant-atom (pseudoknot)))
+   
+(define (run #!key (n (unknown 30 1)))
+   (let loop ((n n) (result #f))
+      (if (SFX> n 0)
+	  (loop (SFX- n 1) (run1))
+	  result)))
 
 (define (check result)
   (and (number? result)
