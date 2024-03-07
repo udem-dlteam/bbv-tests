@@ -1,5 +1,3 @@
-(import (scheme base) (scheme cxr) (scheme file) (scheme read) (scheme write) (scheme time))
-
 ;;; DYNAMIC -- Obtained from Andrew Wright.
 
 ;; Fritz's dynamic type inferencer, set up to run on itself
