@@ -65,9 +65,9 @@
   ;; a binding for a key in ext-env hides any binding in env for
   ;; the same key (see dynamic-lookup)
   ;; returns the extended environment
-  (append ext-env env))
+  (Sappend ext-env env))
 
-(define dynamic-lookup (lambda (x l) (assv x l)))
+(define dynamic-lookup (lambda (x l) (Sassv x l)))
 ;; returns the first pair in env that matches the key; returns #f
 ;; if no such pair exists
 
@@ -77,7 +77,7 @@
 
 (define (env-show env)
   ;; returns a printable list representation of a type environment
-  (map binding-show env))
+  (Smap2 binding-show env))
 ;;----------------------------------------------------------------------------
 ;;       Parsing for Scheme
 ;;----------------------------------------------------------------------------
@@ -122,10 +122,10 @@
    ((symbol? e)
     (dynamic-parse-action-symbol-const e))
    ((vector? e)
-    (dynamic-parse-action-vector-const (map dynamic-parse-datum (vector->list e))))
+    (dynamic-parse-action-vector-const (Smap2 dynamic-parse-datum (Svector->list e))))
    ((pair? e)
-    (dynamic-parse-action-pair-const (dynamic-parse-datum (car e))
-                                     (dynamic-parse-datum (cdr e))))
+    (dynamic-parse-action-pair-const (dynamic-parse-datum (Scar e))
+                                     (dynamic-parse-datum (Scdr e))))
    (else (error 'dynamic-parse-datum "Unknown datum: ~s" e))))
 
 
@@ -139,7 +139,7 @@
   ;; the value of the binding as a result
   (if (symbol? e)
       (cond
-       ((memq e syntactic-keywords)
+       ((Smemq e syntactic-keywords)
         (error 'dynamic-parse-formal "Illegal identifier (keyword): ~s" e))
        ((dynamic-lookup e f-env)
         (error 'dynamic-parse-formal "Duplicate variable definition: ~s" e))
@@ -171,10 +171,10 @@
               (pf*
                (extend-env-with-binding f-env binding)
                (cons var-result results)
-               (cdr formals))))
+               (Scdr formals))))
            (else (error 'dynamic-parse-formal* "Illegal formals: ~s" formals))))))
     (let ((renv-rres (pf* dynamic-empty-env '() formals)))
-      (cons (car renv-rres) (reverse (cdr renv-rres))))))
+      (cons (Scar renv-rres) (Sreverse (Scdr renv-rres))))))
 
 
 ;; dynamic-parse-formals: parses <formals>
@@ -187,22 +187,22 @@
                    ((null? formals)
                     (cons dynamic-empty-env (dynamic-parse-action-null-formal)))
                    ((pair? formals)
-                    (let* ((fst-formal (car formals))
-                           (rem-formals (cdr formals))
+                    (let* ((fst-formal (Scar formals))
+                           (rem-formals (Scdr formals))
                            (bind-res (dynamic-parse-formal f-env fst-formal))
-                           (bind (car bind-res))
-                           (res (cdr bind-res))
+                           (bind (Scar bind-res))
+                           (res (Scdr bind-res))
                            (nf-env (extend-env-with-binding f-env bind))
                            (renv-res* (pfs nf-env rem-formals))
-                           (renv (car renv-res*))
-                           (res* (cdr renv-res*)))
+                           (renv (Scar renv-res*))
+                           (res* (Scdr renv-res*)))
                       (cons
                        (extend-env-with-binding renv bind)
                        (dynamic-parse-action-pair-formal res res*))))
                    (else
                     (let* ((bind-res (dynamic-parse-formal f-env formals))
-                           (bind (car bind-res))
-                           (res (cdr bind-res)))
+                           (bind (Scar bind-res))
+                           (res (Scdr bind-res)))
                       (cons
                        (extend-env-with-binding dynamic-empty-env bind)
                        res)))))))
@@ -218,7 +218,7 @@
    ((symbol? e)
     (dynamic-parse-variable env e))
    ((pair? e)
-    (let ((op (car e)) (args (cdr e)))
+    (let ((op (Scar e)) (args (Scdr e)))
       (case op
         ((quote) (dynamic-parse-quote env args))
         ((lambda) (dynamic-parse-lambda env args))
@@ -245,9 +245,9 @@
             (lambda (results es)
               (cond
                ((null? es) results)
-               ((pair? es) (pe* (cons (dynamic-parse-expression env (car es)) results) (cdr es)))
+               ((pair? es) (pe* (cons (dynamic-parse-expression env (Scar es)) results) (Scdr es)))
                (else (error 'dynamic-parse-expression* "Not a list of expressions: ~s" es))))))
-    (reverse (pe* '() exprs))))
+    (Sreverse (pe* '() exprs))))
 
 
 ;; dynamic-parse-expressions
@@ -256,8 +256,8 @@
 ;;; parses lists of arguments of a procedure call
   (cond
    ((null? exprs) (dynamic-parse-action-null-arg))
-   ((pair? exprs) (let* ((fst-expr (car exprs))
-                         (rem-exprs (cdr exprs))
+   ((pair? exprs) (let* ((fst-expr (Scar exprs))
+                         (rem-exprs (Scdr exprs))
                          (fst-res (dynamic-parse-expression env fst-expr))
                          (rem-res (dynamic-parse-expressions env rem-exprs)))
                     (dynamic-parse-action-pair-arg fst-res rem-res)))
@@ -269,7 +269,7 @@
 
 (define (dynamic-parse-variable env e)
   (if (symbol? e)
-      (if (memq e syntactic-keywords)
+      (if (Smemq e syntactic-keywords)
           (error 'dynamic-parse-variable "Illegal identifier (keyword): ~s" e)
           (let ((assoc-var-def (dynamic-lookup e env)))
             (if assoc-var-def
@@ -290,7 +290,7 @@
 
 (define (dynamic-parse-quote env args)
   (if (list-of-1? args)
-      (dynamic-parse-datum (car args))
+      (dynamic-parse-datum (Scar args))
       (error 'dynamic-parse-quote "Not a datum (multiple arguments): ~s" args)))
 
 
@@ -298,11 +298,11 @@
 
 (define (dynamic-parse-lambda env args)
   (if (pair? args)
-      (let* ((formals (car args))
-             (body (cdr args))
+      (let* ((formals (Scar args))
+             (body (Scdr args))
              (nenv-fresults (dynamic-parse-formals formals))
-             (nenv (car nenv-fresults))
-             (fresults (cdr nenv-fresults)))
+             (nenv (Scar nenv-fresults))
+             (fresults (Scdr nenv-fresults)))
         (dynamic-parse-action-lambda-expression
          fresults
          (dynamic-parse-body (extend-env-with-env env nenv) body)))
@@ -317,33 +317,33 @@
     ;; finds the defined variables in a body and returns an
     ;; environment containing them
     (if (pair? body)
-        (let ((n-env (def-var f-env (car body))))
+        (let ((n-env (def-var f-env (Scar body))))
           (if n-env
-              (def-var* n-env (cdr body))
+              (def-var* n-env (Scdr body))
               f-env))
         f-env))
   (define (def-var f-env clause)
     ;; finds the defined variables in a single clause and extends
     ;; f-env accordingly; returns false if it's not a definition
     (if (pair? clause)
-        (case (car clause)
-          ((define) (if (pair? (cdr clause))
-                        (let ((pattern (cadr clause)))
+        (case (Scar clause)
+          ((define) (if (pair? (Scdr clause))
+                        (let ((pattern (Scadr clause)))
                           (cond
                            ((symbol? pattern)
                             (extend-env-with-binding
                              f-env
                              (gen-binding pattern
                                           (dynamic-parse-action-var-def pattern))))
-                           ((and (pair? pattern) (symbol? (car pattern)))
+                           ((and (pair? pattern) (symbol? (Scar pattern)))
                             (extend-env-with-binding
                              f-env
-                             (gen-binding (car pattern)
+                             (gen-binding (Scar pattern)
                                           (dynamic-parse-action-var-def
-                                           (car pattern)))))
+                                           (Scar pattern)))))
                            (else f-env)))
                         f-env))
-          ((begin) (def-var* f-env (cdr clause)))
+          ((begin) (def-var* f-env (Scdr clause)))
           (else #f))
         #f))
   (if (pair? body)
@@ -356,13 +356,13 @@
   (cond
    ((list-of-3? args)
     (dynamic-parse-action-conditional
-     (dynamic-parse-expression env (car args))
-     (dynamic-parse-expression env (cadr args))
-     (dynamic-parse-expression env (caddr args))))
+     (dynamic-parse-expression env (Scar args))
+     (dynamic-parse-expression env (Scadr args))
+     (dynamic-parse-expression env (Scaddr args))))
    ((list-of-2? args)
     (dynamic-parse-action-conditional
-     (dynamic-parse-expression env (car args))
-     (dynamic-parse-expression env (cadr args))
+     (dynamic-parse-expression env (Scar args))
+     (dynamic-parse-expression env (Scadr args))
      (dynamic-parse-action-empty)))
    (else (error 'dynamic-parse-if "Not an if-expression: ~s" args))))
 
@@ -372,8 +372,8 @@
 (define (dynamic-parse-set env args)
   (if (list-of-2? args)
       (dynamic-parse-action-assignment
-       (dynamic-parse-variable env (car args))
-       (dynamic-parse-expression env (cadr args)))
+       (dynamic-parse-variable env (Scar args))
+       (dynamic-parse-expression env (Scadr args)))
       (error 'dynamic-parse-set "Not a variable/expression pair: ~s" args)))
 
 
@@ -389,7 +389,7 @@
 (define (dynamic-parse-cond env args)
   (if (and (pair? args) (list? args))
       (dynamic-parse-action-cond-expression
-       (map (lambda (e)
+       (Smap2 (lambda (e)
               (dynamic-parse-cond-clause env e))
             args))
       (error 'dynamic-parse-cond "Not a list of cond-clauses: ~s" args)))
@@ -400,10 +400,10 @@
 ;;; ***Note***: Only (<test> <sequence>) is permitted!
   (if (pair? e)
       (cons
-       (if (eqv? (car e) 'else)
+       (if (Sequal? (Scar e) 'else)
            (dynamic-parse-action-empty)
-           (dynamic-parse-expression env (car e)))
-       (dynamic-parse-body env (cdr e)))
+           (dynamic-parse-expression env (Scar e)))
+       (dynamic-parse-body env (Scdr e)))
       (error 'dynamic-parse-cond-clause "Not a cond-clause: ~s" e)))
 
 
@@ -428,12 +428,12 @@
 ;; dynamic-parse-case
 
 (define (dynamic-parse-case env args)
-  (if (and (list? args) (> (length args) 1))
+  (if (and (list? args) (> (Slength args) 1))
       (dynamic-parse-action-case-expression
-       (dynamic-parse-expression env (car args))
-       (map (lambda (e)
+       (dynamic-parse-expression env (Scar args))
+       (Smap2 (lambda (e)
               (dynamic-parse-case-clause env e))
-            (cdr args)))
+            (Scdr args)))
       (error 'dynamic-parse-case "Not a list of clauses: ~s" args)))
 
 ;; dynamic-parse-case-clause
@@ -442,12 +442,12 @@
   (if (pair? e)
       (cons
        (cond
-        ((eqv? (car e) 'else)
+        ((Sequal? (Scar e) 'else)
          (list (dynamic-parse-action-empty)))
-        ((list? (car e))
-         (map dynamic-parse-datum (car e)))
-        (else (error 'dynamic-parse-case-clause "Not a datum list: ~s" (car e))))
-       (dynamic-parse-body env (cdr e)))
+        ((list? (Scar e))
+         (Smap2 dynamic-parse-datum (Scar e)))
+        (else (error 'dynamic-parse-case-clause "Not a datum list: ~s" (Scar e))))
+       (dynamic-parse-body env (Scdr e)))
       (error 'dynamic-parse-case-clause "Not case clause: ~s" e)))
 
 
@@ -465,11 +465,11 @@
 
 (define (dynamic-parse-normal-let env args)
 ;;; parses "normal" let-expressions
-  (let* ((bindings (car args))
-         (body (cdr args))
+  (let* ((bindings (Scar args))
+         (body (Scdr args))
          (env-ast (dynamic-parse-parallel-bindings env bindings))
-         (nenv (car env-ast))
-         (bresults (cdr env-ast)))
+         (nenv (Scar env-ast))
+         (bresults (Scdr env-ast)))
     (dynamic-parse-action-let-expression
      bresults
      (dynamic-parse-body (extend-env-with-env env nenv) body))))
@@ -478,16 +478,16 @@
 
 (define (dynamic-parse-named-let env args)
 ;;; parses a named let-expression
-  (if (pair? (cdr args))
-      (let* ((variable (car args))
-             (bindings (cadr args))
-             (body (cddr args))
+  (if (pair? (Scdr args))
+      (let* ((variable (Scar args))
+             (bindings (Scadr args))
+             (body (Scddr args))
              (vbind-vres (dynamic-parse-formal dynamic-empty-env variable))
-             (vbind (car vbind-vres))
-             (vres (cdr vbind-vres))
+             (vbind (Scar vbind-vres))
+             (vres (Scdr vbind-vres))
              (env-ast (dynamic-parse-parallel-bindings env bindings))
-             (nenv (car env-ast))
-             (bresults (cdr env-ast)))
+             (nenv (Scar env-ast))
+             (bresults (Scdr env-ast)))
         (dynamic-parse-action-named-let-expression
          vres bresults
          (dynamic-parse-body (extend-env-with-env
@@ -504,11 +504,11 @@
   ;; ***Note***: the list of pairs is returned in reverse unzipped form!
   (if (list-of-list-of-2s? bindings)
       (let* ((env-formals-asg
-              (dynamic-parse-formal* (map car bindings)))
-             (nenv (car env-formals-asg))
-             (bresults (cdr env-formals-asg))
+              (dynamic-parse-formal* (Smap2 Scar bindings)))
+             (nenv (Scar env-formals-asg))
+             (bresults (Scdr env-formals-asg))
              (exprs-asg
-              (dynamic-parse-expression* env (map cadr bindings))))
+              (dynamic-parse-expression* env (Smap2 (lambda (l) (Scadr l)) bindings))))
         (cons nenv (cons bresults exprs-asg)))
       (error 'dynamic-parse-parallel-bindings
              "Not a list of bindings: ~s" bindings)))
@@ -518,11 +518,11 @@
 
 (define (dynamic-parse-let* env args)
   (if (pair? args)
-      (let* ((bindings (car args))
-             (body (cdr args))
+      (let* ((bindings (Scar args))
+             (body (Scdr args))
              (env-ast (dynamic-parse-sequential-bindings env bindings))
-             (nenv (car env-ast))
-             (bresults (cdr env-ast)))
+             (nenv (Scar env-ast))
+             (bresults (Scdr env-ast)))
         (dynamic-parse-action-let*-expression
          bresults
          (dynamic-parse-body (extend-env-with-env env nenv) body)))
@@ -546,39 +546,39 @@
            ((null? binds)
             (cons f-env (cons var-defs expr-asgs)))
            ((pair? binds)
-            (let ((fst-bind (car binds)))
+            (let ((fst-bind (Scar binds)))
               (if (list-of-2? fst-bind)
                   (let* ((fbinding-bres
-                          (dynamic-parse-formal f-env (car fst-bind)))
-                         (fbind (car fbinding-bres))
-                         (bres (cdr fbinding-bres))
+                          (dynamic-parse-formal f-env (Scar fst-bind)))
+                         (fbind (Scar fbinding-bres))
+                         (bres (Scdr fbinding-bres))
                          (new-expr-asg
-                          (dynamic-parse-expression c-env (cadr fst-bind))))
+                          (dynamic-parse-expression c-env (Scadr fst-bind))))
                     (psb
                      (extend-env-with-binding f-env fbind)
                      (extend-env-with-binding c-env fbind)
                      (cons bres var-defs)
                      (cons new-expr-asg expr-asgs)
-                     (cdr binds)))
+                     (Scdr binds)))
                   (error 'dynamic-parse-sequential-bindings
                          "Illegal binding: ~s" fst-bind))))
            (else (error 'dynamic-parse-sequential-bindings
                         "Illegal bindings: ~s" binds))))))
     (let ((env-vdefs-easgs (psb dynamic-empty-env env '() '() bindings)))
-      (cons (car env-vdefs-easgs)
-            (cons (reverse (cadr env-vdefs-easgs))
-                  (reverse (cddr env-vdefs-easgs)))))))
+      (cons (Scar env-vdefs-easgs)
+            (cons (Sreverse (Scadr env-vdefs-easgs))
+                  (Sreverse (Scddr env-vdefs-easgs)))))))
 
 
 ;; dynamic-parse-letrec
 
 (define (dynamic-parse-letrec env args)
   (if (pair? args)
-      (let* ((bindings (car args))
-             (body (cdr args))
+      (let* ((bindings (Scar args))
+             (body (Scdr args))
              (env-ast (dynamic-parse-recursive-bindings env bindings))
-             (nenv (car env-ast))
-             (bresults (cdr env-ast)))
+             (nenv (Scar env-ast))
+             (bresults (Scdr env-ast)))
         (dynamic-parse-action-letrec-expression
          bresults
          (dynamic-parse-body (extend-env-with-env env nenv) body)))
@@ -590,15 +590,15 @@
 ;;; ***Note***: the list of pairs is returned in reverse unzipped form!
   (if (list-of-list-of-2s? bindings)
       (let* ((env-formals-asg
-              (dynamic-parse-formal* (map car bindings)))
+              (dynamic-parse-formal* (Smap2 Scar bindings)))
              (formals-env
-              (car env-formals-asg))
+              (Scar env-formals-asg))
              (formals-res
-              (cdr env-formals-asg))
+              (Scdr env-formals-asg))
              (exprs-asg
               (dynamic-parse-expression*
                (extend-env-with-env env formals-env)
-               (map cadr bindings))))
+               (Smap2 Scadr bindings))))
         (cons
          formals-env
          (cons formals-res exprs-asg)))
@@ -625,8 +625,8 @@
 
 (define (dynamic-parse-command env c)
   (if (pair? c)
-      (let ((op (car c))
-            (args (cdr c)))
+      (let ((op (Scar c))
+            (args (Scdr c)))
         (case op
           ((define) (dynamic-parse-define env args))
           ;;        ((begin) (dynamic-parse-command* env args));;; AKW
@@ -640,7 +640,7 @@
 (define (dynamic-parse-command* env commands)
 ;;; parses a sequence of commands
   (if (list? commands)
-      (map (lambda (command) (dynamic-parse-command env command)) commands)
+      (Smap2 (lambda (command) (dynamic-parse-command env command)) commands)
       (error 'dynamic-parse-command* "Invalid sequence of commands: ~s" commands)))
 
 
@@ -651,21 +651,21 @@
 ;;; ***Note***: the parser admits forms (define (x . y) ...)
 ;;; ***Note***: Variables are treated as applied occurrences!
   (if (pair? args)
-      (let ((pattern (car args))
-            (exp-or-body (cdr args)))
+      (let ((pattern (Scar args))
+            (exp-or-body (Scdr args)))
         (cond
          ((symbol? pattern)
           (if (list-of-1? exp-or-body)
               (dynamic-parse-action-definition
                (dynamic-parse-variable env pattern)
-               (dynamic-parse-expression env (car exp-or-body)))
+               (dynamic-parse-expression env (Scar exp-or-body)))
               (error 'dynamic-parse-define "Not a single expression: ~s" exp-or-body)))
          ((pair? pattern)
-          (let* ((function-name (car pattern))
-                 (function-arg-names (cdr pattern))
+          (let* ((function-name (Scar pattern))
+                 (function-arg-names (Scdr pattern))
                  (env-ast (dynamic-parse-formals function-arg-names))
-                 (formals-env (car env-ast))
-                 (formals-ast (cdr env-ast)))
+                 (formals-env (Scar env-ast))
+                 (formals-ast (Scdr env-ast)))
             (dynamic-parse-action-function-definition
              (dynamic-parse-variable env function-name)
              formals-ast
@@ -680,22 +680,22 @@
 (define (forall? pred list)
   (if (null? list)
       #t
-      (and (pred (car list)) (forall? pred (cdr list)))))
+      (and (pred (Scar list)) (forall? pred (Scdr list)))))
 
 ;; list-of-1?
 
 (define (list-of-1? l)
-  (and (pair? l) (null? (cdr l))))
+  (and (pair? l) (null? (Scdr l))))
 
 ;; list-of-2?
 
 (define (list-of-2? l)
-  (and (pair? l) (pair? (cdr l)) (null? (cddr l))))
+  (and (pair? l) (pair? (Scdr l)) (null? (Scddr l))))
 
 ;; list-of-3?
 
 (define (list-of-3? l)
-  (and (pair? l) (pair? (cdr l)) (pair? (cddr l)) (null? (cdddr l))))
+  (and (pair? l) (pair? (Scdr l)) (pair? (Scddr l)) (null? (Scdddr l))))
 
 ;; list-of-list-of-2s?
 
@@ -704,7 +704,7 @@
    ((null? e)
     #t)
    ((pair? e)
-    (and (list-of-2? (car e)) (list-of-list-of-2s? (cdr e))))
+    (and (list-of-2? (Scar e)) (list-of-list-of-2s? (Scdr e))))
    (else #f)))
 
 
@@ -714,7 +714,7 @@
 
 (define (dynamic-parse-from-port port)
   (let ((next-input (read port)))
-    (if (eof-object? next-input)
+    (if (Seof-object? next-input)
         '()
         (dynamic-parse-action-commands
          (dynamic-parse-command dynamic-empty-env next-input)
@@ -752,12 +752,12 @@
   ;; the rank field to 0
   (cons '() (cons 0 info)))
 
-(define info (lambda (l) (cddr l)))
+(define info (lambda (l) (Scddr l)))
 ;; returns the information stored in an element
 
 (define (set-info! elem info)
   ;; sets the info-field of elem to info
-  (set-cdr! (cdr elem) info))
+  (Sset-cdr! (Scdr elem) info))
 
 ;; (define (find! x)
 ;;;; finds the class representative of x and sets the parent field
@@ -783,11 +783,11 @@
   ;;(display "Find!: ")
   ;;(display (pretty-print (info elem)))
   ;;(newline)
-  (let ((p-elem (car elem)))
+  (let ((p-elem (Scar elem)))
     (if (null? p-elem)
         elem
         (let ((rep-elem (find! p-elem)))
-          (set-car! elem rep-elem)
+          (Sset-car! elem rep-elem)
           rep-elem))))
 
 (define (link! elem-1 elem-2)
@@ -797,21 +797,21 @@
   ;;(display "Link!: ")
   ;;(display (pretty-print (list (info elem-1) (info elem-2))))
   ;;(newline)
-  (let ((rank-1 (cadr elem-1))
-        (rank-2 (cadr elem-2)))
+  (let ((rank-1 (Scadr elem-1))
+        (rank-2 (Scadr elem-2)))
     (cond
      ((= rank-1 rank-2)
-      (set-car! (cdr elem-2) (+ rank-2 1))
-      (set-car! elem-1 elem-2)
+      (Sset-car! (Scdr elem-2) (+ rank-2 1))
+      (Sset-car! elem-1 elem-2)
       elem-2)
      ((> rank-1 rank-2)
-      (set-car! elem-2 elem-1)
+      (Sset-car! elem-2 elem-1)
       elem-1)
      (else
-      (set-car! elem-1 elem-2)
+      (Sset-car! elem-1 elem-2)
       elem-2))))
 
-(define asymm-link! (lambda (l x) (set-car! l x)))
+(define asymm-link! (lambda (l x) (Sset-car! l x)))
 
 ;;(define (asymm-link! elem-1 elem-2)
 ;; links elem-1 onto elem-2 no matter what rank;
@@ -896,20 +896,20 @@
 
 (define (tvar-id tvar)
   ;; returns the (printable) symbol representing the type variable
-  (car (info tvar)))
+  (Scar (info tvar)))
 
 (define (tvar-def tvar)
   ;; returns the type definition (if any) of the type variable
-  (cdr (info tvar)))
+  (Scdr (info tvar)))
 
 (define (set-def! tvar tcon targs)
   ;; sets the type definition part of tvar to type
-  (set-cdr! (info tvar) (cons tcon targs))
+  (Sset-cdr! (info tvar) (cons tcon targs))
   '())
 
 (define (reset-def! tvar)
   ;; resets the type definition part of tvar to nil
-  (set-cdr! (info tvar) '()))
+  (Sset-cdr! (info tvar) '()))
 
 (define type-con (lambda (l) (car l)))
 ;; returns the type constructor of a type definition
@@ -919,9 +919,9 @@
 
 (define (tvar->string tvar)
   ;; converts a tvar's id to a string
-  (if (eqv? (tvar-id tvar) 0)
+  (if (Sequal? (tvar-id tvar) 0)
       "Dynamic"
-      (string-append "t#" (number->string (tvar-id tvar) 10))))
+      (Sstring-append "t#" (SFXnumber->string (tvar-id tvar)))))
 
 (define (tvar-show tv)
   ;; returns a printable list representation of type variable tv
@@ -935,14 +935,14 @@
 (define (type-show type)
   ;; returns a printable list representation of type definition type
   (cond
-   ((eqv? (type-con type) ptype-con)
+   ((Sequal? (type-con type) ptype-con)
     (let ((new-tvar (gen-tvar)))
       (cons ptype-con
             (cons (tvar-show new-tvar)
                   (tvar-show ((type-args type) new-tvar))))))
    (else
     (cons (type-con type)
-          (map (lambda (tv)
+          (Smap2 (lambda (tv)
                  (tvar->string (find! tv)))
                (type-args type))))))
 
@@ -994,11 +994,11 @@
          (tv1-def (tvar-def tv1-rep))
          (tv2-def (tvar-def tv2-rep)))
     (cond
-     ((eqv? tv1-rep tv2-rep)
+     ((Sequal? tv1-rep tv2-rep)
       '())
-     ((eqv? tv2-rep dynamic)
+     ((Sequal? tv2-rep dynamic)
       (equiv-with-dynamic! tv1-rep))
-     ((eqv? tv1-rep dynamic)
+     ((Sequal? tv1-rep dynamic)
       (equiv-with-dynamic! tv2-rep))
      ((null? tv1-def)
       (if (null? tv2-def)
@@ -1009,11 +1009,11 @@
      ((null? tv2-def)
       ;; tv1 is a (nondynamic) type, tv2 is a type variable
       (asymm-link! tv2-rep tv1-rep))
-     ((eqv? (type-con tv1-def) (type-con tv2-def))
+     ((Sequal? (type-con tv1-def) (type-con tv2-def))
       ;; both tv1 and tv2 are (nondynamic) types with equal numbers of
       ;; arguments
       (link! tv1-rep tv2-rep)
-      (map equiv! (type-args tv1-def) (type-args tv2-def)))
+      (Smap2 equiv! (type-args tv1-def) (type-args tv2-def)))
      (else
       ;; tv1 and tv2 are types with distinct type constructors or different
       ;; numbers of arguments
@@ -1023,11 +1023,11 @@
 
 (define (equiv-with-dynamic! tv)
   (let ((tv-rep (find! tv)))
-    (if (not (eqv? tv-rep dynamic))
+    (if (not (Sequal? tv-rep dynamic))
         (let ((tv-def (tvar-def tv-rep)))
           (asymm-link! tv-rep dynamic)
           (if (not (null? tv-def))
-              (map equiv-with-dynamic! (type-args tv-def))))))
+              (Smap2 equiv-with-dynamic! (type-args tv-def))))))
   '())
 ;;----------------------------------------------------------------------------
 ;; Polymorphic type management
@@ -1078,7 +1078,7 @@
     (cond
      ((null? tv-def)
       tv-rep)
-     ((eqv? (type-con tv-def) ptype-con)
+     ((Sequal? (type-con tv-def) ptype-con)
       (instantiate-type ((type-args tv-def) (gen-tvar))))
      (else
       tv-rep))))
@@ -1108,16 +1108,16 @@
 (define gen-constr (lambda (a b) (cons a b)))
 ;; generates an equality between tvar1 and tvar2
 
-(define constr-lhs (lambda (c) (car c)))
+(define constr-lhs (lambda (c) (Scar c)))
 ;; returns the left-hand side of a constraint
 
-(define constr-rhs (lambda (c) (cdr c)))
+(define constr-rhs (lambda (c) (Scdr c)))
 ;; returns the right-hand side of a constraint
 
 (define (constr-show c)
-  (cons (tvar-show (car c))
+  (cons (tvar-show (Scar c))
         (cons '=
-              (cons (tvar-show (cdr c)) '()))))
+              (cons (tvar-show (Scdr c)) '()))))
 
 
 ;; constraint set management
@@ -1134,7 +1134,7 @@
 
 (define (glob-constr-show)
   ;; returns printable version of global constraints
-  (map constr-show global-constraints))
+  (Smap2 constr-show global-constraints))
 
 
 ;; constraint normalization
@@ -1148,7 +1148,7 @@
   (init-global-constraints!))
 
 (define (normalize! constraints)
-  (map (lambda (c)
+  (Smap2 (lambda (c)
          (equiv! (constr-lhs c) (constr-rhs c))) constraints))
 ;; ----------------------------------------------------------------------------
 ;; Abstract syntax definition and parse actions
@@ -1418,87 +1418,87 @@
     (case syntax-op
       ((0 1 2 3 4 8 10) syntax-arg)
       ((29 31) '())
-      ((30 32) (cons (ast-show (car syntax-arg)) (ast-show (cdr syntax-arg))))
+      ((30 32) (cons (ast-show (Scar syntax-arg)) (ast-show (Scdr syntax-arg))))
       ((5) (list 'quote syntax-arg))
-      ((6) (list->vector (map ast-show syntax-arg)))
-      ((7) (list 'cons (ast-show (car syntax-arg)) (ast-show (cdr syntax-arg))))
+      ((6) (Slist->vector (Smap2 ast-show syntax-arg)))
+      ((7) (list 'cons (ast-show (Scar syntax-arg)) (ast-show (Scdr syntax-arg))))
       ((9) (ast-arg syntax-arg))
-      ((11) (cons (ast-show (car syntax-arg)) (ast-show (cdr syntax-arg))))
-      ((12) (cons 'lambda (cons (ast-show (car syntax-arg))
-                                (map ast-show (cdr syntax-arg)))))
-      ((13) (cons 'if (cons (ast-show (car syntax-arg))
-                            (cons (ast-show (cadr syntax-arg))
-                                  (let ((alt (cddr syntax-arg)))
-                                    (if (eqv? (ast-con alt) empty)
+      ((11) (cons (ast-show (Scar syntax-arg)) (ast-show (Scdr syntax-arg))))
+      ((12) (cons 'lambda (cons (ast-show (Scar syntax-arg))
+                                (Smap2 ast-show (Scdr syntax-arg)))))
+      ((13) (cons 'if (cons (ast-show (Scar syntax-arg))
+                            (cons (ast-show (Scadr syntax-arg))
+                                  (let ((alt (Scddr syntax-arg)))
+                                    (if (Sequal? (ast-con alt) empty)
                                         '()
                                         (list (ast-show alt))))))))
-      ((14) (list 'set! (ast-show (car syntax-arg)) (ast-show (cdr syntax-arg))))
+      ((14) (list 'set! (ast-show (Scar syntax-arg)) (ast-show (Scdr syntax-arg))))
       ((15) (cons 'cond
-                  (map (lambda (cc)
-                         (let ((guard (car cc))
-                               (body (cdr cc)))
+                  (Smap2 (lambda (cc)
+                         (let ((guard (Scar cc))
+                               (body (Scdr cc)))
                            (cons
-                            (if (eqv? (ast-con guard) empty)
+                            (if (Sequal? (ast-con guard) empty)
                                 'else
                                 (ast-show guard))
-                            (map ast-show body))))
+                            (Smap2 ast-show body))))
                        syntax-arg)))
       ((16) (cons 'case
-                  (cons (ast-show (car syntax-arg))
-                        (map (lambda (cc)
-                               (let ((data (car cc)))
+                  (cons (ast-show (Scar syntax-arg))
+                        (Smap2 (lambda (cc)
+                               (let ((data (Scar cc)))
                                  (if (and (pair? data)
-                                          (eqv? (ast-con (car data)) empty))
+                                          (Sequal? (ast-con (Scar data)) empty))
                                      (cons 'else
-                                           (map ast-show (cdr cc)))
-                                     (cons (map datum-show data)
-                                           (map ast-show (cdr cc))))))
-                             (cdr syntax-arg)))))
-      ((17) (cons 'and (map ast-show syntax-arg)))
-      ((18) (cons 'or (map ast-show syntax-arg)))
+                                           (Smap2 ast-show (Scdr cc)))
+                                     (cons (Smap2 datum-show data)
+                                           (Smap2 ast-show (Scdr cc))))))
+                             (Scdr syntax-arg)))))
+      ((17) (cons 'and (Smap2 ast-show syntax-arg)))
+      ((18) (cons 'or (Smap2 ast-show syntax-arg)))
       ((19) (cons 'let
-                  (cons (map
+                  (cons (Smap2
                          (lambda (vd e)
                            (list (ast-show vd) (ast-show e)))
-                         (caar syntax-arg)
-                         (cdar syntax-arg))
-                        (map ast-show (cdr syntax-arg)))))
+                         (Scaar syntax-arg)
+                         (Scdar syntax-arg))
+                        (Smap2 ast-show (Scdr syntax-arg)))))
       ((20) (cons 'let
-                  (cons (ast-show (car syntax-arg))
-                        (cons (map
+                  (cons (ast-show (Scar syntax-arg))
+                        (cons (Smap2
                                (lambda (vd e)
                                  (list (ast-show vd) (ast-show e)))
-                               (caadr syntax-arg)
-                               (cdadr syntax-arg))
-                              (map ast-show (cddr syntax-arg))))))
+                               (Scaadr syntax-arg)
+                               (Scdadr syntax-arg))
+                              (Smap2 ast-show (Scddr syntax-arg))))))
       ((21) (cons 'let*
-                  (cons (map
+                  (cons (Smap2
                          (lambda (vd e)
                            (list (ast-show vd) (ast-show e)))
-                         (caar syntax-arg)
-                         (cdar syntax-arg))
-                        (map ast-show (cdr syntax-arg)))))
+                         (Scaar syntax-arg)
+                         (Scdar syntax-arg))
+                        (Smap2 ast-show (Scdr syntax-arg)))))
       ((22) (cons 'letrec
-                  (cons (map
+                  (cons (Smap2
                          (lambda (vd e)
                            (list (ast-show vd) (ast-show e)))
-                         (caar syntax-arg)
-                         (cdar syntax-arg))
-                        (map ast-show (cdr syntax-arg)))))
+                         (Scaar syntax-arg)
+                         (Scdar syntax-arg))
+                        (Smap2 ast-show (cdr syntax-arg)))))
       ((23) (cons 'begin
-                  (map ast-show syntax-arg)))
+                  (Smap2 ast-show syntax-arg)))
       ((24) (error 'ast-show "Do expressions not handled! (~s)" syntax-arg))
       ((25) (error 'ast-show "This can't happen: empty encountered!"))
       ((26) (list 'define
-                  (ast-show (car syntax-arg))
-                  (ast-show (cdr syntax-arg))))
+                  (ast-show (Scar syntax-arg))
+                  (ast-show (Scdr syntax-arg))))
       ((27) (cons 'define
                   (cons
-                   (cons (ast-show (car syntax-arg))
-                         (ast-show (cadr syntax-arg)))
-                   (map ast-show (cddr syntax-arg)))))
+                   (cons (ast-show (Scar syntax-arg))
+                         (ast-show (Scadr syntax-arg)))
+                   (Smap2 ast-show (Scddr syntax-arg)))))
       ((28) (cons 'begin
-                  (map ast-show syntax-arg)))
+                  (Smap2 ast-show syntax-arg)))
       (else (error 'ast-show "Unknown abstract syntax operator: ~s"
                    syntax-op)))))
 
@@ -1507,7 +1507,7 @@
 
 (define (ast*-show p)
 ;;; shows a list of abstract syntax trees
-  (map ast-show p))
+  (Smap2 ast-show p))
 
 
 ;; datum-show
@@ -1516,8 +1516,8 @@
 ;;; prints an abstract syntax tree as a datum
   (case (ast-con ast)
     ((0 1 2 3 4 5) (ast-arg ast))
-    ((6) (list->vector (map datum-show (ast-arg ast))))
-    ((7) (cons (datum-show (car (ast-arg ast))) (datum-show (cdr (ast-arg ast)))))
+    ((6) (Slist->vector (Smap2 datum-show (ast-arg ast))))
+    ((7) (cons (datum-show (Scar (ast-arg ast))) (datum-show (Scdr (ast-arg ast)))))
     (else (error 'datum-show "This should not happen!"))))
 
 ;; write-to-port
@@ -1558,12 +1558,12 @@
            ((4) (charseq))
            ((5) (symbol))
            ((6) (let ((aux-tvar (gen-tvar)))
-                  (for-each (lambda (t)
+                  (Sfor-each2 (lambda (t)
                               (add-constr! t aux-tvar))
-                            (map ast-tvar arg))
+                            (Smap2 ast-tvar arg))
                   (array aux-tvar)))
-           ((7 30 32) (let ((t1 (ast-tvar (car arg)))
-                            (t2 (ast-tvar (cdr arg))))
+           ((7 30 32) (let ((t1 (ast-tvar (Scar arg)))
+                            (t2 (ast-tvar (Scdr arg))))
                         (pair t1 t2)))
            ((8) (gen-tvar))
            ((9) (ast-tvar arg))
@@ -1576,55 +1576,55 @@
                                                       (gen-binding arg new-tvar)))
                          new-tvar))))
            ((11) (let ((new-tvar (gen-tvar)))
-                   (add-constr! (procedure (ast-tvar (cdr arg)) new-tvar)
-                                (ast-tvar (car arg)))
+                   (add-constr! (procedure (ast-tvar (Scdr arg)) new-tvar)
+                                (ast-tvar (Scar arg)))
                    new-tvar))
-           ((12) (procedure (ast-tvar (car arg))
-                            (ast-tvar (tail (cdr arg)))))
-           ((13) (let ((t-test (ast-tvar (car arg)))
-                       (t-consequent (ast-tvar (cadr arg)))
-                       (t-alternate (ast-tvar (cddr arg))))
+           ((12) (procedure (ast-tvar (Scar arg))
+                            (ast-tvar (tail (Scdr arg)))))
+           ((13) (let ((t-test (ast-tvar (Scar arg)))
+                       (t-consequent (ast-tvar (Scadr arg)))
+                       (t-alternate (ast-tvar (Scddr arg))))
                    (add-constr! (boolean) t-test)
                    (add-constr! t-consequent t-alternate)
                    t-consequent))
-           ((14) (let ((var-tvar (ast-tvar (car arg)))
-                       (exp-tvar (ast-tvar (cdr arg))))
+           ((14) (let ((var-tvar (ast-tvar (Scar arg)))
+                       (exp-tvar (ast-tvar (Scdr arg))))
                    (add-constr! var-tvar exp-tvar)
                    var-tvar))
            ((15) (let ((new-tvar (gen-tvar)))
-                   (for-each (lambda (body)
+                   (Sfor-each2 (lambda (body)
                                (add-constr! (ast-tvar (tail body)) new-tvar))
-                             (map cdr arg))
-                   (for-each (lambda (e)
+                             (Smap2 Scdr arg))
+                   (Sfor-each2 (lambda (e)
                                (add-constr! (boolean) (ast-tvar e)))
-                             (map car arg))
+                             (Smap2 Scar arg))
                    new-tvar))
            ((16) (let* ((new-tvar (gen-tvar))
-                        (t-key (ast-tvar (car arg)))
-                        (case-clauses (cdr arg)))
-                   (for-each (lambda (exprs)
-                               (for-each (lambda (e)
+                        (t-key (ast-tvar (Scar arg)))
+                        (case-clauses (Scdr arg)))
+                   (Sfor-each2 (lambda (exprs)
+                               (Sfor-each2 (lambda (e)
                                            (add-constr! (ast-tvar e) t-key))
                                          exprs))
-                             (map car case-clauses))
-                   (for-each (lambda (body)
+                             (Smap2 (lambda (p) (Scar l)) case-clauses))
+                   (Sfor-each2 (lambda (body)
                                (add-constr! (ast-tvar (tail body)) new-tvar))
-                             (map cdr case-clauses))
+                             (Smap2 (lambda (p) (Scdr l)) case-clauses))
                    new-tvar))
-           ((17 18) (for-each (lambda (e)
+           ((17 18) (Sfor-each2 (lambda (e)
                                 (add-constr! (boolean) (ast-tvar e)))
                               arg)
             (boolean))
-           ((19 21 22) (let ((var-def-tvars (map ast-tvar (caar arg)))
-                             (def-expr-types (map ast-tvar (cdar arg)))
-                             (body-type (ast-tvar (tail (cdr arg)))))
-                         (for-each add-constr! var-def-tvars def-expr-types)
+           ((19 21 22) (let ((var-def-tvars (Smap2 ast-tvar (Scaar arg)))
+                             (def-expr-types (Smap2 ast-tvar (Scdar arg)))
+                             (body-type (ast-tvar (tail (Scdr arg)))))
+                         (Sfor-each2 add-constr! var-def-tvars def-expr-types)
                          body-type))
-           ((20) (let ((var-def-tvars (map ast-tvar (caadr arg)))
-                       (def-expr-types (map ast-tvar (cdadr arg)))
-                       (body-type (ast-tvar (tail (cddr arg))))
-                       (named-var-type (ast-tvar (car arg))))
-                   (for-each add-constr! var-def-tvars def-expr-types)
+           ((20) (let ((var-def-tvars (Smap2 ast-tvar (Scaadr arg)))
+                       (def-expr-types (Smap2 ast-tvar (Scdadr arg)))
+                       (body-type (ast-tvar (tail (Scddr arg))))
+                       (named-var-type (ast-tvar (Scar arg))))
+                   (Sfor-each2 add-constr! var-def-tvars def-expr-types)
                    (add-constr! (procedure (convert-tvars var-def-tvars) body-type)
                                 named-var-type)
                    body-type))
@@ -1632,13 +1632,13 @@
            ((24) (error 'ast-gen
                         "Do-expressions not handled! (Argument: ~s) arg"))
            ((25) (gen-tvar))
-           ((26) (let ((t-var (ast-tvar (car arg)))
-                       (t-exp (ast-tvar (cdr arg))))
+           ((26) (let ((t-var (ast-tvar (Scar arg)))
+                       (t-exp (ast-tvar (Scdr arg))))
                    (add-constr! t-var t-exp)
                    t-var))
-           ((27) (let ((t-var (ast-tvar (car arg)))
-                       (t-formals (ast-tvar (cadr arg)))
-                       (t-body (ast-tvar (tail (cddr arg)))))
+           ((27) (let ((t-var (ast-tvar (Scar arg)))
+                       (t-formals (ast-tvar (Scadr arg)))
+                       (t-body (ast-tvar (tail (Scddr arg)))))
                    (add-constr! (procedure t-formals t-body) t-var)
                    t-var))
            ((28) (gen-tvar))
@@ -1659,9 +1659,9 @@
 
 (define (tail l)
 ;;; returns the tail of a nonempty list
-  (if (null? (cdr l))
-      (car l)
-      (tail (cdr l))))
+  (if (null? (Scdr l))
+      (Scar l)
+      (tail (Scdr l))))
 
 ;; convert-tvars
 
@@ -1669,8 +1669,8 @@
 ;;; converts a list of tvars to a single tvar
   (cond
    ((null? tvar-list) (null))
-   ((pair? tvar-list) (pair (car tvar-list)
-                            (convert-tvars (cdr tvar-list))))
+   ((pair? tvar-list) (pair (Scar tvar-list)
+                            (convert-tvars (Scdr tvar-list))))
    (else (error 'convert-tvars "Not a list of tvars: ~s" tvar-list))))
 
 
@@ -1685,90 +1685,90 @@
      (case syntax-op
        ((0 1 2 3 4 8 10) syntax-arg)
        ((29 31) '())
-       ((30 32) (cons (tast-show (car syntax-arg))
-                      (tast-show (cdr syntax-arg))))
+       ((30 32) (cons (tast-show (Scar syntax-arg))
+                      (tast-show (Scdr syntax-arg))))
        ((5) (list 'quote syntax-arg))
-       ((6) (list->vector (map tast-show syntax-arg)))
-       ((7) (list 'cons (tast-show (car syntax-arg))
-                  (tast-show (cdr syntax-arg))))
+       ((6) (Slist->vector (Smap2 tast-show syntax-arg)))
+       ((7) (list 'cons (tast-show (Scar syntax-arg))
+                  (tast-show (Scdr syntax-arg))))
        ((9) (ast-arg syntax-arg))
-       ((11) (cons (tast-show (car syntax-arg)) (tast-show (cdr syntax-arg))))
-       ((12) (cons 'lambda (cons (tast-show (car syntax-arg))
-                                 (map tast-show (cdr syntax-arg)))))
-       ((13) (cons 'if (cons (tast-show (car syntax-arg))
-                             (cons (tast-show (cadr syntax-arg))
-                                   (let ((alt (cddr syntax-arg)))
-                                     (if (eqv? (ast-con alt) empty)
+       ((11) (cons (tast-show (Scar syntax-arg)) (tast-show (Scdr syntax-arg))))
+       ((12) (cons 'lambda (cons (tast-show (Scar syntax-arg))
+                                 (Smap2 tast-show (Scdr syntax-arg)))))
+       ((13) (cons 'if (cons (tast-show (Scar syntax-arg))
+                             (cons (tast-show (Scadr syntax-arg))
+                                   (let ((alt (Scddr syntax-arg)))
+                                     (if (Sequal? (ast-con alt) empty)
                                          '()
                                          (list (tast-show alt))))))))
-       ((14) (list 'set! (tast-show (car syntax-arg))
-                   (tast-show (cdr syntax-arg))))
+       ((14) (list 'set! (tast-show (Scar syntax-arg))
+                   (tast-show (Scdr syntax-arg))))
        ((15) (cons 'cond
-                   (map (lambda (cc)
-                          (let ((guard (car cc))
-                                (body (cdr cc)))
+                   (Smap2 (lambda (cc)
+                          (let ((guard (Scar cc))
+                                (body (Scdr cc)))
                             (cons
-                             (if (eqv? (ast-con guard) empty)
+                             (if (Sequal? (ast-con guard) empty)
                                  'else
                                  (tast-show guard))
-                             (map tast-show body))))
+                             (Smap2 tast-show body))))
                         syntax-arg)))
        ((16) (cons 'case
-                   (cons (tast-show (car syntax-arg))
-                         (map (lambda (cc)
-                                (let ((data (car cc)))
+                   (cons (tast-show (Scar syntax-arg))
+                         (Smap2 (lambda (cc)
+                                (let ((data (Scar cc)))
                                   (if (and (pair? data)
-                                           (eqv? (ast-con (car data)) empty))
+                                           (Sequal? (ast-con (Scar data)) empty))
                                       (cons 'else
-                                            (map tast-show (cdr cc)))
-                                      (cons (map datum-show data)
-                                            (map tast-show (cdr cc))))))
-                              (cdr syntax-arg)))))
-       ((17) (cons 'and (map tast-show syntax-arg)))
-       ((18) (cons 'or (map tast-show syntax-arg)))
+                                            (Smap2 tast-show (Scdr cc)))
+                                      (cons (Smap2 datum-show data)
+                                            (Smap2 tast-show (Scdr cc))))))
+                              (Scdr syntax-arg)))))
+       ((17) (cons 'and (Smap2 tast-show syntax-arg)))
+       ((18) (cons 'or (Smap2 tast-show syntax-arg)))
        ((19) (cons 'let
-                   (cons (map
+                   (cons (Smap2
                           (lambda (vd e)
                             (list (tast-show vd) (tast-show e)))
-                          (caar syntax-arg)
-                          (cdar syntax-arg))
-                         (map tast-show (cdr syntax-arg)))))
+                          (Scaar syntax-arg)
+                          (Scdar syntax-arg))
+                         (Smap2 tast-show (cdr syntax-arg)))))
        ((20) (cons 'let
-                   (cons (tast-show (car syntax-arg))
-                         (cons (map
+                   (cons (tast-show (Scar syntax-arg))
+                         (cons (Smap2
                                 (lambda (vd e)
                                   (list (tast-show vd) (tast-show e)))
-                                (caadr syntax-arg)
-                                (cdadr syntax-arg))
-                               (map tast-show (cddr syntax-arg))))))
+                                (Scaadr syntax-arg)
+                                (Scdadr syntax-arg))
+                               (Smap2 tast-show (Scddr syntax-arg))))))
        ((21) (cons 'let*
-                   (cons (map
+                   (cons (Smap2
                           (lambda (vd e)
                             (list (tast-show vd) (tast-show e)))
-                          (caar syntax-arg)
-                          (cdar syntax-arg))
-                         (map tast-show (cdr syntax-arg)))))
+                          (Scaar syntax-arg)
+                          (Scdar syntax-arg))
+                         (Smap2 tast-show (Scdr syntax-arg)))))
        ((22) (cons 'letrec
-                   (cons (map
+                   (cons (Smap2
                           (lambda (vd e)
                             (list (tast-show vd) (tast-show e)))
-                          (caar syntax-arg)
-                          (cdar syntax-arg))
-                         (map tast-show (cdr syntax-arg)))))
+                          (Scaar syntax-arg)
+                          (Scdar syntax-arg))
+                         (Smap2 tast-show (Scdr syntax-arg)))))
        ((23) (cons 'begin
-                   (map tast-show syntax-arg)))
+                   (Smap2 tast-show syntax-arg)))
        ((24) (error 'tast-show "Do expressions not handled! (~s)" syntax-arg))
        ((25) (error 'tast-show "This can't happen: empty encountered!"))
        ((26) (list 'define
-                   (tast-show (car syntax-arg))
-                   (tast-show (cdr syntax-arg))))
+                   (tast-show (Scar syntax-arg))
+                   (tast-show (Scdr syntax-arg))))
        ((27) (cons 'define
                    (cons
-                    (cons (tast-show (car syntax-arg))
-                          (tast-show (cadr syntax-arg)))
-                    (map tast-show (cddr syntax-arg)))))
+                    (cons (tast-show (Scar syntax-arg))
+                          (tast-show (Scadr syntax-arg)))
+                    (Smap2 tast-show (Scddr syntax-arg)))))
        ((28) (cons 'begin
-                   (map tast-show syntax-arg)))
+                   (Smap2 tast-show syntax-arg)))
        (else (error 'tast-show "Unknown abstract syntax operator: ~s"
                     syntax-op)))
      syntax-tvar)))
@@ -1777,7 +1777,7 @@
 
 (define (tast*-show p)
 ;;; shows a list of abstract syntax trees
-  (map tast-show p))
+  (Smap2 tast-show p))
 
 
 ;; counters for tagging/untagging
@@ -1808,12 +1808,12 @@
 
 (define (tag-show tvar-rep prog)
   ;; display prog with tagging operation
-  (if (eqv? tvar-rep dynamic)
+  (if (Sequal? tvar-rep dynamic)
       (begin
-        (set! tag-counter (+ tag-counter 1))
+        (set! tag-counter (SFX+ tag-counter 1))
         (list 'tag prog))
       (begin
-        (set! no-tag-counter (+ no-tag-counter 1))
+        (set! no-tag-counter (SFX+ no-tag-counter 1))
         (list 'no-tag prog))))
 
 
@@ -1821,22 +1821,22 @@
 
 (define (untag-show tvar-rep prog)
   ;; display prog with untagging operation
-  (if (eqv? tvar-rep dynamic)
+  (if (Sequal? tvar-rep dynamic)
       (begin
-        (set! untag-counter (+ untag-counter 1))
+        (set! untag-counter (SFX+ untag-counter 1))
         (list 'untag prog))
       (begin
-        (set! no-untag-counter (+ no-untag-counter 1))
+        (set! no-untag-counter (SFX+ no-untag-counter 1))
         (list 'no-untag prog))))
 
 (define (may-untag-show tvar-rep prog)
   ;; display possible untagging in actual arguments
-  (if (eqv? tvar-rep dynamic)
+  (if (Sequal? tvar-rep dynamic)
       (begin
-        (set! may-untag-counter (+ may-untag-counter 1))
+        (set! may-untag-counter (SFX+ may-untag-counter 1))
         (list 'may-untag prog))
       (begin
-        (set! no-may-untag-counter (+ no-may-untag-counter 1))
+        (set! no-may-untag-counter (SFX+ no-may-untag-counter 1))
         (list 'no-may-untag prog))))
 
 
@@ -1853,110 +1853,110 @@
        (tag-show syntax-tvar syntax-arg))
       ((8 10) syntax-arg)
       ((29 31) '())
-      ((30) (cons (tag-ast-show (car syntax-arg))
-                  (tag-ast-show (cdr syntax-arg))))
-      ((32) (cons (may-untag-show (find! (ast-tvar (car syntax-arg)))
-                                  (tag-ast-show (car syntax-arg)))
-                  (tag-ast-show (cdr syntax-arg))))
+      ((30) (cons (tag-ast-show (Scar syntax-arg))
+                  (tag-ast-show (Scdr syntax-arg))))
+      ((32) (cons (may-untag-show (find! (ast-tvar (Scar syntax-arg)))
+                                  (tag-ast-show (Scar syntax-arg)))
+                  (tag-ast-show (Scdr syntax-arg))))
       ((5) (tag-show syntax-tvar (list 'quote syntax-arg)))
-      ((6) (tag-show syntax-tvar (list->vector (map tag-ast-show syntax-arg))))
-      ((7) (tag-show syntax-tvar (list 'cons (tag-ast-show (car syntax-arg))
-                                       (tag-ast-show (cdr syntax-arg)))))
+      ((6) (tag-show syntax-tvar (Slist->vector (Smap2 tag-ast-show syntax-arg))))
+      ((7) (tag-show syntax-tvar (list 'cons (tag-ast-show (Scar syntax-arg))
+                                       (tag-ast-show (Scdr syntax-arg)))))
       ((9) (ast-arg syntax-arg))
-      ((11) (let ((proc-tvar (find! (ast-tvar (car syntax-arg)))))
+      ((11) (let ((proc-tvar (find! (ast-tvar (Scar syntax-arg)))))
               (cons (untag-show proc-tvar
-                                (tag-ast-show (car syntax-arg)))
-                    (tag-ast-show (cdr syntax-arg)))))
+                                (tag-ast-show (Scar syntax-arg)))
+                    (tag-ast-show (Scdr syntax-arg)))))
       ((12) (tag-show syntax-tvar
-                      (cons 'lambda (cons (tag-ast-show (car syntax-arg))
-                                          (map tag-ast-show (cdr syntax-arg))))))
-      ((13) (let ((test-tvar (find! (ast-tvar (car syntax-arg)))))
+                      (cons 'lambda (cons (tag-ast-show (Scar syntax-arg))
+                                          (Smap2 tag-ast-show (cdr syntax-arg))))))
+      ((13) (let ((test-tvar (find! (ast-tvar (Scar syntax-arg)))))
               (cons 'if (cons (untag-show test-tvar
-                                          (tag-ast-show (car syntax-arg)))
-                              (cons (tag-ast-show (cadr syntax-arg))
-                                    (let ((alt (cddr syntax-arg)))
-                                      (if (eqv? (ast-con alt) empty)
+                                          (tag-ast-show (Scar syntax-arg)))
+                              (cons (tag-ast-show (Scadr syntax-arg))
+                                    (let ((alt (Scddr syntax-arg)))
+                                      (if (Sequal? (ast-con alt) empty)
                                           '()
                                           (list (tag-ast-show alt)))))))))
-      ((14) (list 'set! (tag-ast-show (car syntax-arg))
+      ((14) (list 'set! (tag-ast-show (Scar syntax-arg))
                   (tag-ast-show (cdr syntax-arg))))
       ((15) (cons 'cond
-                  (map (lambda (cc)
-                         (let ((guard (car cc))
+                  (Smap2 (lambda (cc)
+                         (let ((guard (Scar cc))
                                (body (cdr cc)))
                            (cons
-                            (if (eqv? (ast-con guard) empty)
+                            (if (Sequal? (ast-con guard) empty)
                                 'else
                                 (untag-show (find! (ast-tvar guard))
                                             (tag-ast-show guard)))
-                            (map tag-ast-show body))))
+                            (Smap2 tag-ast-show body))))
                        syntax-arg)))
       ((16) (cons 'case
                   (cons (tag-ast-show (car syntax-arg))
-                        (map (lambda (cc)
+                        (Smap2 (lambda (cc)
                                (let ((data (car cc)))
                                  (if (and (pair? data)
-                                          (eqv? (ast-con (car data)) empty))
+                                          (Sequal? (ast-con (car data)) empty))
                                      (cons 'else
-                                           (map tag-ast-show (cdr cc)))
-                                     (cons (map datum-show data)
-                                           (map tag-ast-show (cdr cc))))))
+                                           (Smap2 tag-ast-show (cdr cc)))
+                                     (cons (Smap2 datum-show data)
+                                           (Smap2 tag-ast-show (cdr cc))))))
                              (cdr syntax-arg)))))
-      ((17) (cons 'and (map
+      ((17) (cons 'and (Smap2
                         (lambda (ast)
                           (let ((bool-tvar (find! (ast-tvar ast))))
                             (untag-show bool-tvar (tag-ast-show ast))))
                         syntax-arg)))
-      ((18) (cons 'or (map
+      ((18) (cons 'or (Smap2
                        (lambda (ast)
                          (let ((bool-tvar (find! (ast-tvar ast))))
                            (untag-show bool-tvar (tag-ast-show ast))))
                        syntax-arg)))
       ((19) (cons 'let
-                  (cons (map
+                  (cons (Smap3
                          (lambda (vd e)
                            (list (tag-ast-show vd) (tag-ast-show e)))
-                         (caar syntax-arg)
-                         (cdar syntax-arg))
-                        (map tag-ast-show (cdr syntax-arg)))))
+                         (Scaar syntax-arg)
+                         (Scdar syntax-arg))
+                        (Smap2 tag-ast-show (cdr syntax-arg)))))
       ((20) (cons 'let
-                  (cons (tag-ast-show (car syntax-arg))
-                        (cons (map
+                  (cons (tag-ast-show (Scar syntax-arg))
+                        (cons (Smap3
                                (lambda (vd e)
                                  (list (tag-ast-show vd) (tag-ast-show e)))
-                               (caadr syntax-arg)
-                               (cdadr syntax-arg))
-                              (map tag-ast-show (cddr syntax-arg))))))
+                               (Scaadr syntax-arg)
+                               (Scdadr syntax-arg))
+                              (Smap2 tag-ast-show (Scddr syntax-arg))))))
       ((21) (cons 'let*
-                  (cons (map
+                  (cons (Smap3
                          (lambda (vd e)
                            (list (tag-ast-show vd) (tag-ast-show e)))
-                         (caar syntax-arg)
-                         (cdar syntax-arg))
-                        (map tag-ast-show (cdr syntax-arg)))))
+                         (Scaar syntax-arg)
+                         (Scdar syntax-arg))
+                        (Smap2 tag-ast-show (Scdr syntax-arg)))))
       ((22) (cons 'letrec
-                  (cons (map
+                  (cons (Smap2
                          (lambda (vd e)
                            (list (tag-ast-show vd) (tag-ast-show e)))
-                         (caar syntax-arg)
-                         (cdar syntax-arg))
-                        (map tag-ast-show (cdr syntax-arg)))))
+                         (Scaar syntax-arg)
+                         (Scdar syntax-arg))
+                        (Smap2 tag-ast-show (Scdr syntax-arg)))))
       ((23) (cons 'begin
-                  (map tag-ast-show syntax-arg)))
+                  (Smap2 tag-ast-show syntax-arg)))
       ((24) (error 'tag-ast-show "Do expressions not handled! (~s)" syntax-arg))
       ((25) (error 'tag-ast-show "This can't happen: empty encountered!"))
       ((26) (list 'define
-                  (tag-ast-show (car syntax-arg))
-                  (tag-ast-show (cdr syntax-arg))))
-      ((27) (let ((func-tvar (find! (ast-tvar (car syntax-arg)))))
+                  (tag-ast-show (Scar syntax-arg))
+                  (tag-ast-show (Scdr syntax-arg))))
+      ((27) (let ((func-tvar (find! (ast-tvar (Scar syntax-arg)))))
               (list 'define
-                    (tag-ast-show (car syntax-arg))
+                    (tag-ast-show (Scar syntax-arg))
                     (tag-show func-tvar
                               (cons 'lambda
-                                    (cons (tag-ast-show (cadr syntax-arg))
-                                          (map tag-ast-show (cddr syntax-arg))))))))
+                                    (cons (tag-ast-show (Scadr syntax-arg))
+                                          (Smap2 tag-ast-show (Scddr syntax-arg))))))))
       ((28) (cons 'begin
-                  (map tag-ast-show syntax-arg)))
+                  (Smap2 tag-ast-show syntax-arg)))
       (else (error 'tag-ast-show "Unknown abstract syntax operator: ~s"
                    syntax-op)))))
 
@@ -1966,7 +1966,7 @@
 (define (tag-ast*-show p)
   ;; display list of commands/expressions with tagging/untagging
   ;; operations
-  (map tag-ast-show p))
+  (Smap2 tag-ast-show p))
 ;; ----------------------------------------------------------------------------
 ;; Top level type environment
 ;; ----------------------------------------------------------------------------
@@ -1983,7 +1983,7 @@
 (define misc-env
   (list
    (cons 'quote (forall (lambda (tv) tv)))
-   (cons 'eqv? (forall (lambda (tv) (procedure (convert-tvars (list tv tv))
+   (cons 'Sequal? (forall (lambda (tv) (procedure (convert-tvars (list tv tv))
                                                (boolean)))))
    (cons 'eq? (forall (lambda (tv) (procedure (convert-tvars (list tv tv))
                                               (boolean)))))
@@ -2261,7 +2261,7 @@
 ;; global top level environment
 
 (define (global-env)
-  (append misc-env
+  (Sappend misc-env
           io-env
           boolean-env
           symbol-env
@@ -2280,7 +2280,7 @@
 
 (define (dynamic-top-level-env-show)
   ;; displays the top level environment
-  (map (lambda (binding)
+  (Smap2 (lambda (binding)
          (cons (key-show (binding-key binding))
                (cons ': (tvar-show (binding-value binding)))))
        (env->list dynamic-top-level-env)))
@@ -2292,7 +2292,7 @@
 
 (define (ic!) (init-global-constraints!))
 (define (pc) (glob-constr-show))
-(define (lc) (length global-constraints))
+(define (lc) (Slength global-constraints))
 (define (n!) (normalize-global-constraints!))
 (define (pt) (dynamic-top-level-env-show))
 (define (it!) (init-dynamic-top-level-env!))
@@ -2316,11 +2316,11 @@
   (let* ((count (read))
          (input1 (read))
          (output (read))
-         (s2 (number->string count))
+         (s2 (SFXnumber->string count))
          (s1 input1)
          (name "dynamic"))
     (run-r7rs-benchmark
      (string-append name ":" s2)
      count
      (lambda () (doit (hide count input1)))
-     (lambda (result) (equal? result output)))))
+     (lambda (result) (Sequal? result output)))))
