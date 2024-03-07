@@ -19,6 +19,11 @@
 
 (define-macro (unknown . args) `(PRIMop first-argument ,@args))
 
+(define-macro (MAPop* kind op . args)
+  (if (<= (length args) 2)
+    `(MAPop ,kind ,op ,@args)
+    `(MAPop* ,kind ,op (MAPop ,kind ,op ,(car args) ,(cadr args)) ,@(cddr args))))
+
 (define-macro (MAPop kind op . args)
   (cond
    ((eq? kind 'FL)
@@ -32,10 +37,10 @@
    ((eq? kind 'SFX)
     `(,(symbol-append 'FX op) ,@args))))
 
-(define-macro (GEN+ x y)         `(MAPop GEN + ,x ,y))
-(define-macro (GEN- x . rest)    `(MAPop GEN - ,x ,@rest))
-(define-macro (GEN* x y)         `(MAPop GEN * ,x ,y))
-(define-macro (GEN/ x y)         `(MAPop GEN / ,x ,y))
+(define-macro (GEN+ x . rest)    `(MAPop* GEN + ,x ,@rest))
+(define-macro (GEN- x . rest)    `(MAPop* GEN - ,x ,@rest))
+(define-macro (GEN* x . rest)    `(MAPop* GEN * ,x ,@rest))
+(define-macro (GEN/ x . rest)    `(MAPop* GEN / ,x ,@rest))
 (define-macro (GENquotient x y)  `(MAPop GEN quotient ,x ,y))
 (define-macro (GENremainder x y) `(MAPop GEN remainder ,x ,y))
 (define-macro (GENmodulo x y)    `(MAPop GEN modulo ,x ,y))
@@ -48,12 +53,13 @@
 (define-macro (GENsqrt x)        `(MAPop GEN sqrt ,x))
 (define-macro (GENsin x)         `(MAPop GEN sin ,x))
 (define-macro (GENcos x)         `(MAPop GEN cos ,x))
+(define-macro (GENatan x)        `(MAPop GEN atan ,x))
 (define-macro (GENatan2 x y)     `(MAPop GEN atan2 ,x ,y))
 
-(define-macro (SFL+ x y)         `(MAPop SFL + ,x ,y))
-(define-macro (SFL- x . rest)    `(MAPop SFL - ,x ,@rest))
-(define-macro (SFL* x y)         `(MAPop SFL * ,x ,y))
-(define-macro (SFL/ x y)         `(MAPop SFL / ,x ,y))
+(define-macro (SFL+ x . rest)    `(MAPop* SFL + ,x ,@rest))
+(define-macro (SFL- x . rest)    `(MAPop* SFL - ,x ,@rest))
+(define-macro (SFL* x . rest)    `(MAPop* SFL * ,x ,@rest))
+(define-macro (SFL/ x . rest)    `(MAPop* SFL / ,x ,@rest))
 (define-macro (SFLquotient x y)  `(MAPop SFL quotient ,x ,y))
 (define-macro (SFLremainder x y) `(MAPop SFL remainder ,x ,y))
 (define-macro (SFLmodulo x y)    `(MAPop SFL modulo ,x ,y))
@@ -66,11 +72,12 @@
 (define-macro (SFLsqrt x)        `(MAPop SFL sqrt ,x))
 (define-macro (SFLsin x)         `(MAPop SFL sin ,x))
 (define-macro (SFLcos x)         `(MAPop SFL cos ,x))
+(define-macro (SFLatan x)        `(MAPop SFL atan ,x))
 (define-macro (SFLatan2 x y)     `(MAPop SFL atan2 ,x ,y))
 
-(define-macro (SFX+ x y)         `(MAPop SFX + ,x ,y))
-(define-macro (SFX- x . rest)    `(MAPop SFX - ,x ,@rest))
-(define-macro (SFX* x y)         `(MAPop SFX * ,x ,y))
+(define-macro (SFX+ x . rest)    `(MAPop* SFX + ,x ,@rest))
+(define-macro (SFX- x . rest)    `(MAPop* SFX - ,x ,@rest))
+(define-macro (SFX* x . rest)    `(MAPop* SFX * ,x ,@rest))
 (define-macro (SFXquotient x y)  `(MAPop SFX quotient ,x ,y))
 (define-macro (SFXremainder x y) `(MAPop SFX remainder ,x ,y))
 (define-macro (SFXmodulo x y)    `(MAPop SFX modulo ,x ,y))
@@ -104,6 +111,7 @@
 (define-macro (FLsqrt x)        `(FLop sqrt ,x))
 (define-macro (FLsin x)         `(FLop sin ,x))
 (define-macro (FLcos x)         `(FLop cos ,x))
+(define-macro (FLatan x)        `(FLop atan ,x))
 (define-macro (FLatan2 x y)     `(FLop atan2 ,x ,y))
 
 (define-macro (FX+ x y)         `(FXop + ,x ,y))
@@ -332,6 +340,11 @@
        (if (FLONUM? ,a)
            (FLsin ,a)
            (PRIMop sin ,a)))))
+
+(define-macro (BBVatan x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (PRIMop atan ,a))))
 
 (define-macro (BBVatan2 x y)
   (let ((a (gensym))

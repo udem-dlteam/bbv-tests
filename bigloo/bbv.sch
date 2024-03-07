@@ -79,8 +79,16 @@
 (define-macro-arithmetic (GENatan2 x y)     `(MAPop GEN atan2 ,x ,y))
 (define-macro-arithmetic (GENatan x)        `(MAPop GEN atan ,x))
 
-(define-macro-arithmetic (SFL+ x y)         `(MAPop SFL + ,x ,y))
-(define-macro-arithmetic (SFL- x y)         `(MAPop SFL - ,x ,y))
+(define-macro-arithmetic (SFL+ x y . z)     (if (pair? z)
+						`(SFL+ (SFL+ ,x ,y) ,@z)
+						`(MAPop SFL + ,x ,y)))
+(define-macro-arithmetic (SFL- x . z)       (cond
+					       ((null? z)
+						`(SFL- 0. ,x))
+					       ((null? (cdr z))
+						`(MAPop SFL - ,x ,(car z)))
+					       (else
+						`(SFL- (SFL- ,x ,(car z)) ,@(cdr z)))))
 (define-macro-arithmetic (SFL* x y)         `(MAPop SFL * ,x ,y))
 (define-macro-arithmetic (SFL/ x y)         `(MAPop SFL / ,x ,y))
 (define-macro-arithmetic (SFLquotient x y)  `(MAPop SFL quotient ,x ,y))

@@ -16,6 +16,7 @@ SCRIPT_DIR="${SCRIPT_DIR%/.}"
 OPTIM_LEVEL=0     # optimization level
 SAFE_ARITHMETIC=1 # safe/unsafe arithmetic
 PRIMITIVE_COUNT=0 # enables primitive (0 to disable)
+SHOW_EXPANSION=0  # show macro expansion
 GENERATE_CFG=0    # enable cfg generation
 VIEW_CFG=0        # open cfg in pdf viewer
 USE_IGSC=0        # use gambit igsc instead of gsc
@@ -24,7 +25,7 @@ VERSION_LIMIT=    # version limit
 SYSTEM=           # system (gambit or bigloo)
 
 # Parse parameters
-while getopts "f:S:D:V:O:UPGWIchv" opt; do
+while getopts "f:S:D:V:O:UPGWIEchv" opt; do
   case $opt in
     f)
       INPUT_FILE=$(readlink -f $OPTARG)
@@ -76,6 +77,9 @@ while getopts "f:S:D:V:O:UPGWIchv" opt; do
       ;;
     I)
       USE_IGSC=1
+      ;;
+    E)
+      SHOW_EXPANSION=1
       ;;
     c)
       rm -f tests/*/*.cfg tests/*/*.cfg.pdf tests/*/*.gvm tests/*/*.o* tests/*/*~ tests/*/*.bbv.dot tests/*/*.exe
@@ -213,14 +217,19 @@ case "$SYSTEM" in
       FLAGS="$FLAGS -cfg"
     fi
 
+    EXPANSION_FLAG=""
+    if [ "$SHOW_EXPANSION" = "1" ]; then
+      EXPANSION_FLAG="-expansion"
+    fi
+
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
       PRELUDE="$PRELUDE
                (##include \"$SCRIPT_DIR/gambit/lib.scm\")"
       POSTLUDE="(##include \"$SCRIPT_DIR/gambit/main.scm\")"
-      $GAMBITCOMP -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS -gvm-interpret $INPUT_FILE
+      $GAMBITCOMP  $EXPANSION_FLAG -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS -gvm-interpret $INPUT_FILE
     else
       # Compilation
-      $GAMBITCOMP -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE
+      $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE
       $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
       $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
       $GAMBITCOMP -exe -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
