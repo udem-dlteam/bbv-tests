@@ -68,7 +68,7 @@
   (list 'quote val))
 
 (define (new-variables parms env)
-  (append (Smap2 (lambda (x) (cons x (new-variable x))) parms) env))
+  (Sappend (Smap2 (lambda (x) (cons x (new-variable x))) parms) env))
 
 (define *current-num* 0)
 
