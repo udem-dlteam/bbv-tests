@@ -1387,6 +1387,10 @@ def average_time(run):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
     return statistics.mean(results)
 
+def compile_time(run):
+    results = StaticMeasure.get(name="compile-time", run=run)
+    return results.value
+
 def stdev_time(run):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
     return 0 if len(results) == 1 else statistics.stdev(results)
@@ -1574,7 +1578,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                                         subtract_unsafe_run=False,
                                         unsafe_runs=None,
                                         base_runs=None,
-                                        include_geometric_mean=True):
+                                        include_geometric_mean=True,
+                                        absolute=False):
         if base_runs is None:
             base_runs = [r for r in runs if r.version_limit == 0]
 
@@ -1584,15 +1589,22 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         else:
             unsafe_base_runs = None
 
+        if absolute:
+            def ratio(value, base):
+                return value
+        else:
+            def ratio(value, base):
+                return value / base
+
         if subtract_unsafe_run:
             def _measure(run, base_run):
                 base_unsafe_run = next(r for r in unsafe_base_runs if run.benchmark == r.benchmark)
                 base_unsafe_measure = measure(base_unsafe_run)
-                return (measure(run) - base_unsafe_measure) / (measure(base_run) - base_unsafe_measure)
+                return ratio((measure(run) - base_unsafe_measure), (measure(base_run) - base_unsafe_measure))
 
         else:
             def _measure(run, base_run):
-                return measure(run) / measure(base_run)
+                return ratio(measure(run), measure(base_run))
 
         
         base_runs = sorted(base_runs,
@@ -1621,10 +1633,14 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             cols = [n for n in cols if is_macro(n.split()[0])]
             df = df[cols]
 
+        mean_name = "Mean" if absolute else "Geometric Mean"
+        mean = statistics.mean if absolute else statistics.geometric_mean
+
+
         if include_geometric_mean:
-            means = [statistics.geometric_mean(x for x in row if not math.isnan(x)) for i, row in df.iterrows()]
+            means = [mean(x for x in row if not math.isnan(x)) for i, row in df.iterrows()]
             geo_df = pd.DataFrame(means,
-                         columns=["Geometric Mean"],
+                                  columns=[mean_name],
                          index=heatmap_row_names)
             df = df.join(geo_df)
 
@@ -1720,6 +1736,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)
         one_heatmap("checks", sum_checks, subtract_unsafe_run=True, base_runs=checks_base_runs,
                     unsafe_runs=unsafe_base_runs)
+
+    one_heatmap("compile_time", compile_time, absolute=True)
 
     #find_correlations(system, compiler, runs, output)
     
