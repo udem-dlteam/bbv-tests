@@ -561,6 +561,8 @@ benchmark_args = {
     "boyer": "repeat: 1",
     "earley": "repeat: 1",
     "compiler": "repeat: 1",
+    "scheme": "repeat: 1",
+    "nucleic": "repeat: 1",
     "conform": "repeat: 1",
     "conform-record": "repeat: 1",
     "conform-vector": "repeat: 1",
