@@ -258,7 +258,7 @@ case "$SYSTEM" in
     fi
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -copt -DSAW_BBV_STATS=1"
-      BIGLOO_SRFI="$BIGLOO_SRFI -srfi bbvcountprimitve"
+      BIGLOO_SRFI="$BIGLOO_SRFI -srfi bbvcountprimitive"
     fi
     if [ "$VERSION_LIMIT" = "0" ]; then
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -fno-saw-bbv"

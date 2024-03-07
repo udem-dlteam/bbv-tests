@@ -44,7 +44,7 @@
 
 (define (unknown x . rest)
    (cond-expand
-      (bbvcountprimitve ((car (list (lambda () (if (pair? rest) (car rest) x))))))
+      (bbvcountprimitive ((car (list (lambda () (if (pair? rest) (car rest) x))))))
       (else ((car (list (lambda () x)))))))
 
 (define-macro-arithmetic (MAPop kind op . args)
