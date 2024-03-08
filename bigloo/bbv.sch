@@ -765,7 +765,7 @@
                   (if (and (pair? lst1) (pair? lst2))
                       (begin
                         (f (Scar lst1) (Scar lst2))
-                        (for-each2 f (Scdr lst1) (Scdr lst2)))
+                        (for-each3 f (Scdr lst1) (Scdr lst2)))
                       #f))))
         (for-each3 f lst1 lst2))
       (DEAD-END "for-each! type error"))))

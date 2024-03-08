@@ -712,15 +712,6 @@
 
 ;; dynamic-parse-from-port
 
-(define read-content (unknown '((define gen-binding cons))))
-(define read-buffer read-content)
-(define (my-read)
-  (if (null? read-buffer)
-      (eof-object)
-      (let ((next (car read-buffer)))
-        (set! read-buffer (cdr read-buffer))
-        next)))
-
 (define (dynamic-parse-from-port)
   (let ((next-input (my-read)))
     (if (eof-object? next-input)
@@ -2313,6 +2304,27 @@
 (define tag-ops 0)
 (define no-ops 0)
 
+(define-macro (init-content)
+  (define (show x)
+    (if #f (pp x))
+    x)
+  (show
+    `(quote
+      ,(let ((port (open-input-file "./tests/todo/dynamic.scm")))
+        (let loop ()
+          (let ((next (read port)))
+            (if (eof-object? next)
+              '()
+              (cons next (loop)))))))))
+
+(define read-content (unknown (init-content)))
+(define read-buffer read-content)
+(define (my-read)
+  (if (null? read-buffer)
+      (eof-object)
+      (let ((next (car read-buffer)))
+        (set! read-buffer (cdr read-buffer))
+        next)))
 
 (define run1
   (lambda ()
@@ -2323,8 +2335,7 @@
       (tag-ast*-show foo)
       (counters-show))))
 
-(define (run #!key (n (unknown 1 500)))
-  (##gvm-interpreter-debug #t)
+(define (run #!key (n (unknown 1 1)))
   (let loop ((n n) (result #f))
     (if (SFX> n 0)
         (loop (SFX- n 1) (run1))
