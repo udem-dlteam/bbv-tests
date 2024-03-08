@@ -57,7 +57,6 @@ if not hasattr(db.Entity, "get_or_create"):
     db.Entity.get_or_create=get_or_create
     del get_or_create
 
-
 class Compiler(db.Entity):
     name = Required(str)
     commit_sha = Required(str)
@@ -218,6 +217,14 @@ class Run(db.Entity):
     static_measures = Set('StaticMeasure', reverse='run')
     arguments = Required(str)
     timestamp = Required(int, default=lambda: int(time.time()))
+
+    @classmethod
+    def get_latest(cls, **kwargs):
+        entities = list(cls.select(**kwargs))
+        if not entities:
+            logger.debug(f"get_latest(**{kwargs})")
+            raise ValueError("Cannot get latest, none exists")
+        return max(entities, key=lambda e: e.timestamp)
 
 
 db.bind(provider='sqlite', filename='benchmarks.db', create_db=True)
@@ -1375,13 +1382,21 @@ def choose_csv_output_path(output, system_name, compiler_name):
 
 def is_macro(name):
     return name in ("almabench", "compiler", "earley", "peval",
-                    "conform", "conform-vector", "conform-record",
-                    "maze", "maze-vector", "maze-record",
-                    "boyer", "slatex")
+                    "conform", "maze", "boyer", "slatex", "scheme",
+                    "nucleic")
 
 def run_is_macro(run):
     return is_macro(run.benchmark.name)
 
+def nan_on(*exceptions):
+    def wrapper(getter):
+        def inner_wrapper(*args, **kwargs):
+            try:
+                return getter(*args, **kwargs)
+            except exceptions:
+                return math.nan
+        return inner_wrapper
+    return wrapper
 
 def average_time(run):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
@@ -1400,8 +1415,9 @@ def sum_checks(run):
     results = [p.value for p in primitive_counts if p.is_typecheck]
     return sum(results)
 
+@nan_on(ValueError)
 def sum_removable_checks(run):
-    unsafe_run = Run.get(compiler=run.compiler, system=run.system, safe_arithmetic=False,
+    unsafe_run = Run.get_latest(compiler=run.compiler, system=run.system, safe_arithmetic=False,
                          version_limit=0, compiler_optimizations=run.compiler_optimizations,
                          benchmark=run.benchmark)
 
@@ -1425,6 +1441,7 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
         and r.compiler.name == compiler_name # TODO switch back to using compiler when no commit-split
         and r.benchmark.name in benchmark_names
         and r.version_limit in version_limits
+        and r.compiler_optimizations
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
             if r2.system == system
@@ -1459,6 +1476,9 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
                                                         for o in (True,)
                                                         for l in version_limits
                                                         for p in ('', stdev_postfix)]
+
+    logger.debug(f"columns in csv: {','.join(column_names)}")
+
     data = []
 
     def get_measure_data(title, get_measure, get_stdev=lambda r: 0):
@@ -1480,12 +1500,15 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
         return measure_data
 
     # Time
+    logger.debug("Appending 'Execution time'")
     data += get_measure_data("Execution time", average_time, stdev_time)
 
     # primitive count
+    logger.debug("Appending 'Runtime removable checks'")
     data += get_measure_data("Runtime removable checks", sum_removable_checks)
 
     # program size
+    logger.debug("Appending 'Program size'")
     data += get_measure_data("Program size", run_program_size)
 
     with open(output_path, 'w') as f:
@@ -1554,7 +1577,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     def get_version_limit_name(v):
         return "No SBBV" if v == 0 else str(v) + " "
 
-    runs.sort(key=lambda r: (is_macro(r.benchmark.name), r.benchmark.name))
+    runs.sort(key=lambda r: (not is_macro(r.benchmark.name), r.benchmark.name))
 
     column_names = [] 
     for r in runs:
@@ -1597,6 +1620,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                 return value / base
 
         if subtract_unsafe_run:
+            @nan_on(StopIteration)
             def _measure(run, base_run):
                 base_unsafe_run = next(r for r in unsafe_base_runs if run.benchmark == r.benchmark)
                 base_unsafe_measure = measure(base_unsafe_run)
@@ -1634,8 +1658,12 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             df = df[cols]
 
         mean_name = "Mean" if absolute else "Geometric Mean"
-        mean = statistics.mean if absolute else statistics.geometric_mean
+        _mean = statistics.mean if absolute else statistics.geometric_mean
 
+        @nan_on(statistics.StatisticsError)
+        def mean(it):
+            it = list(it)
+            return _mean(it)
 
         if include_geometric_mean:
             means = [mean(x for x in row if not math.isnan(x)) for i, row in df.iterrows()]
@@ -1733,7 +1761,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             and not r2.compiler_optimizations))))
 
     if unsafe_base_runs:
-        one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)
+        #one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)
         one_heatmap("checks", sum_checks, subtract_unsafe_run=True, base_runs=checks_base_runs,
                     unsafe_runs=unsafe_base_runs)
 
