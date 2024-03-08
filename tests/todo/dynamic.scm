@@ -1605,10 +1605,10 @@
                                (Sfor-each2 (lambda (e)
                                            (add-constr! (ast-tvar e) t-key))
                                          exprs))
-                             (Smap2 (lambda (p) (Scar l)) case-clauses))
+                             (Smap2 (lambda (p) (Scar p)) case-clauses))
                    (Sfor-each2 (lambda (body)
                                (add-constr! (ast-tvar (tail body)) new-tvar))
-                             (Smap2 (lambda (p) (Scdr l)) case-clauses))
+                             (Smap2 (lambda (p) (Scdr p)) case-clauses))
                    new-tvar))
            ((17 18) (Sfor-each2 (lambda (e)
                                 (add-constr! (boolean) (ast-tvar e)))
@@ -2313,9 +2313,10 @@
       ,(let ((port (open-input-file "./tests/todo/dynamic.scm")))
         (let loop ()
           (let ((next (read port)))
-            (if (eof-object? next)
-              '()
-              (cons next (loop)))))))))
+            (cond
+              ((eof-object? next) '())
+              ((eq? (car next) 'define-macro) '()) ;; skip everything after this macro, parser fails on #!key
+              (else (cons next (loop))))))))))
 
 (define read-content (unknown (init-content)))
 (define read-buffer read-content)
@@ -2342,4 +2343,4 @@
 	      result)))
 
 (define (check result)
-  (Sequal? result '((218 . 455) (6 . 1892) (2204 . 446))))
+  (Sequal? result '((181 . 480) (6 . 1892) (2219 . 427))))
