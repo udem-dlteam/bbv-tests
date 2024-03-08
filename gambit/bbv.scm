@@ -664,22 +664,51 @@
 
 (define-macro (Smap2 f lst) ;; 2 parameter map
   `(let ((f ,f) (lst ,lst))
-     (letrec ((map2
-               (lambda (f lst)
-                 (if (pair? lst)
-                     (cons (f (Scar lst)) (map2 f (Scdr lst)))
-                     '()))))
-       (map2 f lst))))
+     (if (procedure? f)
+      (letrec ((map2
+                (lambda (f lst)
+                  (if (pair? lst)
+                      (cons (f (Scar lst)) (map2 f (Scdr lst)))
+                      '()))))
+        (map2 f lst))
+      (DEAD-END "map type error"))))
 
-(define-macro (Sfor-each2 f lst) ;; 2 parameter for-each
+(define-macro (Smap3 f lst1 lst2) ;; 3 parameter map
+  `(let ((f ,f) (lst1 ,lst1) (lst2 ,lst2))
+     (if (procedure? f)
+      (letrec ((map3
+                (lambda (f lst1 lst2)
+                  (if (and (pair? lst1) (pair? lst2))
+                      (cons (f (Scar lst1) (Scar lst2)) (map3 f (Scdr lst1) (Scdr lst2)))
+                      '()))))
+        (map3 f lst1 lst2))
+      (DEAD-END "map type error"))))
+
+(define-macro (Sfor-each2 f lst) ;; 2 parameter map
   `(let ((f ,f) (lst ,lst))
-     (letrec ((for-each2
-               (lambda (f lst)
-                 (and (pair? lst)
+    (if (procedure? ,f)
+      (letrec ((for-each2
+                (lambda (f lst)
+                  (if (pair? lst)
                       (begin
                         (f (Scar lst))
-                        (for-each2 f (Scdr lst)))))))
-       (for-each2 f lst))))
+                        (for-each2 f (Scdr lst)))
+                      #f))))
+        (for-each2 f lst))
+      (DEAD-END "for-each! type error"))))
+
+(define-macro (Sfor-each3 f lst1 lst2) ;; 3 parameter map
+  `(let ((f ,f) (lst1 ,lst1) (lst2 ,lst2))
+    (if (procedure? ,f)
+      (letrec ((for-each3
+                (lambda (f lst1 lst2)
+                  (if (and (pair? lst1) (pair? lst2))
+                      (begin
+                        (f (Scar lst1) (Scar lst2))
+                        (for-each2 f (Scdr lst1) (Scdr lst2)))
+                      #f))))
+        (for-each3 f lst1 lst2))
+      (DEAD-END "for-each! type error"))))
 
 (define-macro (Sreverse lst)
   `(let ((lst ,lst))

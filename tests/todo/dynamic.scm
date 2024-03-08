@@ -504,7 +504,7 @@
   ;; ***Note***: the list of pairs is returned in reverse unzipped form!
   (if (list-of-list-of-2s? bindings)
       (let* ((env-formals-asg
-              (dynamic-parse-formal* (Smap2 Scar bindings)))
+              (dynamic-parse-formal* (Smap2 (lambda (p) (Scar p)) bindings)))
              (nenv (Scar env-formals-asg))
              (bresults (Scdr env-formals-asg))
              (exprs-asg
@@ -590,7 +590,7 @@
 ;;; ***Note***: the list of pairs is returned in reverse unzipped form!
   (if (list-of-list-of-2s? bindings)
       (let* ((env-formals-asg
-              (dynamic-parse-formal* (Smap2 Scar bindings)))
+              (dynamic-parse-formal* (Smap2 (lambda (p) (Scar p)) bindings)))
              (formals-env
               (Scar env-formals-asg))
              (formals-res
@@ -598,7 +598,7 @@
              (exprs-asg
               (dynamic-parse-expression*
                (extend-env-with-env env formals-env)
-               (Smap2 Scadr bindings))))
+               (Smap2 (lambda (p) (Scadr p)) bindings))))
         (cons
          formals-env
          (cons formals-res exprs-asg)))
@@ -712,19 +712,27 @@
 
 ;; dynamic-parse-from-port
 
-(define (dynamic-parse-from-port port)
-  (let ((next-input (read port)))
-    (if (Seof-object? next-input)
+(define read-content (unknown '((define gen-binding cons))))
+(define read-buffer read-content)
+(define (my-read)
+  (if (null? read-buffer)
+      (eof-object)
+      (let ((next (car read-buffer)))
+        (set! read-buffer (cdr read-buffer))
+        next)))
+
+(define (dynamic-parse-from-port)
+  (let ((next-input (my-read)))
+    (if (eof-object? next-input)
         '()
         (dynamic-parse-action-commands
          (dynamic-parse-command dynamic-empty-env next-input)
-         (dynamic-parse-from-port port)))))
+         (dynamic-parse-from-port)))))
 
 ;; dynamic-parse-file
 
-(define (dynamic-parse-file file-name)
-  (let ((input-port (open-input-file file-name)))
-    (dynamic-parse-from-port input-port)))
+(define (dynamic-parse-file)
+  (dynamic-parse-from-port))
 ;;----------------------------------------------------------------------------
 ;; Implementation of Union/find data structure in Scheme
 ;;----------------------------------------------------------------------------
@@ -1013,7 +1021,7 @@
       ;; both tv1 and tv2 are (nondynamic) types with equal numbers of
       ;; arguments
       (link! tv1-rep tv2-rep)
-      (Smap2 equiv! (type-args tv1-def) (type-args tv2-def)))
+      (Smap3 equiv! (type-args tv1-def) (type-args tv2-def)))
      (else
       ;; tv1 and tv2 are types with distinct type constructors or different
       ;; numbers of arguments
@@ -1457,7 +1465,7 @@
       ((17) (cons 'and (Smap2 ast-show syntax-arg)))
       ((18) (cons 'or (Smap2 ast-show syntax-arg)))
       ((19) (cons 'let
-                  (cons (Smap2
+                  (cons (Smap3
                          (lambda (vd e)
                            (list (ast-show vd) (ast-show e)))
                          (Scaar syntax-arg)
@@ -1465,21 +1473,21 @@
                         (Smap2 ast-show (Scdr syntax-arg)))))
       ((20) (cons 'let
                   (cons (ast-show (Scar syntax-arg))
-                        (cons (Smap2
+                        (cons (Smap3
                                (lambda (vd e)
                                  (list (ast-show vd) (ast-show e)))
                                (Scaadr syntax-arg)
                                (Scdadr syntax-arg))
                               (Smap2 ast-show (Scddr syntax-arg))))))
       ((21) (cons 'let*
-                  (cons (Smap2
+                  (cons (Smap3
                          (lambda (vd e)
                            (list (ast-show vd) (ast-show e)))
                          (Scaar syntax-arg)
                          (Scdar syntax-arg))
                         (Smap2 ast-show (Scdr syntax-arg)))))
       ((22) (cons 'letrec
-                  (cons (Smap2
+                  (cons (Smap3
                          (lambda (vd e)
                            (list (ast-show vd) (ast-show e)))
                          (Scaar syntax-arg)
@@ -1594,10 +1602,10 @@
            ((15) (let ((new-tvar (gen-tvar)))
                    (Sfor-each2 (lambda (body)
                                (add-constr! (ast-tvar (tail body)) new-tvar))
-                             (Smap2 Scdr arg))
+                             (Smap2 (lambda (p) (Scdr p)) arg))
                    (Sfor-each2 (lambda (e)
                                (add-constr! (boolean) (ast-tvar e)))
-                             (Smap2 Scar arg))
+                             (Smap2 (lambda (p) (Scar p)) arg))
                    new-tvar))
            ((16) (let* ((new-tvar (gen-tvar))
                         (t-key (ast-tvar (Scar arg)))
@@ -1618,13 +1626,13 @@
            ((19 21 22) (let ((var-def-tvars (Smap2 ast-tvar (Scaar arg)))
                              (def-expr-types (Smap2 ast-tvar (Scdar arg)))
                              (body-type (ast-tvar (tail (Scdr arg)))))
-                         (Sfor-each2 add-constr! var-def-tvars def-expr-types)
+                         (Sfor-each3 add-constr! var-def-tvars def-expr-types)
                          body-type))
            ((20) (let ((var-def-tvars (Smap2 ast-tvar (Scaadr arg)))
                        (def-expr-types (Smap2 ast-tvar (Scdadr arg)))
                        (body-type (ast-tvar (tail (Scddr arg))))
                        (named-var-type (ast-tvar (Scar arg))))
-                   (Sfor-each2 add-constr! var-def-tvars def-expr-types)
+                   (Sfor-each3 add-constr! var-def-tvars def-expr-types)
                    (add-constr! (procedure (convert-tvars var-def-tvars) body-type)
                                 named-var-type)
                    body-type))
@@ -1727,7 +1735,7 @@
        ((17) (cons 'and (Smap2 tast-show syntax-arg)))
        ((18) (cons 'or (Smap2 tast-show syntax-arg)))
        ((19) (cons 'let
-                   (cons (Smap2
+                   (cons (Smap3
                           (lambda (vd e)
                             (list (tast-show vd) (tast-show e)))
                           (Scaar syntax-arg)
@@ -1735,21 +1743,21 @@
                          (Smap2 tast-show (cdr syntax-arg)))))
        ((20) (cons 'let
                    (cons (tast-show (Scar syntax-arg))
-                         (cons (Smap2
+                         (cons (Smap3
                                 (lambda (vd e)
                                   (list (tast-show vd) (tast-show e)))
                                 (Scaadr syntax-arg)
                                 (Scdadr syntax-arg))
                                (Smap2 tast-show (Scddr syntax-arg))))))
        ((21) (cons 'let*
-                   (cons (Smap2
+                   (cons (Smap3
                           (lambda (vd e)
                             (list (tast-show vd) (tast-show e)))
                           (Scaar syntax-arg)
                           (Scdar syntax-arg))
                          (Smap2 tast-show (Scdr syntax-arg)))))
        ((22) (cons 'letrec
-                   (cons (Smap2
+                   (cons (Smap3
                           (lambda (vd e)
                             (list (tast-show vd) (tast-show e)))
                           (Scaar syntax-arg)
@@ -1935,7 +1943,7 @@
                          (Scdar syntax-arg))
                         (Smap2 tag-ast-show (Scdr syntax-arg)))))
       ((22) (cons 'letrec
-                  (cons (Smap2
+                  (cons (Smap3
                          (lambda (vd e)
                            (list (tag-ast-show vd) (tag-ast-show e)))
                          (Scaar syntax-arg)
@@ -2261,7 +2269,9 @@
 ;; global top level environment
 
 (define (global-env)
-  (Sappend misc-env
+  (LIBconcatenate
+          (list
+          misc-env
           io-env
           boolean-env
           symbol-env
@@ -2270,7 +2280,7 @@
           string-env
           vector-env
           procedure-env
-          list-env))
+          list-env)))
 
 (define dynamic-top-level-env (global-env))
 
@@ -2297,30 +2307,28 @@
 (define (pt) (dynamic-top-level-env-show))
 (define (it!) (init-dynamic-top-level-env!))
 (define (io!) (set! tag-ops 0) (set! no-ops 0))
-(define (i!) (ic!) (it!) (io!) '())
+(define (ib!) (set! read-buffer read-content))
+(define (i!) (ic!) (it!) (io!) (ib!) '())
 
 (define tag-ops 0)
 (define no-ops 0)
 
 
-(define doit
-  (lambda (input-file)
+(define run1
+  (lambda ()
     (i!)
-    (let ((foo (dynamic-parse-file input-file)))
+    (let ((foo (dynamic-parse-file)))
       (normalize-global-constraints!)
       (reset-counters!)
       (tag-ast*-show foo)
       (counters-show))))
 
-(define (run-benchmark)
-  (let* ((count (read))
-         (input1 (read))
-         (output (read))
-         (s2 (SFXnumber->string count))
-         (s1 input1)
-         (name "dynamic"))
-    (run-r7rs-benchmark
-     (string-append name ":" s2)
-     count
-     (lambda () (doit (hide count input1)))
-     (lambda (result) (Sequal? result output)))))
+(define (run #!key (n (unknown 1 500)))
+  (##gvm-interpreter-debug #t)
+  (let loop ((n n) (result #f))
+    (if (SFX> n 0)
+        (loop (SFX- n 1) (run1))
+	      result)))
+
+(define (check result)
+  (Sequal? result '((218 . 455) (6 . 1892) (2204 . 446))))

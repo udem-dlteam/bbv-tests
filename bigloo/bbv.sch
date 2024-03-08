@@ -733,18 +733,42 @@
 	     (map2 f lst))
 	  (DEAD-END "map type error"))))
 
+(define-macro-arithmetic (Smap3 f lst1 lst2) ;; 3 parameter map
+  `(let ((f ,f) (lst1 ,lst1) (lst2 ,lst2))
+     (if (procedure? f)
+      (letrec ((map3
+                (lambda (f lst1 lst2)
+                  (if (and (pair? lst1) (pair? lst2))
+                      (cons (f (Scar lst1) (Scar lst2)) (map3 f (Scdr lst1) (Scdr lst2)))
+                      '()))))
+        (map3 f lst1 lst2))
+      (DEAD-END "map type error"))))
+
 (define-macro-arithmetic (Sfor-each2 f lst) ;; 2 parameter map
-   `(let ((f ,f) (lst ,lst))
-       (if (procedure? ,f)
-	   (letrec ((for-each2
-		       (lambda (f lst)
-			  (if (pair? lst)
-			      (begin
-				 (f (Scar lst))
-				 (for-each2 f (Scdr lst)))
-			      '()))))
-	      (for-each2 f lst))
-	   (DEAD-END "for-each! type error"))))
+  `(let ((f ,f) (lst ,lst))
+    (if (procedure? ,f)
+      (letrec ((for-each2
+                (lambda (f lst)
+                  (if (pair? lst)
+                      (begin
+                        (f (Scar lst))
+                        (for-each2 f (Scdr lst)))
+                      #f))))
+        (for-each2 f lst))
+      (DEAD-END "for-each! type error"))))
+
+(define-macro-arithmetic (Sfor-each3 f lst1 lst2) ;; 3 parameter map
+  `(let ((f ,f) (lst1 ,lst1) (lst2 ,lst2))
+    (if (procedure? ,f)
+      (letrec ((for-each3
+                (lambda (f lst1 lst2)
+                  (if (and (pair? lst1) (pair? lst2))
+                      (begin
+                        (f (Scar lst1) (Scar lst2))
+                        (for-each2 f (Scdr lst1) (Scdr lst2)))
+                      #f))))
+        (for-each3 f lst1 lst2))
+      (DEAD-END "for-each! type error"))))
 
 (define-macro-arithmetic (Sreverse lst)
   `(let ((lst ,lst))
