@@ -910,10 +910,10 @@
   ;; resets the type definition part of tvar to nil
   (Sset-cdr! (info tvar) '()))
 
-(define type-con (lambda (l) (car l)))
+(define type-con (lambda (l) (Scar l)))
 ;; returns the type constructor of a type definition
 
-(define type-args (lambda (l) (cdr l)))
+(define type-args (lambda (l) (Scdr l)))
 ;; returns the type variables of a type definition
 
 (define (tvar->string tvar)
