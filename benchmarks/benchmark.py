@@ -1644,8 +1644,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         for run in runs:
             row, col = get_pos(run)
-            base = base_runs[col]
-            res = _measure(run, base)
+            base = next((b for b in base_runs if b.benchmark == run.benchmark), None)
+            res = _measure(run, base) if base else math.nan
             data[row][col] = res
             if best:
                 data[-1][col] = min(res, data[-1][col]) if data[-1][col] != math.nan else res
