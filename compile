@@ -146,6 +146,7 @@ if [ "$COMPILER_DIR" = "" ]; then
     COMPILER_DIR="$SCRIPT_DIR/gambit/bbv-gambit"
   fi
 fi
+COMPILER_DIR=$(readlink -f $COMPILER_DIR)
 
 if [ "$SAFE_ARITHMETIC" = "0" ]; then
   ARITHMETIC=S
@@ -155,6 +156,7 @@ else
   SAFETY_MODE="safe"
 fi
 
+INPUT_FILE_DIRNAME="$(dirname $INPUT_FILE)"
 INPUT_FILE_NO_EXT="${INPUT_FILE%.scm}"
 OUTPUT_FILE_BASE="$INPUT_FILE_NO_EXT.${SYSTEM}.V${VERSION_LIMIT}.O${OPTIM_LEVEL}.$SAFETY_MODE"
 OUTPUT_FILE_C="$INPUT_FILE_NO_EXT.c"
@@ -226,10 +228,12 @@ case "$SYSTEM" in
       PRELUDE="$PRELUDE
                (##include \"$SCRIPT_DIR/gambit/lib.scm\")"
       POSTLUDE="(##include \"$SCRIPT_DIR/gambit/main.scm\")"
-      $GAMBITCOMP  $EXPANSION_FLAG -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS -gvm-interpret $INPUT_FILE
+      (cd $INPUT_FILE_DIRNAME && \
+       $GAMBITCOMP  $EXPANSION_FLAG -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS -gvm-interpret $INPUT_FILE)
     else
       # Compilation
-      $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE
+      (cd $INPUT_FILE_DIRNAME && \
+       $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE)
       $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
       $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
       $GAMBITCOMP -exe -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c

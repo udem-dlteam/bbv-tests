@@ -397,6 +397,7 @@
 (define-macro (Scadr x) `(Scar (Scdr ,x)))
 (define-macro (Scdar x) `(Scdr (Scar ,x)))
 (define-macro (Scddr x) `(Scdr (Scdr ,x)))
+(define-macro (Scaadr x) `(Scar (Scar (Scdr ,x))))
 (define-macro (Scdddr x) `(Scdr (Scdr (Scdr ,x))))
 (define-macro (Scaddr x) `(Scar (Scdr (Scdr ,x))))
 (define-macro (Scadar x) `(Scar (Scdr (Scar ,x))))

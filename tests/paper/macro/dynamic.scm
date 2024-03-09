@@ -126,7 +126,7 @@
    ((pair? e)
     (dynamic-parse-action-pair-const (dynamic-parse-datum (Scar e))
                                      (dynamic-parse-datum (Scdr e))))
-   (else (error 'dynamic-parse-datum "Unknown datum: ~s" e))))
+   (else (fatal-error 'dynamic-parse-datum "Unknown datum: ~s" e))))
 
 
 ;; VarDef
@@ -140,13 +140,13 @@
   (if (symbol? e)
       (cond
        ((Smemq e syntactic-keywords)
-        (error 'dynamic-parse-formal "Illegal identifier (keyword): ~s" e))
+        (fatal-error 'dynamic-parse-formal "Illegal identifier (keyword): ~s" e))
        ((dynamic-lookup e f-env)
-        (error 'dynamic-parse-formal "Duplicate variable definition: ~s" e))
+        (fatal-error 'dynamic-parse-formal "Duplicate variable definition: ~s" e))
        (else (let ((dynamic-parse-action-result (dynamic-parse-action-var-def e)))
                (cons (gen-binding e dynamic-parse-action-result)
                      dynamic-parse-action-result))))
-      (error 'dynamic-parse-formal "Not an identifier: ~s" e)))
+      (fatal-error 'dynamic-parse-formal "Not an identifier: ~s" e)))
 
 ;; dynamic-parse-formal*
 
@@ -172,7 +172,7 @@
                (extend-env-with-binding f-env binding)
                (cons var-result results)
                (Scdr formals))))
-           (else (error 'dynamic-parse-formal* "Illegal formals: ~s" formals))))))
+           (else (fatal-error 'dynamic-parse-formal* "Illegal formals: ~s" formals))))))
     (let ((renv-rres (pf* dynamic-empty-env '() formals)))
       (cons (Scar renv-rres) (Sreverse (Scdr renv-rres))))))
 
@@ -246,7 +246,7 @@
               (cond
                ((null? es) results)
                ((pair? es) (pe* (cons (dynamic-parse-expression env (Scar es)) results) (Scdr es)))
-               (else (error 'dynamic-parse-expression* "Not a list of expressions: ~s" es))))))
+               (else (fatal-error 'dynamic-parse-expression* "Not a list of expressions: ~s" es))))))
     (Sreverse (pe* '() exprs))))
 
 
@@ -261,7 +261,7 @@
                          (fst-res (dynamic-parse-expression env fst-expr))
                          (rem-res (dynamic-parse-expressions env rem-exprs)))
                     (dynamic-parse-action-pair-arg fst-res rem-res)))
-   (else (error 'dynamic-parse-expressions "Illegal expression list: ~s"
+   (else (fatal-error 'dynamic-parse-expressions "Illegal expression list: ~s"
                 exprs))))
 
 
@@ -270,12 +270,12 @@
 (define (dynamic-parse-variable env e)
   (if (symbol? e)
       (if (Smemq e syntactic-keywords)
-          (error 'dynamic-parse-variable "Illegal identifier (keyword): ~s" e)
+          (fatal-error 'dynamic-parse-variable "Illegal identifier (keyword): ~s" e)
           (let ((assoc-var-def (dynamic-lookup e env)))
             (if assoc-var-def
                 (dynamic-parse-action-variable (binding-value assoc-var-def))
                 (dynamic-parse-action-identifier e))))
-      (error 'dynamic-parse-variable "Not an identifier: ~s" e)))
+      (fatal-error 'dynamic-parse-variable "Not an identifier: ~s" e)))
 
 
 ;; dynamic-parse-procedure-call
@@ -291,7 +291,7 @@
 (define (dynamic-parse-quote env args)
   (if (list-of-1? args)
       (dynamic-parse-datum (Scar args))
-      (error 'dynamic-parse-quote "Not a datum (multiple arguments): ~s" args)))
+      (fatal-error 'dynamic-parse-quote "Not a datum (multiple arguments): ~s" args)))
 
 
 ;; dynamic-parse-lambda
@@ -306,7 +306,7 @@
         (dynamic-parse-action-lambda-expression
          fresults
          (dynamic-parse-body (extend-env-with-env env nenv) body)))
-      (error 'dynamic-parse-lambda "Illegal formals/body: ~s" args)))
+      (fatal-error 'dynamic-parse-lambda "Illegal formals/body: ~s" args)))
 
 
 ;; dynamic-parse-body
@@ -348,7 +348,7 @@
         #f))
   (if (pair? body)
       (dynamic-parse-command* (def-var* env body) body)
-      (error 'dynamic-parse-body "Illegal body: ~s" body)))
+      (fatal-error 'dynamic-parse-body "Illegal body: ~s" body)))
 
 ;; dynamic-parse-if
 
@@ -364,7 +364,7 @@
      (dynamic-parse-expression env (Scar args))
      (dynamic-parse-expression env (Scadr args))
      (dynamic-parse-action-empty)))
-   (else (error 'dynamic-parse-if "Not an if-expression: ~s" args))))
+   (else (fatal-error 'dynamic-parse-if "Not an if-expression: ~s" args))))
 
 
 ;; dynamic-parse-set
@@ -374,7 +374,7 @@
       (dynamic-parse-action-assignment
        (dynamic-parse-variable env (Scar args))
        (dynamic-parse-expression env (Scadr args)))
-      (error 'dynamic-parse-set "Not a variable/expression pair: ~s" args)))
+      (fatal-error 'dynamic-parse-set "Not a variable/expression pair: ~s" args)))
 
 
 ;; dynamic-parse-begin
@@ -392,7 +392,7 @@
        (Smap2 (lambda (e)
               (dynamic-parse-cond-clause env e))
             args))
-      (error 'dynamic-parse-cond "Not a list of cond-clauses: ~s" args)))
+      (fatal-error 'dynamic-parse-cond "Not a list of cond-clauses: ~s" args)))
 
 ;; dynamic-parse-cond-clause
 
@@ -404,7 +404,7 @@
            (dynamic-parse-action-empty)
            (dynamic-parse-expression env (Scar e)))
        (dynamic-parse-body env (Scdr e)))
-      (error 'dynamic-parse-cond-clause "Not a cond-clause: ~s" e)))
+      (fatal-error 'dynamic-parse-cond-clause "Not a cond-clause: ~s" e)))
 
 
 ;; dynamic-parse-and
@@ -413,7 +413,7 @@
   (if (list? args)
       (dynamic-parse-action-and-expression
        (dynamic-parse-expression* env args))
-      (error 'dynamic-parse-and "Not a list of arguments: ~s" args)))
+      (fatal-error 'dynamic-parse-and "Not a list of arguments: ~s" args)))
 
 
 ;; dynamic-parse-or
@@ -422,7 +422,7 @@
   (if (list? args)
       (dynamic-parse-action-or-expression
        (dynamic-parse-expression* env args))
-      (error 'dynamic-parse-or "Not a list of arguments: ~s" args)))
+      (fatal-error 'dynamic-parse-or "Not a list of arguments: ~s" args)))
 
 
 ;; dynamic-parse-case
@@ -434,7 +434,7 @@
        (Smap2 (lambda (e)
               (dynamic-parse-case-clause env e))
             (Scdr args)))
-      (error 'dynamic-parse-case "Not a list of clauses: ~s" args)))
+      (fatal-error 'dynamic-parse-case "Not a list of clauses: ~s" args)))
 
 ;; dynamic-parse-case-clause
 
@@ -446,9 +446,9 @@
          (list (dynamic-parse-action-empty)))
         ((list? (Scar e))
          (Smap2 dynamic-parse-datum (Scar e)))
-        (else (error 'dynamic-parse-case-clause "Not a datum list: ~s" (Scar e))))
+        (else (fatal-error 'dynamic-parse-case-clause "Not a datum list: ~s" (Scar e))))
        (dynamic-parse-body env (Scdr e)))
-      (error 'dynamic-parse-case-clause "Not case clause: ~s" e)))
+      (fatal-error 'dynamic-parse-case-clause "Not case clause: ~s" e)))
 
 
 ;; dynamic-parse-let
@@ -458,7 +458,7 @@
       (if (symbol? (car args))
           (dynamic-parse-named-let env args)
           (dynamic-parse-normal-let env args))
-      (error 'dynamic-parse-let "Illegal bindings/body: ~s" args)))
+      (fatal-error 'dynamic-parse-let "Illegal bindings/body: ~s" args)))
 
 
 ;; dynamic-parse-normal-let
@@ -493,7 +493,7 @@
          (dynamic-parse-body (extend-env-with-env
                               (extend-env-with-binding env vbind)
                               nenv) body)))
-      (error 'dynamic-parse-named-let "Illegal named let-expression: ~s" args)))
+      (fatal-error 'dynamic-parse-named-let "Illegal named let-expression: ~s" args)))
 
 
 ;; dynamic-parse-parallel-bindings
@@ -510,7 +510,7 @@
              (exprs-asg
               (dynamic-parse-expression* env (Smap2 (lambda (l) (Scadr l)) bindings))))
         (cons nenv (cons bresults exprs-asg)))
-      (error 'dynamic-parse-parallel-bindings
+      (fatal-error 'dynamic-parse-parallel-bindings
              "Not a list of bindings: ~s" bindings)))
 
 
@@ -526,7 +526,7 @@
         (dynamic-parse-action-let*-expression
          bresults
          (dynamic-parse-body (extend-env-with-env env nenv) body)))
-      (error 'dynamic-parse-let* "Illegal bindings/body: ~s" args)))
+      (fatal-error 'dynamic-parse-let* "Illegal bindings/body: ~s" args)))
 
 ;; dynamic-parse-sequential-bindings
 
@@ -560,9 +560,9 @@
                      (cons bres var-defs)
                      (cons new-expr-asg expr-asgs)
                      (Scdr binds)))
-                  (error 'dynamic-parse-sequential-bindings
+                  (fatal-error 'dynamic-parse-sequential-bindings
                          "Illegal binding: ~s" fst-bind))))
-           (else (error 'dynamic-parse-sequential-bindings
+           (else (fatal-error 'dynamic-parse-sequential-bindings
                         "Illegal bindings: ~s" binds))))))
     (let ((env-vdefs-easgs (psb dynamic-empty-env env '() '() bindings)))
       (cons (Scar env-vdefs-easgs)
@@ -582,7 +582,7 @@
         (dynamic-parse-action-letrec-expression
          bresults
          (dynamic-parse-body (extend-env-with-env env nenv) body)))
-      (error 'dynamic-parse-letrec "Illegal bindings/body: ~s" args)))
+      (fatal-error 'dynamic-parse-letrec "Illegal bindings/body: ~s" args)))
 
 ;; dynamic-parse-recursive-bindings
 
@@ -602,7 +602,7 @@
         (cons
          formals-env
          (cons formals-res exprs-asg)))
-      (error 'dynamic-parse-recursive-bindings "Illegal bindings: ~s" bindings)))
+      (fatal-error 'dynamic-parse-recursive-bindings "Illegal bindings: ~s" bindings)))
 
 
 ;; dynamic-parse-do
@@ -610,13 +610,13 @@
 (define (dynamic-parse-do env args)
 ;;; parses do-expressions
 ;;; ***Note***: Not implemented!
-  (error 'dynamic-parse-do "Nothing yet..."))
+  (fatal-error 'dynamic-parse-do "Nothing yet..."))
 
 ;; dynamic-parse-quasiquote
 
 (define (dynamic-parse-quasiquote env args)
 ;;; ***Note***: Not implemented!
-  (error 'dynamic-parse-quasiquote "Nothing yet..."))
+  (fatal-error 'dynamic-parse-quasiquote "Nothing yet..."))
 
 
 ;; Command
@@ -641,7 +641,7 @@
 ;;; parses a sequence of commands
   (if (list? commands)
       (Smap2 (lambda (command) (dynamic-parse-command env command)) commands)
-      (error 'dynamic-parse-command* "Invalid sequence of commands: ~s" commands)))
+      (fatal-error 'dynamic-parse-command* "Invalid sequence of commands: ~s" commands)))
 
 
 ;; dynamic-parse-define
@@ -659,7 +659,7 @@
               (dynamic-parse-action-definition
                (dynamic-parse-variable env pattern)
                (dynamic-parse-expression env (Scar exp-or-body)))
-              (error 'dynamic-parse-define "Not a single expression: ~s" exp-or-body)))
+              (fatal-error 'dynamic-parse-define "Not a single expression: ~s" exp-or-body)))
          ((pair? pattern)
           (let* ((function-name (Scar pattern))
                  (function-arg-names (Scdr pattern))
@@ -670,8 +670,8 @@
              (dynamic-parse-variable env function-name)
              formals-ast
              (dynamic-parse-body (extend-env-with-env env formals-env) exp-or-body))))
-         (else (error 'dynamic-parse-define "Not a valid pattern: ~s" pattern))))
-      (error 'dynamic-parse-define "Not a valid definition: ~s" args)))
+         (else (fatal-error 'dynamic-parse-define "Not a valid pattern: ~s" pattern))))
+      (fatal-error 'dynamic-parse-define "Not a valid definition: ~s" args)))
 
 ;; Auxiliary routines
 
@@ -1088,7 +1088,7 @@
          (inst-tvar (tv-func new-tvar))
          (inst-def (tvar-def inst-tvar)))
     (if (null? inst-def)
-        (error 'fix "Illegal recursive type: ~s"
+        (fatal-error 'fix "Illegal recursive type: ~s"
                (list (tvar-show new-tvar) '= (tvar-show inst-tvar)))
         (begin
           (set-def! new-tvar
@@ -1486,8 +1486,8 @@
                         (Smap2 ast-show (cdr syntax-arg)))))
       ((23) (cons 'begin
                   (Smap2 ast-show syntax-arg)))
-      ((24) (error 'ast-show "Do expressions not handled! (~s)" syntax-arg))
-      ((25) (error 'ast-show "This can't happen: empty encountered!"))
+      ((24) (fatal-error 'ast-show "Do expressions not handled! (~s)" syntax-arg))
+      ((25) (fatal-error 'ast-show "This can't happen: empty encountered!"))
       ((26) (list 'define
                   (ast-show (Scar syntax-arg))
                   (ast-show (Scdr syntax-arg))))
@@ -1498,7 +1498,7 @@
                    (Smap2 ast-show (Scddr syntax-arg)))))
       ((28) (cons 'begin
                   (Smap2 ast-show syntax-arg)))
-      (else (error 'ast-show "Unknown abstract syntax operator: ~s"
+      (else (fatal-error 'ast-show "Unknown abstract syntax operator: ~s"
                    syntax-op)))))
 
 
@@ -1517,7 +1517,7 @@
     ((0 1 2 3 4 5) (ast-arg ast))
     ((6) (Slist->vector (Smap2 datum-show (ast-arg ast))))
     ((7) (cons (datum-show (Scar (ast-arg ast))) (datum-show (Scdr (ast-arg ast)))))
-    (else (error 'datum-show "This should not happen!"))))
+    (else (fatal-error 'datum-show "This should not happen!"))))
 
 ;; write-to-port
 
@@ -1628,7 +1628,7 @@
                                 named-var-type)
                    body-type))
            ((23) (ast-tvar (tail arg)))
-           ((24) (error 'ast-gen
+           ((24) (fatal-error 'ast-gen
                         "Do-expressions not handled! (Argument: ~s) arg"))
            ((25) (gen-tvar))
            ((26) (let ((t-var (ast-tvar (Scar arg)))
@@ -1641,7 +1641,7 @@
                    (add-constr! (procedure t-formals t-body) t-var)
                    t-var))
            ((28) (gen-tvar))
-           (else (error 'ast-gen "Can't handle syntax operator: ~s" syntax-op)))))
+           (else (fatal-error 'ast-gen "Can't handle syntax operator: ~s" syntax-op)))))
     (cons syntax-op (cons ntvar arg))))
 
 (define ast-con car)
@@ -1670,7 +1670,7 @@
    ((null? tvar-list) (null))
    ((pair? tvar-list) (pair (Scar tvar-list)
                             (convert-tvars (Scdr tvar-list))))
-   (else (error 'convert-tvars "Not a list of tvars: ~s" tvar-list))))
+   (else (fatal-error 'convert-tvars "Not a list of tvars: ~s" tvar-list))))
 
 
 ;; Pretty-printing abstract syntax trees
@@ -1756,8 +1756,8 @@
                          (Smap2 tast-show (Scdr syntax-arg)))))
        ((23) (cons 'begin
                    (Smap2 tast-show syntax-arg)))
-       ((24) (error 'tast-show "Do expressions not handled! (~s)" syntax-arg))
-       ((25) (error 'tast-show "This can't happen: empty encountered!"))
+       ((24) (fatal-error 'tast-show "Do expressions not handled! (~s)" syntax-arg))
+       ((25) (fatal-error 'tast-show "This can't happen: empty encountered!"))
        ((26) (list 'define
                    (tast-show (Scar syntax-arg))
                    (tast-show (Scdr syntax-arg))))
@@ -1768,7 +1768,7 @@
                     (Smap2 tast-show (Scddr syntax-arg)))))
        ((28) (cons 'begin
                    (Smap2 tast-show syntax-arg)))
-       (else (error 'tast-show "Unknown abstract syntax operator: ~s"
+       (else (fatal-error 'tast-show "Unknown abstract syntax operator: ~s"
                     syntax-op)))
      syntax-tvar)))
 
@@ -1942,8 +1942,8 @@
                         (Smap2 tag-ast-show (Scdr syntax-arg)))))
       ((23) (cons 'begin
                   (Smap2 tag-ast-show syntax-arg)))
-      ((24) (error 'tag-ast-show "Do expressions not handled! (~s)" syntax-arg))
-      ((25) (error 'tag-ast-show "This can't happen: empty encountered!"))
+      ((24) (fatal-error 'tag-ast-show "Do expressions not handled! (~s)" syntax-arg))
+      ((25) (fatal-error 'tag-ast-show "This can't happen: empty encountered!"))
       ((26) (list 'define
                   (tag-ast-show (Scar syntax-arg))
                   (tag-ast-show (Scdr syntax-arg))))
@@ -1956,7 +1956,7 @@
                                           (Smap2 tag-ast-show (Scddr syntax-arg))))))))
       ((28) (cons 'begin
                   (Smap2 tag-ast-show syntax-arg)))
-      (else (error 'tag-ast-show "Unknown abstract syntax operator: ~s"
+      (else (fatal-error 'tag-ast-show "Unknown abstract syntax operator: ~s"
                    syntax-op)))))
 
 
@@ -2308,9 +2308,13 @@
   (define (show x)
     (if #f (pp x))
     x)
+  (define path
+    (cond-expand
+      (bigloo "../tests/paper/macro/dynamic.scm")
+      (else "./dynamic.scm")))
   (show
     `(quote
-      ,(let ((port (open-input-file "./tests/todo/dynamic.scm")))
+      ,(let ((port (open-input-file path)))
         (let loop ()
           (let ((next (read port)))
             (cond
@@ -2336,7 +2340,7 @@
       (tag-ast*-show foo)
       (counters-show))))
 
-(define (run #!key (n (unknown 1 1)))
+(define (run #!key (n (unknown 200 1)))
   (let loop ((n n) (result #f))
     (if (SFX> n 0)
         (loop (SFX- n 1) (run1))

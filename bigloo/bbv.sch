@@ -428,6 +428,7 @@
 (define-macro-arithmetic (Scadr x) `(Scar (Scdr ,x)))
 (define-macro-arithmetic (Scdar x) `(Scdr (Scar ,x)))
 (define-macro-arithmetic (Scddr x) `(Scdr (Scdr ,x)))
+(define-macro-arithmetic (Scaadr x) `(Scar (Scar (Scdr ,x))))
 (define-macro-arithmetic (Scadar x) `(Scar (Scdr (Scar ,x))))
 (define-macro-arithmetic (Scdadr x) `(Scdr (Scar (Scdr ,x))))
 (define-macro-arithmetic (Scaddr x) `(Scar (Scdr (Scdr ,x))))
