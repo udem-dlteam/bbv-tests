@@ -28,6 +28,7 @@ except ImportError:
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from matplotlib import colors
 
 import numpy as np
 
@@ -1382,9 +1383,8 @@ def choose_csv_output_path(output, system_name, compiler_name):
 
 
 def is_macro(name):
-    return name in ("almabench", "compiler", "earley", "peval",
-                    "conform", "maze", "boyer", "slatex", "scheme",
-                    "nucleic")
+    return name in ('almabench', 'boyer', 'compiler', 'conform', 'dynamic',
+                    'earley', 'maze', 'nucleic', 'peval', 'scheme', 'slatex')
 
 def run_is_macro(run):
     return is_macro(run.benchmark.name)
@@ -1680,20 +1680,74 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         #df = df[cols]
 
+        plt.rc('font', size=10.5)
+
         fig, ax = plt.subplots(figsize=(15, 5))
 
+        # I made some ranges wider because it adds nice edges to the bar in the legend
+
+
+        def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+            '''
+            https://stackoverflow.com/a/18926541
+            '''
+            if isinstance(cmap, str): cmap = plt.get_cmap(cmap)
+            new_cmap = colors.LinearSegmentedColormap.from_list(
+                'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+                cmap(np.linspace(minval, maxval, n)))
+            return new_cmap
+
+        center = 1
+        cmap_brightness = 0.2
+        cmap_base = 'coolwarm'
+
+        blue, grey, red = plt.get_cmap(cmap_base)([0, 0.5, 1])
+
+        #cmap = truncate_colormap(cmap_base, cmap_brightness, 1 - cmap_brightness)
+        nsample = 1000
+
+        linear_b2g = colors.ListedColormap(plt.get_cmap(cmap_base)(np.linspace(0, 0.5, nsample)))
+        linear_g2r = colors.ListedColormap(plt.get_cmap(cmap_base)(np.linspace(0.5, 1, nsample)))
+
+        light_b2g = colors.ListedColormap(plt.get_cmap(cmap_base)(np.linspace(0.1, 0.5, nsample)))
+        light_g2r = colors.ListedColormap(plt.get_cmap(cmap_base)(np.linspace(0.5, 0.85, nsample)))
+
+        def fast_transform(x): return np.sqrt(x)
+        fast_b2g = colors.ListedColormap(linear_b2g.reversed()(fast_transform(np.linspace(0, 1, nsample)))).reversed()
+        fast_g2r = colors.ListedColormap(linear_g2r(fast_transform(np.linspace(0, 1, nsample))))
+
+        fast_light_b2g = colors.ListedColormap(light_b2g.reversed()(fast_transform(np.linspace(0, 1, nsample)))).reversed()
+        fast_light_g2r = colors.ListedColormap(light_g2r(fast_transform(np.linspace(0, 1, nsample))))
+
+        def slow_transform(x): return x ** 2
+        slow_b2g = colors.ListedColormap(linear_b2g.reversed()(slow_transform(np.linspace(0, 1, nsample)))).reversed()
+        slow_g2r = colors.ListedColormap(linear_g2r(slow_transform(np.linspace(0, 1, nsample))))
+
+        slow_light_b2g = colors.ListedColormap(light_b2g.reversed()(
+            slow_transform(np.linspace(0, 1, nsample)))).reversed()
+        slow_light_g2r = colors.ListedColormap(light_g2r(slow_transform(np.linspace(0, 1, nsample))))
+        
+        cmap = colors.ListedColormap([*light_b2g.colors, *light_g2r.colors])
+        
         if path_base == 'time':
             vmin, vmax = 0.65, 1.15
         elif path_base == 'program_size':
-            vmin, vmax = 0.5, 9.5
+            cmap = colors.ListedColormap([*fast_b2g.colors, *fast_light_g2r.colors])
+            vmin, vmax = -0.5, 10.5
         elif path_base == 'checks':
-            vmin, vmax = 0.15, 1.05
+            cmap = colors.ListedColormap([*slow_light_b2g.colors, *light_g2r.colors])
+            vmin, vmax = -0.05, 1.05
+        elif path_base == "compile_time":
+            cmap = colors.ListedColormap([*fast_b2g.colors, *fast_light_g2r.colors])
+            vmin, vmax = -3, 63
         else:
             vmin = df.min().min()
             vmax = df.max().max()
 
-        heatmap_ax = sns.heatmap(df, annot=True, fmt='.2f', cmap="coolwarm",
-                                 linewidths=.5, vmin=vmin, vmax=vmax, center=1)
+        heatmap_ax = sns.heatmap(df, annot=True, fmt='.2f', cmap=cmap,
+                                 linewidths=.5, vmin=vmin, vmax=vmax, center=center,
+                                 annot_kws={"size": 11.5,
+                                            'color': 'black'})
 
         ax.xaxis.tick_top()
         plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
