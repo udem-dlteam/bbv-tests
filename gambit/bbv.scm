@@ -112,7 +112,7 @@
 (define-macro (FLsin x)         `(FLop sin ,x))
 (define-macro (FLcos x)         `(FLop cos ,x))
 (define-macro (FLatan x)        `(FLop atan ,x))
-(define-macro (FLatan2 x y)     `(FLop atan2 ,x ,y))
+(define-macro (FLatan2 x y)     `(FLop atan ,x ,y))
 
 (define-macro (FX+ x y)         `(FXop + ,x ,y))
 (define-macro (FX- x . rest)    `(FXop - ,x ,@rest))
