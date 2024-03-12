@@ -29,6 +29,8 @@ except ImportError:
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import colors
+from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import LogLocator
 
 import numpy as np
 
@@ -1544,7 +1546,6 @@ def choose_heatmap_output_path(output, measure, system_name, compiler_name):
     else:
         raise ValueError(f"output must be a folder of .png target, got {output}")
 
-
 @db_session
 def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, output):
     system = get_system_from_name_or_default(system_name)
@@ -1687,7 +1688,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         # I made some ranges wider because it adds nice edges to the bar in the legend
 
 
-        def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+        def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=256):
             '''
             https://stackoverflow.com/a/18926541
             '''
@@ -1697,57 +1698,76 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                 cmap(np.linspace(minval, maxval, n)))
             return new_cmap
 
-        center = 1
-        cmap_brightness = 0.2
+        cmap_brightness = 0.15
         cmap_base = 'coolwarm'
+        dark_cmap = truncate_colormap(cmap_base, 0, 1)
+        light_cmap = truncate_colormap(cmap_base, cmap_brightness, 1 - cmap_brightness)
 
-        blue, grey, red = plt.get_cmap(cmap_base)([0, 0.5, 1])
+        cmap = light_cmap
 
-        #cmap = truncate_colormap(cmap_base, cmap_brightness, 1 - cmap_brightness)
-        nsample = 1000
+        ticks = None
+        vmin = df.min().min()
+        vmax = df.max().max()
+        linthresh = 0.1
+        extra_ticks = []
 
-        linear_b2g = colors.ListedColormap(plt.get_cmap(cmap_base)(np.linspace(0, 0.5, nsample)))
-        linear_g2r = colors.ListedColormap(plt.get_cmap(cmap_base)(np.linspace(0.5, 1, nsample)))
-
-        light_b2g = colors.ListedColormap(plt.get_cmap(cmap_base)(np.linspace(0.1, 0.5, nsample)))
-        light_g2r = colors.ListedColormap(plt.get_cmap(cmap_base)(np.linspace(0.5, 0.85, nsample)))
-
-        def fast_transform(x): return np.sqrt(x)
-        fast_b2g = colors.ListedColormap(linear_b2g.reversed()(fast_transform(np.linspace(0, 1, nsample)))).reversed()
-        fast_g2r = colors.ListedColormap(linear_g2r(fast_transform(np.linspace(0, 1, nsample))))
-
-        fast_light_b2g = colors.ListedColormap(light_b2g.reversed()(fast_transform(np.linspace(0, 1, nsample)))).reversed()
-        fast_light_g2r = colors.ListedColormap(light_g2r(fast_transform(np.linspace(0, 1, nsample))))
-
-        def slow_transform(x): return x ** 2
-        slow_b2g = colors.ListedColormap(linear_b2g.reversed()(slow_transform(np.linspace(0, 1, nsample)))).reversed()
-        slow_g2r = colors.ListedColormap(linear_g2r(slow_transform(np.linspace(0, 1, nsample))))
-
-        slow_light_b2g = colors.ListedColormap(light_b2g.reversed()(
-            slow_transform(np.linspace(0, 1, nsample)))).reversed()
-        slow_light_g2r = colors.ListedColormap(light_g2r(slow_transform(np.linspace(0, 1, nsample))))
-        
-        cmap = colors.ListedColormap([*light_b2g.colors, *light_g2r.colors])
-        
         if path_base == 'time':
-            vmin, vmax = 0.65, 1.15
+            vmin, vmax = 0.7, 1.1
+            extra_ticks = [0.8, 0.9]
         elif path_base == 'program_size':
-            cmap = colors.ListedColormap([*fast_b2g.colors, *fast_light_g2r.colors])
-            vmin, vmax = -0.5, 10.5
+            vmin, vmax = 0.5, 8
         elif path_base == 'checks':
-            cmap = colors.ListedColormap([*slow_light_b2g.colors, *light_g2r.colors])
-            vmin, vmax = -0.05, 1.05
+            vmin, vmax = 0.1, 1.1
+            # Remove red from cmap. It must not appear in color bar since it cannot happen
+            checks_interp = np.interp(
+                np.linspace(0, 1),
+                [0, 0.5, 1],
+                [0, 0.5, 0.5])
+            cmap = colors.LinearSegmentedColormap.from_list("checks_cmap", cmap(checks_interp))
         elif path_base == "compile_time":
-            cmap = colors.ListedColormap([*fast_b2g.colors, *fast_light_g2r.colors])
-            vmin, vmax = -3, 63
-        else:
-            vmin = df.min().min()
-            vmax = df.max().max()
+            vmin, vmax = 0.5, 64
+            
+        locator = LogLocator(base=2)
+        ticks = [t for t in locator.tick_values(vmin, vmax) if vmin <= t <= vmax]
+        ticks = sorted({1, *ticks})
+        if len(ticks) == 1:
+            ticks = sorted({1, vmin, vmax})
+        ticks.extend(extra_ticks)
 
-        heatmap_ax = sns.heatmap(df, annot=True, fmt='.2f', cmap=cmap,
-                                 linewidths=.5, vmin=vmin, vmax=vmax, center=center,
+        center = 1
+        tick_min = min(ticks)
+        tick_max = max(ticks)
+
+        norm = colors.SymLogNorm(linthresh=tick_min, vmin=tick_min, vmax=tick_max)
+
+        # shift the color map accordingly because SymLobNorm cannot be centered
+        norm_center = norm(1)
+
+        color_interpolation = np.interp(
+            np.linspace(0, 1),
+            [0, norm_center, 1],
+            [0, 0.5, 1])
+
+        shifted_cmap = colors.LinearSegmentedColormap.from_list("shifted", cmap(color_interpolation))
+
+        fmt=".2f"
+        cbar_kws = {
+            'format': f'{{x:{fmt}}}',
+            'ticks': ticks,
+            'extend': 'both',
+            'extendrect': True,
+        }
+
+        heatmap_ax = sns.heatmap(df, annot=True, fmt=fmt, cmap=shifted_cmap,
+                                 linewidths=.5,
+                                 norm=norm,
+                                 vmin=tick_min, vmax=tick_max,
                                  annot_kws={"size": 11.5,
-                                            'color': 'black'})
+                                            'color': 'black'},
+                                 cbar_kws=cbar_kws)
+
+        cbar = ax.collections[0].colorbar
+        cbar.set_ticks([], minor=True)
 
         ax.xaxis.tick_top()
         plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
