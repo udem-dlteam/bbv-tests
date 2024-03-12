@@ -1478,7 +1478,7 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
     column_names += [get_column_name(l, o, s, postfix=p) for s in (True,False)
                                                         for o in (True,)
                                                         for l in version_limits
-                                                        for p in ('', stdev_postfix)]
+                                                        for p in ('',)]
 
     logger.debug(f"columns in csv: {','.join(column_names)}")
 
@@ -1496,9 +1496,9 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
         for run in runs:
             row = benchmark_names.index(run.benchmark.name)
             res_col = column_names.index(get_run_column_name(run))
-            stdev_col = column_names.index(get_run_column_name(run, postfix=stdev_postfix))
             measure_data[row + 2][res_col] = get_measure(run)
-            measure_data[row + 2][stdev_col] = get_stdev(run)
+            # stdev_col = column_names.index(get_run_column_name(run, postfix=stdev_postfix))
+            # measure_data[row + 2][stdev_col] = get_stdev(run)
 
         return measure_data
 
