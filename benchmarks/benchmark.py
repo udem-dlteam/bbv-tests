@@ -1445,6 +1445,7 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
         and r.benchmark.name in benchmark_names
         and r.version_limit in version_limits
         and r.compiler_optimizations
+        and r.safe_arithmetic
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
             if r2.system == system
@@ -1475,7 +1476,7 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
     benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
 
     column_names = ["Benchmark"]
-    column_names += [get_column_name(l, o, s, postfix=p) for s in (True,False)
+    column_names += [get_column_name(l, o, s, postfix=p) for s in (True,)
                                                         for o in (True,)
                                                         for l in version_limits
                                                         for p in ('',)]
@@ -1500,7 +1501,7 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
             # stdev_col = column_names.index(get_run_column_name(run, postfix=stdev_postfix))
             # measure_data[row + 2][stdev_col] = get_stdev(run)
 
-        return measure_data
+        return measure_data  
 
     # Time
     logger.debug("Appending 'Execution time'")
@@ -1509,10 +1510,6 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
     # primitive count
     logger.debug("Appending 'Runtime removable checks'")
     data += get_measure_data("Runtime removable checks", sum_removable_checks)
-
-    # program size
-    logger.debug("Appending 'Program size'")
-    data += get_measure_data("Program size", run_program_size)
 
     with open(output_path, 'w') as f:
         csvwriter = csv.writer(f)
