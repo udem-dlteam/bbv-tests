@@ -439,9 +439,17 @@ def extract_executable_from_compiler_output(content):
     return re.search(r"\*\*\*executable: (.+)", content).group(1)
 
 
-def extract_compile_time_from_compiler_output(content):
-    parser = PerfResultParser(content)
-    return parser[parser.time_event][0] # index 0 is value, 1 is variance
+SCHEME_COMPILE_TIME = "scheme-compile-time"
+C_COMPILE_TIME = "c-compile-time"
+TOTAL_COMPILE_TIME = "compile-time"
+
+def extract_compile_times_from_compiler_output(content):
+    scheme_time = re.search(r"\*\*\*scheme-compile-time: (.+)", content).group(1)
+    c_time = re.search(r"\*\*\*c-compile-time: (.+)", content).group(1)
+    return {
+        SCHEME_COMPILE_TIME: float(scheme_time),
+        C_COMPILE_TIME: float(c_time)
+        }
 
 
 def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
@@ -464,12 +472,12 @@ def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizati
 
     timed_command = f"perf stat {base_command}"
     output = run_command(timed_command, timeout, env)
-    compile_time = extract_compile_time_from_compiler_output(output)
+    compile_times = extract_compile_times_from_compiler_output(output)
     executable = extract_executable_from_compiler_output(output)
 
     logger.info(f"executable created at: {executable}")    
 
-    return executable, primitive_count, compile_time
+    return executable, primitive_count, compile_times
 
 
 def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
@@ -494,7 +502,7 @@ def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeou
     base_command = get_command(False)
     timed_command = f"perf stat {base_command}"
     output = run_command(timed_command, timeout)
-    compile_time = extract_compile_time_from_compiler_output(output)
+    compile_times = extract_compile_times_from_compiler_output(output)
     executable = extract_executable_from_compiler_output(output)
 
     logger.info(f"executable created at: {executable}")
@@ -504,7 +512,7 @@ def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeou
     else:
         logger.debug(f"Primitive count: {dict(primitive_count)}")
 
-    return executable, primitive_count, compile_time
+    return executable, primitive_count, compile_times
 
 
 def compile(compiler_execution_data, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
@@ -704,10 +712,16 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
                   compiler_optimizations=compiler_optimizations,
                   arguments=base_arguments)
 
-        executable, primitive_count, compile_time = compile(compiler_execution_data, file, v, safe_arithmetic, compiler_optimizations, timeout)
+        executable, primitive_count, compile_times = compile(compiler_execution_data, file, v, safe_arithmetic, compiler_optimizations, timeout)
+
+        scheme_compile_time = compile_times[SCHEME_COMPILE_TIME]
+        c_compile_time = compile_times[C_COMPILE_TIME]
+        total_compile_time = scheme_compile_time + c_compile_time
 
         logger.debug(f"compilation time: {compile_time}")
-        StaticMeasure(name="compile-time", value=compile_time, run=run)
+        StaticMeasure(name=TOTAL_COMPILE_TIME, value=total_compile_time, run=run)
+        StaticMeasure(name=SCHEME_COMPILE_TIME, value=scheme_compile_time, run=run)
+        StaticMeasure(name=C_COMPILE_TIME, value=c_compile_time, run=run)
 
         align_stack_step = 3
         for i in range(repetitions):
@@ -1406,7 +1420,16 @@ def average_time(run):
     return statistics.mean(results)
 
 def compile_time(run):
-    results = StaticMeasure.get(name="compile-time", run=run)
+    results = StaticMeasure.get(name=TOTAL_COMPILE_TIME, run=run)
+    return results.value
+
+def scheme_compile_time(run):
+    results = StaticMeasure.get(name=SCHEME_COMPILE_TIME, run=run)
+    return results.value
+
+
+def c_compile_time(run):
+    results = StaticMeasure.get(name=C_COMPILE_TIME, run=run)
     return results.value
 
 def stdev_time(run):
@@ -1838,6 +1861,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                     unsafe_runs=unsafe_base_runs)
 
     one_heatmap("compile_time", compile_time)
+    one_heatmap("scheme_compile_time", scheme_compile_time)
+    one_heatmap("c_compile_time", c_compile_time)
 
     #find_correlations(system, compiler, runs, output)
     

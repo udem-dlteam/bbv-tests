@@ -296,7 +296,7 @@ case "$SYSTEM" in
      /usr/bin/time -f "$SCHEME_COMPILE_TIME_MARKER %e" $BIGLOOCOMP $BIGLOO_OPTIONS bbv.bgl $INPUT_FILE && \
      /usr/bin/time -f "$C_COMPILE_TIME_MARKER %e" sh -c "($C_COMPILER $BIGLOO_C_OPTIONS bbv.c && \
                                                           $C_COMPILER bbv.o $BIGLOO_LD_OPTIONS)" && \
-     rm bbv.o bbv.c)
+     rm bbv.c)
 
     if [ -f $OUTPUT_FILE_BASE-program.bbv.cfg ]; then
       (cd $SCRIPT_DIR/bigloo && $BGLCFG $OUTPUT_FILE_BASE-program.bbv.cfg > OUTPUT_FILE_CFG_DOT)
