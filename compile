@@ -164,7 +164,7 @@ fi
 INPUT_FILE_DIRNAME="$(dirname $INPUT_FILE)"
 INPUT_FILE_NO_EXT="${INPUT_FILE%.scm}"
 OUTPUT_FILE_BASE="$INPUT_FILE_NO_EXT.${SYSTEM}.V${VERSION_LIMIT}.O${OPTIM_LEVEL}.$SAFETY_MODE"
-OUTPUT_FILE_C="$OUTPUT_FILE_BASE.c"
+OUTPUT_FILE_C="$INPUT_FILE_NO_EXT.c"
 OUTPUT_FILE_EXE="$OUTPUT_FILE_BASE.exe"
 OUTPUT_FILE_CFG_DOT="$OUTPUT_FILE_BASE.cfg"
 
@@ -242,6 +242,7 @@ case "$SYSTEM" in
       $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
       $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
       /usr/bin/time -f "$C_COMPILE_TIME_MARKER %e" $GAMBITCOMP -exe -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
+      rm $OUTPUT_FILE_C
     fi
 
     if [ "$GENERATE_CFG" = "1" ]; then
