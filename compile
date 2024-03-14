@@ -164,7 +164,7 @@ fi
 INPUT_FILE_DIRNAME="$(dirname $INPUT_FILE)"
 INPUT_FILE_NO_EXT="${INPUT_FILE%.scm}"
 OUTPUT_FILE_BASE="$INPUT_FILE_NO_EXT.${SYSTEM}.V${VERSION_LIMIT}.O${OPTIM_LEVEL}.$SAFETY_MODE"
-OUTPUT_FILE_C="$INPUT_FILE_NO_EXT.c"
+OUTPUT_FILE_C="$OUTPUT_FILE_BASE.c"
 OUTPUT_FILE_EXE="$OUTPUT_FILE_BASE.exe"
 OUTPUT_FILE_CFG_DOT="$OUTPUT_FILE_BASE.cfg"
 
@@ -250,13 +250,20 @@ case "$SYSTEM" in
     ;;
 
   bigloo)
+    C_COMPILER="gcc"
     BIGLOOCOMP="$COMPILER_DIR/bin/bigloo"
     BGLCFG="$COMPILER_DIR/bin/bglcfg"
 
     PATH="$COMPILER_DIR/bin:$PATH"
 
-    BIGLOO_SRFI="-srfi arithmetic$ARITHMETIC"
-    BIGLOO_OPTIONS="-w -unsafe -saw -o $OUTPUT_FILE_EXE"
+    BIGLOO_OPTIONS="-srfi arithmetic$ARITHMETIC -w -unsafe -saw -cgen -o bbv.c"
+    BIGLOO_C_OPTIONS="-Wno-unused-value -Wno-parentheses-equality -Wno-parentheses \
+                      -Wno-invalid-source-encoding -Wno-return-type -Wno-trigraphs \
+                      -fPIC -DBGL_NAN_TAGGING=0  -c   -I. -I. -I${COMPILER_DIR}/lib/bigloo/4.6a"
+    BIGLOO_LD_OPTIONS="-o $OUTPUT_FILE_EXE -Wl,--enable-new-dtags,-rpath=${COMPILER_DIR}/lib/bigloo/4.6a \
+                       -s -fPIC    -L. -L${COMPILER_DIR}/lib/bigloo/4.6a -lbigloo_u-4.6a -lbigloogc-4.6a \
+                       -ldl -lc -lm -lgmp -lpcre2-8 -lunistring -lresolv -ldl"
+
     BIGLOOBBVVLENGTH=false
     BIGLOOBBVVERSIONLIMIT=
 
@@ -264,10 +271,14 @@ case "$SYSTEM" in
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -O0 -fno-user-inlining"
     else
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -Obench"
+      BIGLOO_C_OPTIONS="-O3 $BIGLOO_C_OPTIONS"
+      BIGLOO_LD_OPTIONS="-O3 $BIGLOO_LD_OPTIONS"
     fi
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
-      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -copt -DSAW_BBV_STATS=1"
-      BIGLOO_SRFI="$BIGLOO_SRFI -srfi bbvcountprimitive"
+      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -srfi bbvcountprimitive"
+      BIGLOO_C_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_C_OPTIONS"
+      BIGLOO_LD_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_LD_OPTIONS"
+
     fi
     if [ "$VERSION_LIMIT" = "0" ]; then
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -fno-saw-bbv"
@@ -277,13 +288,14 @@ case "$SYSTEM" in
       BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT
     fi
 
-    BIGLOO_OPTIONS="$BIGLOO_SRFI $BIGLOO_OPTIONS"
-
     # Compilation
     (cd $SCRIPT_DIR/bigloo && \
      BIGLOOBBVVLENGTH=$BIGLOOBBVVLENGTH \
      BIGLOOBBVVERSIONLIMIT=$BIGLOOBBVVERSIONLIMIT \
-     $BIGLOOCOMP $BIGLOO_OPTIONS bbv.bgl $INPUT_FILE)
+     /usr/bin/time -f "$SCHEME_COMPILE_TIME_MARKER %e" $BIGLOOCOMP $BIGLOO_OPTIONS bbv.bgl $INPUT_FILE && \
+     /usr/bin/time -f "$C_COMPILE_TIME_MARKER %e" sh -c "($C_COMPILER $BIGLOO_C_OPTIONS bbv.c && \
+                                                          $C_COMPILER bbv.o $BIGLOO_LD_OPTIONS)" && \
+     rm bbv.o bbv.c)
 
     if [ -f $OUTPUT_FILE_BASE-program.bbv.cfg ]; then
       (cd $SCRIPT_DIR/bigloo && $BGLCFG $OUTPUT_FILE_BASE-program.bbv.cfg > OUTPUT_FILE_CFG_DOT)
