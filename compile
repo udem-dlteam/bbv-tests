@@ -12,6 +12,11 @@ fi
 SCRIPT_DIR="${SCRIPT_DIR%/*}"
 SCRIPT_DIR="${SCRIPT_DIR%/.}"
 
+# Markers
+EXECUTABLE_NAME_MARKER="***executable:"
+SCHEME_COMPILE_TIME_MARKER="***scheme-compile-time:"
+C_COMPILE_TIME_MARKER="***c-compile-time:"
+
 # Default parameters
 OPTIM_LEVEL=0     # optimization level
 SAFE_ARITHMETIC=1 # safe/unsafe arithmetic
@@ -233,10 +238,10 @@ case "$SYSTEM" in
     else
       # Compilation
       (cd $INPUT_FILE_DIRNAME && \
-       /usr/bin/time -f "(scheme-compile-time %e)" $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE)
+       /usr/bin/time -f "$SCHEME_COMPILE_TIME_MARKER %e" $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE)
       $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
       $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
-      /usr/bin/time -f "(gcc-compile-time %e)" $GAMBITCOMP -exe -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
+      /usr/bin/time -f "$C_COMPILE_TIME_MARKER %e" $GAMBITCOMP -exe -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
     fi
 
     if [ "$GENERATE_CFG" = "1" ]; then
@@ -287,7 +292,7 @@ case "$SYSTEM" in
 
 esac
 
-echo "***executable: $OUTPUT_FILE_EXE"
+echo "$EXECUTABLE_NAME_MARKER $OUTPUT_FILE_EXE"
 
 if [ "$GENERATE_CFG" = "1" ]; then
   run_dot $OUTPUT_FILE_CFG_DOT
