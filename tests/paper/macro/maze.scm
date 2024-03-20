@@ -14,7 +14,7 @@
   (cons n #f))
 
 (define (fx32 a)
-   (bit-and (-fx (bit-lsh 1 31) 1) a))
+   (SFXbit-and (SFX- (SFXbit-lsh 1 31) 1) a))
 
 (define (rand state)
   (let ((seed (Scar state))
