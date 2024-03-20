@@ -1124,11 +1124,9 @@ function run(o) {
    let res = 0;
    
    while( n-- > 0 ) {
-      if( n % k === 0 ) { console.log( i++ ); }
       res = test();
    }
 
-   console.log( "res=", res );
    return res;
 }
 
