@@ -725,7 +725,7 @@
 \\_/ \\_/ \\_/ \\ /
 ")
 
-(define (run #!key (n (unknown 50000 1)) (nrows 20) (ncols 7))
+(define (run #!key (n (unknown 50000 1)) (nrows (unknown 20)) (ncols (unknown 7)))
   (let loop ((n n) (result #f))
     (if (SFX> n 0)
         (loop (SFX- n 1) (run1 nrows ncols))
