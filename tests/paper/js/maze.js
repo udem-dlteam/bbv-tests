@@ -735,8 +735,8 @@ function run1(nrows, ncols) {
    
 function run(o) {
    let n = o?.n ?? unknown(50000,1);
-   let nrows = o?.nrows ?? 20;
-   let ncols = o?.ncols ?? 7;
+   let nrows = o?.nrows ?? unknown(20,1);
+   let ncols = o?.ncols ?? unknown(7, 1);
    let result = false;
    
    while (n-- > 0) {
@@ -753,7 +753,16 @@ function check(result) {
 }
 
 function main(argv) {
-   check(run({}));
+   const arg = argv.length > 1 ? argv[2] : "{repeat: 1, n: 50000}"
+   const { repeat, n } = JSON.parse(arg);
+   const o = { n };
+   let result = false;
+
+   for (let r = 0; r < repeat; r++) {
+      result = run(o);
+   }
+   
+   check(result);
 }
 
 main(process.argv);
