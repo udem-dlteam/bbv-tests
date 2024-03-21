@@ -83,3 +83,19 @@ This generates an output such as:
 cd bigloo
 BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O0 -fno-user-inlining -fsaw-bbv bbv.bgl /home/serrano/prgm/project/bbv-tests/tests/paper/todo/nucleic.scm
 ```
+
+### To execute manually compiled benchmark
+
+Call the executable with command line arguments as scheme keywords:
+
+```
+/path/to/executable/benchmark.exe [arguments]
+```
+
+Example:
+
+```
+/path/to/executable/benchmark.exe repeat: 2 n: 39.0
+```
+
+This will execute the call `(run n: 39.0)` within the benchmark and repeat it twice.
