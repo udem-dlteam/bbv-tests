@@ -1624,7 +1624,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                                         unsafe_runs=None,
                                         base_runs=None,
                                         include_geometric_mean=True,
-                                        absolute=False):
+                                        absolute=False,
+                                        title=False):
         if base_runs is None:
             base_runs = [r for r in runs if r.version_limit == 0]
 
@@ -1801,6 +1802,9 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             ax.axvline(df.shape[1]-1, color='white', lw=3)
             labels = ax.get_xticklabels()
             labels[-1].set_fontweight('bold')
+
+        if title:
+            plt.title(f'{path_base} {compiler.name}')
 
         plt.tight_layout()
 
