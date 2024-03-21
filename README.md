@@ -99,3 +99,9 @@ Example:
 ```
 
 This will execute the call `(run n: 39.0)` within the benchmark and repeat it twice.
+
+For node:
+
+```
+node maze.js "{repeat: 2, n: 39}"
+```
