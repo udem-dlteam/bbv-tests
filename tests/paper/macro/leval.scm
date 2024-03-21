@@ -3,7 +3,7 @@
 ;*    -------------------------------------------------------------    */
 ;*    Author      :  Manuel Serrano                                    */
 ;*    Creation    :  Sat Dec 26 08:30:11 1998                          */
-;*    Last change :  Thu Mar 21 07:38:00 2024 (serrano)                */
+;*    Last change :  Thu Mar 21 14:40:33 2024 (serrano)                */
 ;*    -------------------------------------------------------------    */
 ;*    An interpreter with lambda (from M. Feeley's one).               */
 ;*=====================================================================*/
@@ -406,7 +406,7 @@
 ;*    comp-global-application ...                                      */
 ;*---------------------------------------------------------------------*/
 (define (comp-global-application proc actuals tail?)
-   (case (length actuals)
+   (case (Slength actuals)
       ((0)
        (lambda (dynamic-env) ((Scdr proc))))
       ((1)
@@ -431,7 +431,7 @@
 ;*    comp-compd-application ...                                       */
 ;*---------------------------------------------------------------------*/
 (define (comp-compd-application proc actuals tail?)
-   (case (length actuals)
+   (case (Slength actuals)
       ((0)
        (lambda (dynamic-env) (proc)))
       ((1)
@@ -456,7 +456,7 @@
 ;*    comp-application ...                                             */
 ;*---------------------------------------------------------------------*/
 (define (comp-application proc actuals tail?)
-   (case (length actuals)
+   (case (Slength actuals)
       ((0)
        (lambda (dynamic-env) ((proc dynamic-env))))
       ((1)
