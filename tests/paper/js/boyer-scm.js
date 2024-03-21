@@ -561,7 +561,16 @@ function check(result) {
 }
 
 function main(argv) {
-   check(run({}));
+   const arg = argv.length > 2 ? argv[2] : "{repeat: 1, n: 500}"
+   const { repeat, n } = JSON.parse(arg);
+   const o = { n };
+   let result = false;
+
+   for (let r = 0; r < repeat; r++) {
+      result = run(o);
+   }
+   
+   check(result);
 }
 
 main(process.argv);

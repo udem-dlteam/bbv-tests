@@ -3,7 +3,7 @@
 /*    -------------------------------------------------------------    */
 /*    Author      :  Manuel Serrano                                    */
 /*    Creation    :  Tue Dec  3 13:33:13 2019                          */
-/*    Last change :  Thu Mar 21 14:45:48 2024 (serrano)                */
+/*    Last change :  Thu Mar 21 19:04:23 2024 (serrano)                */
 /*    Copyright   :  2019-24 Manuel Serrano                            */
 /*    -------------------------------------------------------------    */
 /*    Feeley's Scheme Lambda interpreter                               */
@@ -434,7 +434,16 @@ function check(result) {
 }
 
 function main(argv) {
-   check(run({}));
+   const arg = argv.length > 2 ? argv[2] : "{repeat: 1, n: 60}"
+   const { repeat, n } = JSON.parse(arg);
+   const o = { n };
+   let result = false;
+
+   for (let r = 0; r < repeat; r++) {
+      result = run(o);
+   }
+   
+   check(result);
 }
 
 main(process.argv);

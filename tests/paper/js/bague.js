@@ -3,7 +3,7 @@
 /*    -------------------------------------------------------------    */
 /*    Author      :  Pierre Weis                                       */
 /*    Creation    :  Fri Apr  1 10:00:21 1994                          */
-/*    Last change :  Wed Mar 20 18:59:09 2024 (serrano)                */
+/*    Last change :  Thu Mar 21 19:02:19 2024 (serrano)                */
 /*    -------------------------------------------------------------    */
 /*    Resolution recursive du Baguenaudier: bench les appels de        */
 /*    fonctions et les acces aux vecteurs                              */
@@ -143,7 +143,16 @@ function check(result) {
 }
 
 function main(argv) {
-   check(run({}));
+   const arg = argv.length > 2 ? argv[2] : "{repeat: 1, nombre_de_pierres: 28}"
+   const { repeat, nombre_de_pierres } = JSON.parse(arg);
+   const o = { nombre_de_pierres };
+   let result = false;
+
+   for (let r = 0; r < repeat; r++) {
+      result = run(o);
+   }
+   
+   check(result);
 }
 
 main(process.argv);
