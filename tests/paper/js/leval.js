@@ -3,7 +3,7 @@
 /*    -------------------------------------------------------------    */
 /*    Author      :  Manuel Serrano                                    */
 /*    Creation    :  Tue Dec  3 13:33:13 2019                          */
-/*    Last change :  Thu Mar 21 07:19:33 2024 (serrano)                */
+/*    Last change :  Thu Mar 21 14:45:48 2024 (serrano)                */
 /*    Copyright   :  2019-24 Manuel Serrano                            */
 /*    -------------------------------------------------------------    */
 /*    Feeley's Scheme Lambda interpreter                               */
@@ -358,8 +358,7 @@ let globalEnv =
       cons( "+", (x, y) => x + y),
       cons( "-", (x, y) => x - y),
       cons( "<", (x, y) => x < y),
-      cons( ">=", (x, y) => x >= y),
-      cons( "print", (x) => console.log( x ) ) );
+      cons( ">=", (x, y) => x >= y));
 
 /*---------------------------------------------------------------------*/
 /*    ewal ...                                                         */

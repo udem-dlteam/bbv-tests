@@ -3,7 +3,7 @@
 ;*    -------------------------------------------------------------    */
 ;*    Author      :  Manuel Serrano                                    */
 ;*    Creation    :  Sat Dec 26 08:30:11 1998                          */
-;*    Last change :  Thu Mar 21 14:40:33 2024 (serrano)                */
+;*    Last change :  Thu Mar 21 14:45:54 2024 (serrano)                */
 ;*    -------------------------------------------------------------    */
 ;*    An interpreter with lambda (from M. Feeley's one).               */
 ;*=====================================================================*/
@@ -487,15 +487,10 @@
 ;*---------------------------------------------------------------------*/
 (linit-the-global-environment!)
 
-(ldefine-primitive! '+ (lambda (x y) (+fx x y)))
-(ldefine-primitive! '- (lambda (x y) (-fx x y)))
-(ldefine-primitive! '< (lambda (x y) (<fx x y)))
-(ldefine-primitive! '>= (lambda (x y) (>=fx x y)))
-(ldefine-primitive! 'eq? eq?)
-(ldefine-primitive! 'car car)
-(ldefine-primitive! 'cdr cdr)
-(ldefine-primitive! 'cons cons)
-(ldefine-primitive! 'null? null?)
+(ldefine-primitive! '+ (lambda (x y) (SFX+ x y)))
+(ldefine-primitive! '- (lambda (x y) (SFX- x y)))
+(ldefine-primitive! '< (lambda (x y) (SFX< x y)))
+(ldefine-primitive! '>= (lambda (x y) (SFX>= x y)))
 
 ;*---------------------------------------------------------------------*/
 ;*    cnt                                                              */
