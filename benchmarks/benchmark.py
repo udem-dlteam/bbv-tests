@@ -6,6 +6,7 @@ import collections
 import csv
 import datetime
 import itertools
+import json
 import locale
 import logging
 import math
@@ -15,6 +16,7 @@ import pathlib
 import platform
 import re
 import shlex
+import stat
 import statistics
 import string
 import subprocess
@@ -286,9 +288,11 @@ class PrimitivesCountParser:
 
         if cls.DEFAULT_PRIMITIVE_COUNTER_MARKER not in compiler_output:
             logger.debug(compiler_output)
-            raise ValueError(f"{cls.DEFAULT_PRIMITIVE_COUNTER_MARKER} not found in compiler output")
+            logger.error(f"{cls.DEFAULT_PRIMITIVE_COUNTER_MARKER} not found in compiler output")
+            counter_section = ""
+        else:
+            counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
 
-        counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
         counts = re.findall("\(([^ ]+) (\d+)\)", counter_section)
         self.primitives = {k: int(v) for k, v in counts}
 
@@ -443,7 +447,13 @@ SCHEME_COMPILE_TIME = "scheme-compile-time"
 C_COMPILE_TIME = "c-compile-time"
 TOTAL_COMPILE_TIME = "compile-time"
 
-def extract_compile_times_from_compiler_output(content):
+def extract_compile_times_from_compiler_output(content, dummy=False):
+    if dummy:
+        return {
+        SCHEME_COMPILE_TIME: 0,
+        C_COMPILE_TIME: 0
+        }
+
     scheme_time = re.search(r"\*\*\*scheme-compile-time: (.+)", content).group(1)
     c_time = re.search(r"\*\*\*c-compile-time: (.+)", content).group(1)
     return {
@@ -514,15 +524,31 @@ def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeou
 
     return executable, primitive_count, compile_times
 
+def compile_node(file, timeout):
+    # Node does not compile make a script that calls node
+    script_name = f"{file}.nodejs.exe"
+    script_content = f'#!/bin/bash\nnode {file} "$@"'
+
+    with open(script_name, 'w') as f:
+        f.write(script_content)
+
+    current_permissions = os.stat(script_name).st_mode
+    new_permissions = current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+    os.chmod(script_name, new_permissions)
+
+    return script_name, PrimitivesCountParser(""), extract_compile_times_from_compiler_output("", dummy=True)
 
 def compile(compiler_execution_data, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
     gambitdir = compiler_execution_data.get('gambitdir')
     use_bigloo = compiler_execution_data.get('use_bigloo')
+    use_node = compiler_execution_data.get('use_node')
 
     if use_bigloo:
         return compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
     elif gambitdir:
         return compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
+    elif use_node:
+        return compile_node(file, timeout)
     else:
         raise NotImplementedError
 
@@ -589,8 +615,13 @@ benchmark_args = {
     "maze-record": "repeat: 1",
     "maze-vector": "repeat: 1",
     "peval": "repeat: 1",
+    "leval": "repeat: 1",
     "slatex": "repeat: 1",
 }
+
+def convert_to_node_arguments(arguments):
+    arg_map = dict([a.split(':') for a in arguments.replace(": ", ":").split()])
+    return repr(json.dumps(arg_map))
 
 def get_gambit_program_size(executable, benchmark):
     objdump_command = f"objdump --disassemble {executable} | sed -e '/ <.*>:/!d'"
@@ -649,9 +680,10 @@ def get_program_size(executable, benchmark, compiler):
     elif 'bigloo' in compiler.name:
         return get_bigloo_program_size(executable)
     else:
-        raise ValueError("unknown compiler, cannot retrieve size")
+        logger.error("unknown compiler, cannot retrieve size")
+        return 0
 
-def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
+def get_or_create_run_compiler(gambitdir, use_bigloo, use_node):
     if gambitdir:
         compiler, _ = Compiler.get_or_create_compiler(gambitdir)
         return compiler
@@ -664,14 +696,25 @@ def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
                                              commit_timestamp=-1)
         return compiler
 
+    if use_node:
+        compiler, _ = Compiler.get_or_create(name='nodejs',
+                                             commit_sha='?',
+                                             commit_description='?',
+                                             commit_author='?',
+                                             commit_timestamp=-1)
+        return compiler
+
     raise NotImplementedError
 
 @db_session
-def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_arithmetic, repetitions, compiler_optimizations, force_execution=False, timeout=None):
+def run_and_save_benchmark(gambitdir, use_bigloo, use_node, file, version_limits, safe_arithmetic, repetitions, compiler_optimizations, force_execution=False, timeout=None):
     system, _ = System.get_or_create_current_system()
-    compiler = get_or_create_bigloo_or_gambit(gambitdir, use_bigloo)
+    compiler = get_or_create_run_compiler(gambitdir, use_bigloo, use_node)
 
-    compiler_execution_data = {'gambitdir': gambitdir, 'use_bigloo': use_bigloo, 'compiler': compiler}
+    compiler_execution_data = {'gambitdir': gambitdir,
+                               'use_bigloo': use_bigloo,
+                               'use_node': use_node,
+                               'compiler': compiler}
 
     with open(file) as f:
         name = os.path.splitext(os.path.basename(file))[0]
@@ -726,6 +769,8 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
         align_stack_step = 3
         for i in range(repetitions):
             arguments = f"{base_arguments} align-stack: {i * align_stack_step}"
+            if use_node:
+                arguments = convert_to_node_arguments(arguments)
             perf_results, scheme_stats = run_benchmark(executable, arguments, timeout)
 
             rep = Repetition(run=run)
@@ -2019,7 +2064,7 @@ if __name__ == "__main__":
     def file_path(value):
         path = pathlib.Path(value)
         if path.is_file():
-            return path
+            return path.resolve()
         else:
             raise FileNotFoundError(f"{value} is not a valid file")
 
@@ -2067,6 +2112,11 @@ if __name__ == "__main__":
                                        dest='use_bigloo',
                                        action='store_true',
                                        help='Use Bigloo')
+
+    compiler_parser_group.add_argument('-j', '--nodejs',
+                                       dest='use_node',
+                                       action='store_true',
+                                       help='Use NodeJS')
 
     benchmark_parser.add_argument('-l', '--limit',
                                   dest="version_limits",
@@ -2288,6 +2338,7 @@ if __name__ == "__main__":
     if args.command == 'benchmark':
         run_and_save_benchmark(gambitdir=args.gambitdir,
                                use_bigloo=args.use_bigloo,
+                               use_node=args.use_node,
                                file=args.file,
                                version_limits=args.version_limits,
                                safe_arithmetic=args.safe_arithmetic,
