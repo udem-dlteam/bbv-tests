@@ -20,6 +20,7 @@ system="arctic"
 
 python benchmark.py csv -s $system -c bbv-gambit -b ${benchmarks[@]} -l $version_limits
 python benchmark.py csv -s $system -c bigloo -b ${benchmarks[@]} -l $version_limits
+python benchmark.py csv -s $system -c nodejs -b ${benchmarks[@]} -l 0
 
 python benchmark.py heatmap -c bbv-gambit -s $system -l $version_limits -b ${benchmarks[@]}
 python benchmark.py heatmap -c bigloo -s $system -l $version_limits -b ${benchmarks[@]}
