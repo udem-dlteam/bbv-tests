@@ -1445,7 +1445,7 @@ def choose_csv_output_path(output, system_name, compiler_name):
 
 def is_macro(name):
     return name in ('almabench', 'boyer', 'compiler', 'conform', 'dynamic',
-                    'earley', 'maze', 'nucleic', 'peval', 'scheme', 'slatex')
+                    'earley', 'leval', 'maze', 'nucleic', 'peval', 'scheme', 'slatex')
 
 def run_is_macro(run):
     return is_macro(run.benchmark.name)

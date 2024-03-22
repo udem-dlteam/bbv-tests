@@ -107,7 +107,7 @@
       (else
        (let ((fun (Scar exp))
 	     (args (Scdr exp)))
-	  (let ((actuals (map (lambda (a) (comp a env #f)) args))
+	  (let ((actuals (Smap2 (lambda (a) (comp a env #f)) args))
 		(proc    (comp fun env #f)))
 	     (comp-application proc actuals tail?))))))
 
@@ -151,12 +151,12 @@
       ((global? variable)
        (lambda (dynamic-env) (Scdr variable)))
       ((dynamic? variable)
-       (lambda (dynamic-env) (let ((global (local-assq (vector-ref variable 0)
+       (lambda (dynamic-env) (let ((global (local-assq (Svector-ref variable 0)
 					      the-global-environment)))
 				(if (not global)
 				    (errow "ewal"
 				       "Unbound variable"
-				       (vector-ref variable 0))
+				       (Svector-ref variable 0))
 				    (Scdr global)))))
       (else
        (case variable
@@ -183,12 +183,12 @@
        (lambda (dynamic-env) (update! variable value dynamic-env)))
       ((dynamic? variable)
        (lambda (dynamic-env)
-	  (let ((global (local-assq (vector-ref variable 0)
+	  (let ((global (local-assq (Svector-ref variable 0)
 			   the-global-environment)))
 	     (if (not global)
 		 (errow "ewal"
 		    "Unbound variable"
-		    (vector-ref variable 0))
+		    (Svector-ref variable 0))
 		 (update! global value dynamic-env)))))
       (else
        (case variable
@@ -199,10 +199,10 @@
 	   (lambda (dynamic-env) (Sset-car! (Scdr dynamic-env)
 				    (value dynamic-env))))
 	  ((2)
-	   (lambda (dynamic-env) (Sset-car! (cddr dynamic-env)
+	   (lambda (dynamic-env) (Sset-car! (Scddr dynamic-env)
 				    (value dynamic-env))))
 	  ((3)
-	   (lambda (dynamic-env) (Sset-car! (cdddr dynamic-env)
+	   (lambda (dynamic-env) (Sset-car! (Scdddr dynamic-env)
 				    (value dynamic-env))))
 	  (else
 	   (lambda (dynamic-env)
@@ -317,7 +317,7 @@
 ;*    pair ...                                                         */
 ;*---------------------------------------------------------------------*/
 (define (pair n l)
-   (if (<fx n 0)
+   (if (SFX< n 0)
        (let loop ((n n)
 		  (l l))
 	  (cond
@@ -425,7 +425,7 @@
 					  ((Scadddr actuals) dynamic-env))))
       (else
        (lambda (dynamic-env)
-	  (apply (Scdr proc) (map (lambda (v) (v dynamic-env)) actuals))))))
+	  (apply (Scdr proc) (Smap2 (lambda (v) (v dynamic-env)) actuals))))))
 
 ;*---------------------------------------------------------------------*/
 ;*    comp-compd-application ...                                       */
@@ -450,7 +450,7 @@
 				((Scadddr actuals) dynamic-env))))
       (else
        (lambda (dynamic-env)
-	  (apply proc (map (lambda (v) (v dynamic-env)) actuals))))))
+	  (apply proc (Smap2 (lambda (v) (v dynamic-env)) actuals))))))
    
 ;*---------------------------------------------------------------------*/
 ;*    comp-application ...                                             */
@@ -479,7 +479,7 @@
 			      ((Scadddr actuals) dynamic-env))))
       (else
        (lambda (dynamic-env)
-	  (apply (proc dynamic-env) (map (lambda (v) (v dynamic-env))
+	  (apply (proc dynamic-env) (Smap2 (lambda (v) (v dynamic-env))
 				       actuals))))))
 
 ;*---------------------------------------------------------------------*/
@@ -511,7 +511,7 @@
 			     (tak (- y 1) z x)
 			     (tak (- z 1) x y)))))))
 (define takcall
-   '(tak 20 10 3))
+   (unknown '(tak 20 10 3) '(tak 10 5 3)))
 
 ;*---------------------------------------------------------------------*/
 ;*    fib ...                                                          */
@@ -524,7 +524,7 @@
 			  1
 			  (+ (fib (- x 1)) (fib (- x 2))))))))
 (define fibcall
-   '(fib 20))
+	(unknown '(fib 20) '(fib 10)))
 
 ;*---------------------------------------------------------------------*/
 ;*    run                                                              */
@@ -546,5 +546,5 @@
 ;*    check ...                                                        */
 ;*---------------------------------------------------------------------*/
 (define (check result)
-   (print "result=" result)
-   (equal? result '#(4 10946 1452256)))
+   ;(print "result=" result)
+   (equal? result (unknown '#(4 10946 1452256) '#(5 89 366))))
