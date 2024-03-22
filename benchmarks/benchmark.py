@@ -581,7 +581,7 @@ default_arguments = "repeat: 10"
 
 benchmark_args = {
     "ack": "repeat: 50 m: 3 n: 9",
-    "bague": "repeat: 1",
+    "bague": "repeat: 1 nombre-de-pierres: 28",
     "fib": "repeat: 3 n: 39",
     "fibfp": "repeat: 2 n: 39.0",
     "tak": "repeat: 10000 x: 18 y: 12 z: 6",
@@ -602,18 +602,14 @@ benchmark_args = {
     "primes": "repeat: 1000000",
     "rev": "repeat: 100000000",
     "vlen": "repeat: 100000000",
-    "boyer": "repeat: 1",
-    "earley": "repeat: 1",
+    "boyer": "repeat: 1 n: 500",
+    "earley": "repeat: 1 n: 10000",
     "compiler": "repeat: 1",
     "dynamic": "repeat: 1",
     "scheme": "repeat: 1",
     "nucleic": "repeat: 1",
     "conform": "repeat: 1",
-    "conform-record": "repeat: 1",
-    "conform-vector": "repeat: 1",
     "maze": "repeat: 1",
-    "maze-record": "repeat: 1",
-    "maze-vector": "repeat: 1",
     "peval": "repeat: 1",
     "leval": "repeat: 1",
     "slatex": "repeat: 1",
@@ -621,7 +617,7 @@ benchmark_args = {
 
 def convert_to_node_arguments(arguments):
     arg_map = dict([a.split(':') for a in arguments.replace(": ", ":").split()])
-    return repr(json.dumps(arg_map))
+    return repr(json.dumps({k.replace("-", "_"): v for k, v in arg_map.items()}))
 
 def get_gambit_program_size(executable, benchmark):
     objdump_command = f"objdump --disassemble {executable} | sed -e '/ <.*>:/!d'"
@@ -1506,11 +1502,13 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
 
     output_path = choose_csv_output_path(output, system_name, compiler_name)
 
+    alternate_names = {name: f"{name}-scm" for name in benchmark_names}
+
     runs = list(select(
         r for r in Run
         if r.system == system
         and r.compiler.name == compiler_name # TODO switch back to using compiler when no commit-split
-        and r.benchmark.name in benchmark_names
+        and (r.benchmark.name in benchmark_names or r.benchmark.name in alternate_names.values())
         and r.version_limit in version_limits
         and r.compiler_optimizations
         and r.safe_arithmetic
@@ -1563,7 +1561,7 @@ def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
             measure_data.append([name] + [math.nan] * (len(column_names) - 1))
 
         for run in runs:
-            row = benchmark_names.index(run.benchmark.name)
+            row = benchmark_names.index(run.benchmark.name.replace('-scm', ''))
             res_col = column_names.index(get_run_column_name(run))
             measure_data[row + 2][res_col] = get_measure(run)
             # stdev_col = column_names.index(get_run_column_name(run, postfix=stdev_postfix))
