@@ -6,18 +6,18 @@ js_files=$(find ../tests/paper -type f -name "*.js")
 . ./venv/bin/activate
 
 gambit=../../bbv-gambit
-chez=../ChezScheme
+chez=../../ChezScheme
 
 reps=50
 timeout=3600
 
+# Do NodeJS and Chez runs first they should be quick, having no version limits
 for file in ${js_files[@]}; do
-  # NodeJS runs, do first as they should be quick
   python ./benchmark.py -v benchmark ${file} -O --node -l 0 -r ${reps} -t ${timeout}
 done
 
 for file in ${scm_files[@]}; do
-  python ./benchmark.py -v benchmark ${file} -O --gambit ${chez} -l 0 -r ${reps} -t ${timeout}
+  python ./benchmark.py -v benchmark ${file} -O --chez ${chez} -l 0 -r ${reps} -t ${timeout}
 done
 
 # BBV runs
