@@ -37,7 +37,7 @@ while getopts "f:S:D:V:O:UPGWIEchv" opt; do
       ;;
     S)
       case $OPTARG in
-        'gambit'|'bigloo')
+        'gambit'|'bigloo'|'chez'|'node')
           SYSTEM=$OPTARG
           ;;
         *)
@@ -123,14 +123,18 @@ if [ "$INPUT_FILE" = "" ]; then
   exit 1
 fi
 
-if [[ "${INPUT_FILE##*.}" != "scm" ]]; then
-    echo "** provided file must be a .scm file, not '$INPUT_FILE'"
-    exit 1
-fi
-
 if [ "$SYSTEM" = "" ]; then
   echo "*** no system provided: use -S <system>" >&2
   exit 1
+fi
+
+EXPECTED_EXTENSION="scm"
+if [ "$SYSTEM" = "node" ]; then
+  EXPECTED_EXTENSION="js"
+fi
+if [[ "${INPUT_FILE##*.}" != "$EXPECTED_EXTENSION" ]]; then
+    echo "** provided file must be a .$EXPECTED_EXTENSION file, not '$INPUT_FILE'"
+    exit 1
 fi
 
 if [ "$VERSION_LIMIT" = "" ]; then
@@ -147,11 +151,12 @@ fi
 if [ "$COMPILER_DIR" = "" ]; then
   if [ "$SYSTEM" = "bigloo" ]; then
     COMPILER_DIR="$SCRIPT_DIR/bigloo/local"
+    COMPILER_DIR=$(readlink -f $COMPILER_DIR)
   elif [ "$SYSTEM" = "gambit" ]; then
     COMPILER_DIR="$SCRIPT_DIR/gambit/bbv-gambit"
+    COMPILER_DIR=$(readlink -f $COMPILER_DIR)
   fi
 fi
-COMPILER_DIR=$(readlink -f $COMPILER_DIR)
 
 if [ "$SAFE_ARITHMETIC" = "0" ]; then
   ARITHMETIC=S
@@ -303,8 +308,64 @@ case "$SYSTEM" in
     fi
     ;;
 
+  chez)
+    CHEZ_OPTIONS="--quiet"
+
+    if [ "$PRIMITIVE_COUNT" = "1" ]; then
+      >&2 echo "WARNING: no support for Chez Scheme primitive count"
+    fi
+    if [ "$VERSION_LIMIT" != "0" ]; then
+      >&2 echo "WARNING: no support for Chez Scheme BBV"
+    fi
+
+    if  [ "$COMPILER_DIR" = "" ]; then
+      CHEZCOMP="scheme"
+    else
+      CHEZCOMP="$COMPILER_DIR/ta6le/bin/ta6le/scheme"
+    fi
+
+    if [ "$SAFE_ARITHMETIC" = "0" ]; then
+      CHEZ_OPTIONS="$CHEZ_OPTIONS --optimize-level 3"
+    else
+      CHEZ_OPTIONS="$CHEZ_OPTIONS --optimize-level $OPTIM_LEVEL"
+    fi
+
+    BBV_FILE="$SCRIPT_DIR/chez/bbv.scm"
+    MAIN_FILE="$SCRIPT_DIR/chez/main.scm"
+    BUNDLE_FILE="$OUTPUT_FILE_BASE.scm"
+    cat $BBV_FILE $INPUT_FILE $MAIN_FILE > $BUNDLE_FILE
+
+    echo "#!/bin/bash" > $OUTPUT_FILE_EXE
+    echo "$CHEZCOMP $CHEZ_OPTIONS --script $BUNDLE_FILE \"\$@\"" >> $OUTPUT_FILE_EXE
+    ;;
+  node)
+    CHEZ_OPTIONS="--quiet"
+
+    if [ "$PRIMITIVE_COUNT" = "1" ]; then
+      >&2 echo "WARNING: no support for Node primitive count"
+    fi
+    if [ "$VERSION_LIMIT" != "0" ]; then
+      >&2 echo "WARNING: no support for Node BBV"
+    fi
+    if [ "$SAFE_ARITHMETIC" = "0" ]; then
+      >&2 echo "WARNING: no unsafe mode for NodeJS"
+    fi
+    if [ "$OPTIM_LEVEL" != "0" ]; then
+      >&2 echo "WARNING: no optimisation level for NodeJS"
+    fi
+
+    if  [ "$COMPILER_DIR" = "" ]; then
+      NODECOMP="node"
+    else
+      NODECOMP="$COMPILER_DIR/bin/node"
+    fi
+
+    echo "#!/bin/bash" > $OUTPUT_FILE_EXE
+    echo "$NODECOMP $INPUT_FILE \"\$@\"" >> $OUTPUT_FILE_EXE
+    ;;
 esac
 
+chmod u+x $OUTPUT_FILE_EXE
 echo "$EXECUTABLE_NAME_MARKER $OUTPUT_FILE_EXE"
 
 if [ "$GENERATE_CFG" = "1" ]; then
