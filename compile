@@ -328,7 +328,7 @@ case "$SYSTEM" in
     if [ "$SAFE_ARITHMETIC" = "0" ]; then
       CHEZ_OPTIONS="$CHEZ_OPTIONS --optimize-level 3"
     else
-      CHEZ_OPTIONS="$CHEZ_OPTIONS --optimize-level $OPTIM_LEVEL"
+      CHEZ_OPTIONS="$CHEZ_OPTIONS --optimize-level $(( OPTIM_LEVEL > 2 ? 2 : OPTIM_LEVEL ))"
     fi
 
     BBV_FILE="$SCRIPT_DIR/chez/bbv.scm"

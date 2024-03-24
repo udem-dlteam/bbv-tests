@@ -470,10 +470,6 @@ def extract_compile_times_from_compiler_output(content, dummy=False):
 def compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
     env = os.environ.copy()
 
-    optimization_flag = "-O3" if compiler_optimizations else ""
-    arithmetic_flag = "-U" if not safe_arithmetic else ""
-    path_flag = f'-D {compiler.path}' if compiler.path else ''
-
     base_command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
     command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
 
@@ -530,7 +526,6 @@ def compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizatio
     return executable, primitive_count, compile_times
 
 def compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
-    # Node does not compile make a script that calls node
     command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
     output = run_command(command, timeout)
     executable = extract_executable_from_compiler_output(output)
