@@ -1042,3 +1042,11 @@
                         (DEAD-END "record type error"))))))
                 fields
                 (iota (length fields) 1)))))))
+
+(define-macro (define-keys signature . body)
+  (define (replace lst)
+    (cond
+      ((null? lst) '())
+      ((eq? (car lst) '!key) (cons '#!key (cdr lst)))
+      (else (cons (car lst) (replace (cdr lst))))))
+  `(define ,(replace signature) ,@body))

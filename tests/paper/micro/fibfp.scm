@@ -1,4 +1,4 @@
-(define (run #!key (n (unknown 39.0 10.0)))
+(define-keys (run !key (n (unknown 39.0 10.0)))
 
   (define (fibfp n)
     (if (SFL< n 2.0)

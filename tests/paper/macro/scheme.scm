@@ -1068,7 +1068,7 @@
 		     "seven" "eight" "nine" "ten" "eleven" "twelve")
 	   string<?))))
 
-(define (run #!key (n (unknown 100000 1)))
+(define-keys (run !key (n (unknown 100000 1)))
    (let loop ((n n) (result #f))
       (if (SFX> n 0)
 	  (begin

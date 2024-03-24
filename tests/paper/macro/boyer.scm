@@ -598,7 +598,7 @@
 
 ;;; make sure you've run (setup) then call:  (test)
 
-(define (run #!key (n (unknown 500 1)))
+(define-keys (run !key (n (unknown 500 1)))
   (let loop ((n n) (result #f))
     (if (SFX> n 0)
         (begin

@@ -1351,3 +1351,28 @@
                         (iota (length fields) 1)))))))
     (else
      #f)))
+
+(define-macro (define-keys signature . body)
+  (let ()
+    (define (get-base-signature signature)
+      (if (eq? (car signature) '!key)
+          '()
+          (cons (car signature) (get-base-signature (cdr signature)))))
+
+    (define (get-keys signature)
+      (if (eq? (car signature) '!key)
+          (cdr signature)
+          (get-keys (cdr signature))))
+
+    (define (get-key-binding pair)
+      (let ((name (car pair))
+            (default (cadr pair))
+            (k (gensym)))
+        `(,name (let ((,k (memq (quote ,(string->symbol (string-append (symbol->string name) ":"))) keywords)))
+            (if ,k (cadr ,k) ,default)))))
+
+  (let ((base-signature (get-base-signature signature))
+        (keys (get-keys signature)))
+    `(define (,@base-signature . keywords)
+      (let (,@(map get-key-binding keys))
+        ,@body)))))

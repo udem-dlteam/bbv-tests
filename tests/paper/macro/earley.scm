@@ -643,7 +643,7 @@
     (let ((x (p '(a a a a a a a a a))))
       (Slength (parse->trees x 's 0 9)))))
 
-(define (run #!key (n (unknown 10000 1)))
+(define-keys (run !key (n (unknown 10000 1)))
   (let loop ((n n) (result #f))
     (if (SFX> n 0)
         (loop (SFX- n 1) (test))

@@ -2444,7 +2444,7 @@
 (define (check result)
   (equal? result expected-result))
 
-(define (run #!key (n (unknown 10000 1)))
+(define-keys (run !key (n (unknown 10000 1)))
 ;;  (statprof-start! '(profile))
   (let loop ((n n) (result #f))
     (if (SFX> n 0)

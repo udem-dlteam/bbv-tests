@@ -2340,7 +2340,7 @@
       (tag-ast*-show foo)
       (counters-show))))
 
-(define (run #!key (n (unknown 200 1)))
+(define-keys (run !key (n (unknown 200 1)))
   (let loop ((n n) (result #f))
     (if (SFX> n 0)
         (loop (SFX- n 1) (run1))

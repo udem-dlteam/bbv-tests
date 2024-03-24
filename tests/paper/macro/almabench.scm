@@ -391,7 +391,7 @@ w))
 ;;---------------------------------------------------------------------------
 ;;Entry point
 ;;Calculate RA and Dec for noon on every day in 1900-2100
-(define (run #!key (K TEST_LENGTH))
+(define-keys (run !key (K TEST_LENGTH))
    (let* ((jd (make-vector 2 0.0))
 	  (pv (make-matrix 2 3))
 	  (position (make-vector 3 0.0)))
