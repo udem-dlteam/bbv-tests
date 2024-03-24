@@ -6,7 +6,6 @@ js_files=$(find ../tests/paper -type f -name "*.js")
 . ./venv/bin/activate
 
 gambit=../../bbv-gambit
-chez=../../ChezScheme
 
 reps=50
 timeout=3600
@@ -17,7 +16,7 @@ for file in ${js_files[@]}; do
 done
 
 for file in ${scm_files[@]}; do
-  python ./benchmark.py -v benchmark ${file} -O --chez ${chez} -l 0 -r ${reps} -t ${timeout}
+  python ./benchmark.py -v benchmark ${file} -O --chez -l 0 -r ${reps} -t ${timeout}
 done
 
 # BBV runs
