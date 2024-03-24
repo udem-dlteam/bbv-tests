@@ -1789,7 +1789,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                 [0, 0.5, 0.5])
             cmap = colors.LinearSegmentedColormap.from_list("checks_cmap", cmap(checks_interp))
         elif path_base == "compile_time":
-            vmin, vmax = 0.5, 64
+            vmin, vmax = 0.5, 32
             
         locator = LogLocator(base=2)
         ticks = [t for t in locator.tick_values(vmin, vmax) if vmin <= t <= vmax]

@@ -87,7 +87,7 @@
       ((not (pair? (Scar exp)))
        (let ((fun (Scar exp))
 	     (args (Scdr exp)))
-	  (let ((actuals (map (lambda (a) (comp a env #f)) args)))
+	  (let ((actuals (Smap2 (lambda (a) (comp a env #f)) args)))
 	     (cond
 		((symbol? fun)
 		 (let ((proc (variable fun env)))
