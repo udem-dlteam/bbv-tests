@@ -151,11 +151,12 @@ fi
 if [ "$COMPILER_DIR" = "" ]; then
   if [ "$SYSTEM" = "bigloo" ]; then
     COMPILER_DIR="$SCRIPT_DIR/bigloo/local"
-    COMPILER_DIR=$(readlink -f $COMPILER_DIR)
   elif [ "$SYSTEM" = "gambit" ]; then
     COMPILER_DIR="$SCRIPT_DIR/gambit/bbv-gambit"
-    COMPILER_DIR=$(readlink -f $COMPILER_DIR)
   fi
+fi
+if [ "$COMPILER_DIR" != "" ]; then
+  COMPILER_DIR=$(readlink -f $COMPILER_DIR)
 fi
 
 if [ "$SAFE_ARITHMETIC" = "0" ]; then

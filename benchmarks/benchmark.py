@@ -64,6 +64,7 @@ if not hasattr(db.Entity, "get_or_create"):
 
 class Compiler(db.Entity):
     name = Required(str)
+    path = Optional(str)
     commit_sha = Required(str)
     commit_description = Required(str)
     commit_author = Required(str)
@@ -71,20 +72,24 @@ class Compiler(db.Entity):
     runs = Set('Run')
 
     @classmethod
-    def get_or_create_compiler(cls, compilerdir):
+    def get_or_create_compiler(cls, compiler):
+        compilerdir = compiler.path
         # Define the format for the commit details we want
         # %H: commit hash, %an: author name, %s: subject, %ct: committer date (Unix timestamp)
         format_str = "%H%n%an%n%s%n%ct"
+        name = compiler.name
 
-        output = subprocess.check_output(['git', 'show', '-s', f'--format={format_str}'],
-                                         cwd=compilerdir, universal_newlines=True).strip()
-
-        name = compilerdir.name
-        sha, author, description, timestamp = output.splitlines()
+        try:
+            output = subprocess.check_output(['git', 'show', '-s', f'--format={format_str}'],
+                                            cwd=compilerdir, universal_newlines=True).strip()
+            sha, author, description, timestamp = output.splitlines()
+        except (ValueError, TypeError):
+            sha, author, description, timestamp = "????"
 
         logger.debug(f"current compiler is: {name}, {sha}, {author}, {description}, {timestamp}")
 
         return Compiler.get_or_create(name=name,
+                                      path=compiler.path,
                                       commit_sha=sha,
                                       commit_description=description,
                                       commit_author=author,
@@ -462,15 +467,15 @@ def extract_compile_times_from_compiler_output(content, dummy=False):
         }
 
 
-def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
+def compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
     env = os.environ.copy()
-
 
     optimization_flag = "-O3" if compiler_optimizations else ""
     arithmetic_flag = "-U" if not safe_arithmetic else ""
+    path_flag = f'-D {compiler.path}' if compiler.path else ''
 
-    base_command = f"{COMPILE_SCRIPT} -S gambit -D {gambitdir} -V {vlimit} {arithmetic_flag} {optimization_flag} -f {file}"
-    command_with_primitives = f"{base_command} -P"
+    base_command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
+    command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
 
     output_with_primitives = run_command(command_with_primitives, timeout, env)
     primitive_count = PrimitivesCountParser(output_with_primitives)
@@ -489,16 +494,16 @@ def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizati
 
     return executable, primitive_count, compile_times
 
+def get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, primitive_count):
+    optimization_flag = "-O3" if compiler_optimizations else ""
+    primitive_count_flag = '-P' if primitive_count else ''
+    arithmetic_flag = '-U' if not safe_arithmetic else ''
+    path_flag = f'-D {compiler.path}' if compiler.path else ''
+    return f"{COMPILE_SCRIPT} -S {compiler.name} {path_flag} -V {vlimit} {arithmetic_flag} {optimization_flag} {primitive_count_flag} -f {file}"
 
-def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
-    def get_command(primitive_count):
-        optimization_flag = "-O3" if compiler_optimizations else ""
-        primitive_count_flag = '-P' if primitive_count else ''
-        arithmetic_flag = '-U' if not safe_arithmetic else ''
-        return f"{COMPILE_SCRIPT} -S bigloo -V {vlimit} {arithmetic_flag} {optimization_flag} {primitive_count_flag} -f {file}"
-
+def compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
     # First execution with primitive count
-    command_with_primitives = get_command(True)
+    command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
 
     output = run_command(command_with_primitives, timeout)
 
@@ -509,7 +514,7 @@ def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeou
     primitive_count = PrimitivesCountParser(executable_output)
 
     # Second execution without primitive count
-    base_command = get_command(False)
+    base_command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
     timed_command = f"perf stat {base_command}"
     output = run_command(timed_command, timeout)
     compile_times = extract_compile_times_from_compiler_output(output)
@@ -524,34 +529,20 @@ def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeou
 
     return executable, primitive_count, compile_times
 
-def compile_node(file, timeout):
+def compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
     # Node does not compile make a script that calls node
-    script_name = f"{file}.nodejs.exe"
-    script_content = f'#!/bin/bash\nnode {file} "$@"'
+    command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
+    output = run_command(command, timeout)
+    executable = extract_executable_from_compiler_output(output)
+    return executable, PrimitivesCountParser(""), extract_compile_times_from_compiler_output("", dummy=True)
 
-    with open(script_name, 'w') as f:
-        f.write(script_content)
-
-    current_permissions = os.stat(script_name).st_mode
-    new_permissions = current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
-    os.chmod(script_name, new_permissions)
-
-    return script_name, PrimitivesCountParser(""), extract_compile_times_from_compiler_output("", dummy=True)
-
-def compile(compiler_execution_data, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
-    gambitdir = compiler_execution_data.get('gambitdir')
-    use_bigloo = compiler_execution_data.get('use_bigloo')
-    use_node = compiler_execution_data.get('use_node')
-
-    if use_bigloo:
-        return compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
-    elif gambitdir:
-        return compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
-    elif use_node:
-        return compile_node(file, timeout)
+def compile(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
+    if compiler.name == "bigloo":
+        return compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
+    elif compiler.name == "gambit":
+        return compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
     else:
-        raise NotImplementedError
-
+        return compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
 
 def run_benchmark(executable, arguments, timeout=None):
     # Run program to measure time only
@@ -679,38 +670,22 @@ def get_program_size(executable, benchmark, compiler):
         logger.error("unknown compiler, cannot retrieve size")
         return 0
 
-def get_or_create_run_compiler(gambitdir, use_bigloo, use_node):
-    if gambitdir:
-        compiler, _ = Compiler.get_or_create_compiler(gambitdir)
+def get_or_create_run_compiler(compiler):
+    if compiler.path:
+        compiler, _ = Compiler.get_or_create_compiler(compiler)
         return compiler
-    
-    if use_bigloo:
-        compiler, _ = Compiler.get_or_create(name='bigloo',
+    else:
+        compiler, _ = Compiler.get_or_create(name=compiler.name,
                                              commit_sha='?',
                                              commit_description='?',
                                              commit_author='?',
                                              commit_timestamp=-1)
         return compiler
-
-    if use_node:
-        compiler, _ = Compiler.get_or_create(name='nodejs',
-                                             commit_sha='?',
-                                             commit_description='?',
-                                             commit_author='?',
-                                             commit_timestamp=-1)
-        return compiler
-
-    raise NotImplementedError
 
 @db_session
-def run_and_save_benchmark(gambitdir, use_bigloo, use_node, file, version_limits, safe_arithmetic, repetitions, compiler_optimizations, force_execution=False, timeout=None):
+def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repetitions, compiler_optimizations, force_execution=False, timeout=None):
     system, _ = System.get_or_create_current_system()
-    compiler = get_or_create_run_compiler(gambitdir, use_bigloo, use_node)
-
-    compiler_execution_data = {'gambitdir': gambitdir,
-                               'use_bigloo': use_bigloo,
-                               'use_node': use_node,
-                               'compiler': compiler}
+    compiler = get_or_create_run_compiler(compiler)
 
     with open(file) as f:
         name = os.path.splitext(os.path.basename(file))[0]
@@ -751,13 +726,13 @@ def run_and_save_benchmark(gambitdir, use_bigloo, use_node, file, version_limits
                   compiler_optimizations=compiler_optimizations,
                   arguments=base_arguments)
 
-        executable, primitive_count, compile_times = compile(compiler_execution_data, file, v, safe_arithmetic, compiler_optimizations, timeout)
+        executable, primitive_count, compile_times = compile(compiler, file, v, safe_arithmetic, compiler_optimizations, timeout)
 
         scheme_compile_time = compile_times[SCHEME_COMPILE_TIME]
         c_compile_time = compile_times[C_COMPILE_TIME]
         total_compile_time = scheme_compile_time + c_compile_time
 
-        logger.debug(f"compilation time: {compile_time}")
+        logger.debug(f"compilation time: {total_compile_time}")
         StaticMeasure(name=TOTAL_COMPILE_TIME, value=total_compile_time, run=run)
         StaticMeasure(name=SCHEME_COMPILE_TIME, value=scheme_compile_time, run=run)
         StaticMeasure(name=C_COMPILE_TIME, value=c_compile_time, run=run)
@@ -765,7 +740,7 @@ def run_and_save_benchmark(gambitdir, use_bigloo, use_node, file, version_limits
         align_stack_step = 3
         for i in range(repetitions):
             arguments = f"{base_arguments} align-stack: {i * align_stack_step}"
-            if use_node:
+            if compiler.name == "node":
                 arguments = convert_to_node_arguments(arguments)
             perf_results, scheme_stats = run_benchmark(executable, arguments, timeout)
 
@@ -1885,7 +1860,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             and r2.compiler_optimizations))))
 
     # Use Gambit as base runs for checks
-    checks_compiler_name = 'bbv-gambit'
+    checks_compiler_name = 'gambit'
     checks_base_runs = list(select(
         r for r in Run
         if r.compiler.name == checks_compiler_name
@@ -2098,23 +2073,23 @@ if __name__ == "__main__":
 
     benchmark_parser.add_argument('file', type=file_path)
 
-    compiler_parser_group = benchmark_parser.add_mutually_exclusive_group(required=True)
+    class CompilerArg:
+        def __init__(self, name, path):
+            self.name = name
+            self.path = path
 
-    compiler_parser_group.add_argument('-g', '--gambit-dir',
-                                       dest='gambitdir',
-                                       type=directory_path,
-                                       metavar='PATH',
-                                       help='Gambit root')
+    class StoreFlagAndOptionalArg(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            # Store a tuple with the flag's name (or a simplified version of it) and the optional argument
+            print(parser)
+            setattr(namespace, self.dest, CompilerArg(option_string.replace('--', ''), values if values else None))
 
-    compiler_parser_group.add_argument('-b', '--bigloo',
-                                       dest='use_bigloo',
-                                       action='store_true',
-                                       help='Use Bigloo')
+    compiler_parser_group = benchmark_parser.add_mutually_exclusive_group()
 
-    compiler_parser_group.add_argument('-j', '--nodejs',
-                                       dest='use_node',
-                                       action='store_true',
-                                       help='Use NodeJS')
+    compiler_parser_group.add_argument('--gambit', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Gambit compiler. Optional directory path can follow.')
+    compiler_parser_group.add_argument('--bigloo', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Bigloo compiler. Optional directory path can follow.')
+    compiler_parser_group.add_argument('--chez',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Chez compiler. Optional directory path can follow.')
+    compiler_parser_group.add_argument('--node',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use NodeJS compiler. Optional directory path can follow.')
 
     benchmark_parser.add_argument('-l', '--limit',
                                   dest="version_limits",
@@ -2334,9 +2309,9 @@ if __name__ == "__main__":
     logger.debug(args)
 
     if args.command == 'benchmark':
-        run_and_save_benchmark(gambitdir=args.gambitdir,
-                               use_bigloo=args.use_bigloo,
-                               use_node=args.use_node,
+        if not args.compiler:
+            raise benchmark_parser.error("a compiler is required")
+        run_and_save_benchmark(compiler=args.compiler,
                                file=args.file,
                                version_limits=args.version_limits,
                                safe_arithmetic=args.safe_arithmetic,
