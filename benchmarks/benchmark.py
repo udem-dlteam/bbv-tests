@@ -732,7 +732,6 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
         StaticMeasure(name=SCHEME_COMPILE_TIME, value=scheme_compile_time, run=run)
         StaticMeasure(name=C_COMPILE_TIME, value=c_compile_time, run=run)
 
-        print(repetitions)
         align_stack_step = 3
         for i in range(repetitions):
             arguments = f"{base_arguments} align-stack: {i * align_stack_step}"
