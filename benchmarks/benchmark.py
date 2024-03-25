@@ -2076,7 +2076,6 @@ if __name__ == "__main__":
     class StoreFlagAndOptionalArg(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
             # Store a tuple with the flag's name (or a simplified version of it) and the optional argument
-            print(parser)
             setattr(namespace, self.dest, CompilerArg(option_string.replace('--', ''), values if values else None))
 
     compiler_parser_group = benchmark_parser.add_mutually_exclusive_group()
