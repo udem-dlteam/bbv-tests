@@ -332,9 +332,10 @@ case "$SYSTEM" in
     fi
 
     BBV_FILE="$SCRIPT_DIR/chez/bbv.scm"
+    LIB_FILE="$SCRIPT_DIR/chez/lib.scm"
     MAIN_FILE="$SCRIPT_DIR/chez/main.scm"
     BUNDLE_FILE="$OUTPUT_FILE_BASE.scm"
-    cat $BBV_FILE $INPUT_FILE $MAIN_FILE > $BUNDLE_FILE
+    cat $BBV_FILE $LIB_FILE $INPUT_FILE $MAIN_FILE > $BUNDLE_FILE
 
     echo "#!/bin/bash" > $OUTPUT_FILE_EXE
     echo "$CHEZCOMP $CHEZ_OPTIONS --script $BUNDLE_FILE \"\$@\"" >> $OUTPUT_FILE_EXE
