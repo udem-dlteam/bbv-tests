@@ -338,7 +338,9 @@ case "$SYSTEM" in
     cat $BBV_FILE $LIB_FILE $INPUT_FILE $MAIN_FILE > $BUNDLE_FILE
 
     echo "#!/bin/bash" > $OUTPUT_FILE_EXE
-    echo "$CHEZCOMP $CHEZ_OPTIONS --script $BUNDLE_FILE \"\$@\"" >> $OUTPUT_FILE_EXE
+    echo -n "(cd $INPUT_FILE_DIRNAME && " >> $OUTPUT_FILE_EXE
+    echo "$CHEZCOMP $CHEZ_OPTIONS --script $BUNDLE_FILE \"\$@\")" >> $OUTPUT_FILE_EXE
+
     ;;
   node)
     CHEZ_OPTIONS="--quiet"
