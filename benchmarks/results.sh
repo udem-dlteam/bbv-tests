@@ -1,28 +1,30 @@
 #!/bin/bash
 
 files=$(find ../tests/paper -type f -name "*.scm")
+js_files=$(find ../tests/paper -type f -name "*.js")
 
-benchmarks=() # Initialize an empty array
+benchmarks=()
 
 for file in ${files[@]}; do
     base=$(basename "$file" .scm)  # Extracts the base name without the extension
-    benchmarks+=("$base")       # Append the base name to the array
+    benchmarks+=("$base")          # Append the base name to the array
 done
 
-benchmarks=( "${benchmarks[@]/rev}" )
-benchmarks=( "${benchmarks[@]/vlen}" )
-#benchmarks=( "${benchmarks[@]/vec}" )
+js_benchmarks=()
 
-version_limits="0 1 2 3 4 5 6 7 8 9 10 15 20"
+for file in ${js_files[@]}; do
+    base=$(basename "$file" .js)
+    js_benchmarks+=("$base")
+done
+
+version_limits="0 5"
 system="arctic"
 
 . ./venv/bin/activate
 
-python benchmark.py csv -s $system -c bbv-gambit -b ${benchmarks[@]} -l $version_limits
-python benchmark.py csv -s $system -c bigloo -b ${benchmarks[@]} -l $version_limits
-python benchmark.py csv -s $system -c nodejs -b ${benchmarks[@]} -l 0
+python benchmark.py csv -s $system -l $version_limits
 
-python benchmark.py heatmap -c bbv-gambit -s $system -l $version_limits -b ${benchmarks[@]}
+python benchmark.py heatmap -c gambit -s $system -l $version_limits -b ${benchmarks[@]}
 python benchmark.py heatmap -c bigloo -s $system -l $version_limits -b ${benchmarks[@]}
 
 deactivate

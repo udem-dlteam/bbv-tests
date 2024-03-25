@@ -1385,7 +1385,7 @@ def perf_distribution(system_name,
 ##############################################################################
     
 
-def choose_csv_output_path(output, system_name, compiler_name):
+def choose_csv_output_path(output, system_name):
     path = pathlib.Path(output or '.').resolve()
     suffix = path.suffix
 
@@ -1394,7 +1394,7 @@ def choose_csv_output_path(output, system_name, compiler_name):
         logger.debug(f"output into folder {path}")
 
         # build default filename
-        filename = f"results_{compiler_name}_{system_name}.csv"
+        filename = f"results_{system_name}.csv"
 
         # sanitize filename
         filename = sanitize_filename(filename)
@@ -1464,91 +1464,80 @@ def run_program_size(run):
     m = StaticMeasure.get(name='program-size', run=run)
     return m.value if m else math.nan
 
-
 @db_session
-def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
-    system = get_system_from_name_or_default(system_name)
-    compiler = get_compiler_from_name(compiler_name)
+def to_csv(system_name, version_limits, output):
+    def one_csv_result(compiler_name):
+        system = get_system_from_name_or_default(system_name)
+        compiler = get_compiler_from_name(compiler_name)
 
-    output_path = choose_csv_output_path(output, system_name, compiler_name)
+        runs = list(select(
+            r for r in Run
+            if r.system == system
+            and r.compiler.name == compiler_name # TODO switch back to using compiler when no commit-split
+            and r.version_limit in version_limits
+            and r.compiler_optimizations
+            and r.safe_arithmetic
+            and r.timestamp == max(select(
+                r2.timestamp for r2 in Run
+                if r2.system == system
+                and r2.compiler.name == compiler_name
+                and r2.version_limit == r.version_limit
+                and r2.benchmark == r.benchmark
+                and r2.version_limit == r.version_limit
+                and r2.safe_arithmetic == r.safe_arithmetic
+                and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
 
-    alternate_names = {name: f"{name}-scm" for name in benchmark_names}
+        def get_column_name(limit):
+            return f"V={limit}"
+        
+        def get_run_column_name(run):
+            return get_column_name(run.version_limit)
 
-    runs = list(select(
-        r for r in Run
-        if r.system == system
-        and r.compiler.name == compiler_name # TODO switch back to using compiler when no commit-split
-        and (r.benchmark.name in benchmark_names or r.benchmark.name in alternate_names.values())
-        and r.version_limit in version_limits
-        and r.compiler_optimizations
-        and r.safe_arithmetic
-        and r.timestamp == max(select(
-            r2.timestamp for r2 in Run
-            if r2.system == system
-            and r2.compiler.name == compiler_name
-            and r2.version_limit == r.version_limit
-            and r2.benchmark == r.benchmark
-            and r2.version_limit == r.version_limit
-            and r2.safe_arithmetic == r.safe_arithmetic
-            and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
+        benchmark_names = set(run.benchmark.name for run in runs)
+        benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
 
-    def get_column_name(limit, optim, safe, postfix=''):
-        name = f"V={limit}"
-        if optim or not safe:
-            name += "("
-            if optim: name += "O"
-            if not safe: name += "U"
-            name += ")"
-        return name + postfix
+        column_names = ["Benchmark"]
+        column_names += [get_column_name(l) for l in version_limits]
 
-    stdev_postfix = ' stdev'
+        logger.debug(f"columns in csv: {','.join(column_names)}")
+
+        data = []
+
+        def get_measure_data(title, get_measure, get_stdev=lambda r: 0):
+
+            measure_data = []
+            measure_data.append([f"{title} - {compiler_name.title()}"])
+            measure_data.append(column_names)
+
+            for name in benchmark_names:
+                measure_data.append([name] + [math.nan] * (len(column_names) - 1))
+
+            for run in runs:
+                row = benchmark_names.index(run.benchmark.name)
+                res_col = column_names.index(get_run_column_name(run))
+                measure_data[row + 2][res_col] = get_measure(run)
+
+            return measure_data  
+
+        # Time
+        logger.debug("Appending 'Execution time'")
+        data += get_measure_data("Execution time", average_time, stdev_time)
+
+        # primitive count
+        if compiler_name in ("gambit", "bigloo"):
+            logger.debug("Appending 'Runtime removable checks'")
+            data += get_measure_data("Runtime removable checks", sum_removable_checks)
+
+        return data
+
+    output_path = choose_csv_output_path(output, system_name)
     
-    def get_run_column_name(run, postfix=''):
-        return get_column_name(run.version_limit,
-                               run.compiler_optimizations,
-                               run.safe_arithmetic,
-                               postfix=postfix)
-
-    benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
-
-    column_names = ["Benchmark"]
-    column_names += [get_column_name(l, o, s, postfix=p) for s in (True,)
-                                                        for o in (True,)
-                                                        for l in version_limits
-                                                        for p in ('',)]
-
-    logger.debug(f"columns in csv: {','.join(column_names)}")
-
     data = []
-
-    def get_measure_data(title, get_measure, get_stdev=lambda r: 0):
-
-        measure_data = []
-        measure_data.append([f"{title} - {compiler_name.title()}"])
-        measure_data.append(column_names)
-
-        for name in benchmark_names:
-            measure_data.append([name] + [math.nan] * (len(column_names) - 1))
-
-        for run in runs:
-            row = benchmark_names.index(run.benchmark.name.replace('-scm', ''))
-            res_col = column_names.index(get_run_column_name(run))
-            measure_data[row + 2][res_col] = get_measure(run)
-            # stdev_col = column_names.index(get_run_column_name(run, postfix=stdev_postfix))
-            # measure_data[row + 2][stdev_col] = get_stdev(run)
-
-        return measure_data  
-
-    # Time
-    logger.debug("Appending 'Execution time'")
-    data += get_measure_data("Execution time", average_time, stdev_time)
-
-    # primitive count
-    logger.debug("Appending 'Runtime removable checks'")
-    data += get_measure_data("Runtime removable checks", sum_removable_checks)
-
-    with open(output_path, 'w') as f:
-        csvwriter = csv.writer(f)
+    for compiler_name in ('bigloo', 'gambit', 'chez', 'node'):
+        data.extend(one_csv_result(compiler_name))
+    
+    with open(output_path, 'w') as csv_file:
+        csvwriter = csv.writer(csv_file)
         csvwriter.writerows(data)
 
 ##############################################################################
@@ -1632,7 +1621,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         return [[math.nan] * len(column_names) for _ in range(len(row_names))]
 
     def one_heatmap(path_base, measure, best=False,
-                                        only_macro=False,
+                                        include_macro=True,
+                                        include_micro=True,
                                         subtract_unsafe_run=False,
                                         unsafe_runs=None,
                                         base_runs=None,
@@ -1688,9 +1678,14 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         df = pd.DataFrame(data, columns=column_names, index=heatmap_row_names)
 
-        if only_macro:
+        if not include_micro:
             cols = df.columns.tolist()
             cols = [n for n in cols if is_macro(n.split()[0])]
+            df = df[cols]
+
+        if not include_macro:
+            cols = df.columns.tolist()
+            cols = [n for n in cols if not is_macro(n.split()[0])]
             df = df[cols]
 
         mean_name = "Mean" if absolute else "Geometric Mean"
@@ -1745,19 +1740,27 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         linthresh = 0.1
         extra_ticks = []
 
-        if path_base == 'time':
-            vmin, vmax = 0.7, 1.1
-            extra_ticks = [0.8, 0.9]
-        elif path_base == 'program_size':
-            vmin, vmax = 0.5, 8
-        elif path_base == 'checks':
-            vmin, vmax = 0.1, 1.1
-            # Remove red from cmap. It must not appear in color bar since it cannot happen
+        def remove_red():
+            nonlocal cmap
             checks_interp = np.interp(
                 np.linspace(0, 1),
                 [0, 0.5, 1],
                 [0, 0.5, 0.5])
             cmap = colors.LinearSegmentedColormap.from_list("checks_cmap", cmap(checks_interp))
+
+        if path_base == 'time':
+            vmin, vmax = 0.7, 1.1
+            extra_ticks = [0.8, 0.9]
+        elif path_base == 'micro_time':
+            vmin, vmax = 0.5, 1.0
+            extra_ticks = [0.75]
+            remove_red()
+        elif path_base == 'program_size':
+            vmin, vmax = 0.5, 8
+        elif path_base == 'checks':
+            vmin, vmax = 0.1, 1.1
+            # Remove red from cmap. It must not appear in color bar since it cannot happen
+            remove_red()
         elif path_base == "compile_time":
             vmin, vmax = 0.5, 32
             
@@ -1829,7 +1832,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.savefig(output_path)
 
     # Execution time
-    one_heatmap("time", average_time, only_macro=True)
+    one_heatmap("time", average_time, include_micro=False)
+    one_heatmap("micro_time", average_time, include_macro=False)
 
     # old way to compute checks
     # one_heatmap("checks", sum_checks)
@@ -1873,7 +1877,6 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             and not r2.compiler_optimizations))))
 
     if unsafe_base_runs:
-        #one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)
         one_heatmap("checks", sum_checks, subtract_unsafe_run=True, base_runs=checks_base_runs,
                     unsafe_runs=unsafe_base_runs)
 
@@ -2236,19 +2239,6 @@ if __name__ == "__main__":
                             dest="system_name",
                             help="Benchmarks system")
 
-    csv_parser.add_argument('-c', '--compiler',
-                            metavar="COMPILER",
-                            dest="compiler_name",
-                            default="gambit",
-                            help="Benchmark compiler")
-
-    csv_parser.add_argument('-b', '--benchmarks',
-                            metavar="BENCHMARK",
-                            required=True,
-                            nargs="+",
-                            dest="benchmark_names",
-                            help="benchmarks to dump in csv")
-
     csv_parser.add_argument('-l', '--limit',
                             dest="version_limits",
                             metavar="LIMIT",
@@ -2338,8 +2328,6 @@ if __name__ == "__main__":
                           output=args.output)
     elif args.command == 'csv':
         to_csv(system_name=args.system_name,
-               compiler_name=args.compiler_name,
-               benchmark_names=args.benchmark_names,
                version_limits=args.version_limits,
                output=args.output)
     elif args.command == 'heatmap':
