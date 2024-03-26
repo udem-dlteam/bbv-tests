@@ -67,7 +67,7 @@
 	 (else '())))
 
 (define (put-lemmas s v)
-  (cond ((Sassq s lemmas-prop-list) => (lambda (p) (Sset-cdr! p v)))
+  (cond ((Sassq s lemmas-prop-list) => (lambda (p) (Sset-mcdr! p v)))
 	(else (set! lemmas-prop-list (cons (cons s v) lemmas-prop-list)))))
 
 (define (add-lemma term)
