@@ -358,7 +358,7 @@ case "$SYSTEM" in
     if  [ "$COMPILER_DIR" = "" ]; then
       RACKETCOMP="raco"
     else
-      RACKETCOMP="$COMPILER_DIR/bin/raco" # TODO: is that right?
+      RACKETCOMP="$COMPILER_DIR/racket/bin/raco"
     fi
 
     if [ "$SAFE_ARITHMETIC" = "0" ]; then
