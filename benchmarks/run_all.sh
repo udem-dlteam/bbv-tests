@@ -9,21 +9,21 @@ rkt_files=$(find ../tests/paper -type f -regex '^.*/[^.]*\.rkt$')
 gambit=../../bbv-gambit
 
 reps=50
-timeout=3600
+timeout=1800
 
 verbosity="-v"
 
 # Do NodeJS, Chez and Racket runs first they should be quick, having no version limits
+for file in ${rkt_files[@]}; do
+  python ./benchmark.py $verbosity benchmark ${file} -O --racket -l 0 -r ${reps} -t ${timeout}
+done
+
 for file in ${js_files[@]}; do
   python ./benchmark.py $verbosity benchmark ${file} -O --node -l 0 -r ${reps} -t ${timeout}
 done
 
 for file in ${scm_files[@]}; do
   python ./benchmark.py $verbosity benchmark ${file} -O --chez -l 0 -r ${reps} -t ${timeout}
-done
-
-for file in ${rkt_files[@]}; do
-  python ./benchmark.py $verbosity benchmark ${file} -O --racket -l 0 -r ${reps} -t ${timeout}
 done
 
 # BBV runs
