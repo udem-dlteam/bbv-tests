@@ -10,6 +10,22 @@
 
 ;;; Rehacked by Olin 4/1995.
 
+(require racket/mpair)
+(require racket/fixnum)
+(define cons mcons)
+(define pair? mpair?)
+(define list? mlist?)
+(define car mcar)
+(define cdr mcdr)
+(define set-car! set-mcar!)
+(define set-cdr! set-mcdr!)
+(define list mlist)
+
+(define-macro (mquote x)
+  (if (pair? x)
+    `(mlist ,@(map (lambda (sexp) `(mquote ,sexp)) x))
+    `(quote ,x)))
+
 (define (random-state n)
   (cons n #f))
 
@@ -26,7 +42,7 @@
            (lo (fx32 (SFXmodulo seed Q)))
            (test (fx32 (SFX- (fx32 (SFX* A lo)) (fx32 (SFX* R hi)))))
            (val (if (SFX> test 0) test (SFX+ test M))))
-      (Sset-car! state val)
+      (Sset-mcar! state val)
       val)))
 
 (define (random-int n state)
@@ -124,7 +140,7 @@
                  (let lp ((x s))        ; changing everyone's cdr to r.
                    (let ((next (Scdr x)))        
                      (cond ((not (eq? r next))
-                            (Sset-cdr! x r)
+                            (Sset-mcdr! x r)
                             (lp next))))))
              r)))))                     ; Then return r.
 
@@ -140,11 +156,11 @@
          (n  (SFX+ n1 n2)))
 
     (cond ((SFX> n1 n2)
-           (Sset-cdr! r2 r1)
-           (Sset-car! r1 n))
+           (Sset-mcdr! r2 r1)
+           (Sset-mcar! r1 n))
           (else
-           (Sset-cdr! r1 r2)
-           (Sset-car! r2 n)))))
+           (Sset-mcdr! r1 r2)
+           (Sset-mcar! r2 n)))))
 
 ;------------------------------------------------------------------------------
 ; Was file "maze.scm".
@@ -461,7 +477,7 @@
             (add-wall (href harr x 1) (href harr (SFX- x 3) 0) south-west)
             (add-wall (href harr x 1) (href harr (SFX+ x 3) 0) south-east))))
 
-    (Slist->vector walls)))
+    (Smlist->vector walls)))
 
 
 ;;; Find the cell ctop from the top row, and the cell cbot from the bottom
@@ -732,4 +748,4 @@
         result)))
 
 (define (check result)
-  (string=? (list->string result) output-expected))
+  (string=? (list->string (mlist->list result)) output-expected))

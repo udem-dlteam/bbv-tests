@@ -1533,7 +1533,7 @@ def to_csv(system_name, version_limits, output):
     output_path = choose_csv_output_path(output, system_name)
     
     data = []
-    for compiler_name in ('bigloo', 'gambit', 'chez', 'node'):
+    for compiler_name in ('bigloo', 'gambit', 'chez', 'node', 'racket'):
         data.extend(one_csv_result(compiler_name))
     
     with open(output_path, 'w') as csv_file:
@@ -2087,6 +2087,7 @@ if __name__ == "__main__":
     compiler_parser_group.add_argument('--bigloo', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Bigloo compiler. Optional directory path can follow.')
     compiler_parser_group.add_argument('--chez',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Chez compiler. Optional directory path can follow.')
     compiler_parser_group.add_argument('--node',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use NodeJS compiler. Optional directory path can follow.')
+    compiler_parser_group.add_argument('--racket', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Racket compiler. Optional directory path can follow.')
 
     benchmark_parser.add_argument('-l', '--limit',
                                   dest="version_limits",

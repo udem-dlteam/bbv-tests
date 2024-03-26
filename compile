@@ -37,7 +37,7 @@ while getopts "f:S:D:V:O:UPGWIEchv" opt; do
       ;;
     S)
       case $OPTARG in
-        'gambit'|'bigloo'|'chez'|'node')
+        'gambit'|'bigloo'|'chez'|'racket'|'node')
           SYSTEM=$OPTARG
           ;;
         *)
@@ -131,6 +131,9 @@ fi
 EXPECTED_EXTENSION="scm"
 if [ "$SYSTEM" = "node" ]; then
   EXPECTED_EXTENSION="js"
+fi
+if [ "$SYSTEM" = "racket" ]; then
+  EXPECTED_EXTENSION="rkt"
 fi
 if [[ "${INPUT_FILE##*.}" != "$EXPECTED_EXTENSION" ]]; then
     echo "** provided file must be a .$EXPECTED_EXTENSION file, not '$INPUT_FILE'"
@@ -342,14 +345,43 @@ case "$SYSTEM" in
     echo "$CHEZCOMP $CHEZ_OPTIONS --script $BUNDLE_FILE \"\$@\")" >> $OUTPUT_FILE_EXE
 
     ;;
-  node)
-    CHEZ_OPTIONS="--quiet"
+  racket)
+    RACKET_OPTIONS="exe"
 
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
-      >&2 echo "WARNING: no support for Node primitive count"
+      >&2 echo "WARNING: no support for Racket primitive count"
     fi
     if [ "$VERSION_LIMIT" != "0" ]; then
-      >&2 echo "WARNING: no support for Node BBV"
+      >&2 echo "WARNING: no support for Racket BBV"
+    fi
+
+    if  [ "$COMPILER_DIR" = "" ]; then
+      RACKETCOMP="raco"
+    else
+      RACKETCOMP="$COMPILER_DIR/bin/raco" # TODO: is that right?
+    fi
+
+    if [ "$SAFE_ARITHMETIC" = "0" ]; then
+      >&2 echo "WARNING: no support for Racket usnafe arithmetic"
+    fi
+
+    BBV_FILE="$SCRIPT_DIR/racket/bbv.scm"
+    LIB_FILE="$SCRIPT_DIR/racket/lib.scm"
+    MAIN_FILE="$SCRIPT_DIR/racket/main.scm"
+    RACKET_FILE="$OUTPUT_FILE_BASE.rkt"
+
+    echo "#lang racket" > $RACKET_FILE
+    cat $BBV_FILE $LIB_FILE $INPUT_FILE $MAIN_FILE >> $RACKET_FILE
+
+    (cd $INPUT_FILE_DIRNAME && \
+        $RACKETCOMP $RACKET_OPTIONS -o $OUTPUT_FILE_EXE $RACKET_FILE)
+    ;;
+  node)
+    if [ "$PRIMITIVE_COUNT" = "1" ]; then
+      >&2 echo "WARNING: no support for NodeJS primitive count"
+    fi
+    if [ "$VERSION_LIMIT" != "0" ]; then
+      >&2 echo "WARNING: no support for NodeJS BBV"
     fi
     if [ "$SAFE_ARITHMETIC" = "0" ]; then
       >&2 echo "WARNING: no unsafe mode for NodeJS"

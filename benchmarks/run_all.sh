@@ -2,6 +2,7 @@
 
 scm_files=$(find ../tests/paper -type f -regex '^.*/[^.]*\.scm$')
 js_files=$(find ../tests/paper -type f -regex '^.*/[^.]*\.js$')
+rkt_files=$(find ../tests/paper -type f -regex '^.*/[^.]*\.rkt$')
 
 . ./venv/bin/activate
 
@@ -12,13 +13,17 @@ timeout=3600
 
 verbosity="-v"
 
-# Do NodeJS and Chez runs first they should be quick, having no version limits
+# Do NodeJS, Chez and Racket runs first they should be quick, having no version limits
 for file in ${js_files[@]}; do
   python ./benchmark.py $verbosity benchmark ${file} -O --node -l 0 -r ${reps} -t ${timeout}
 done
 
 for file in ${scm_files[@]}; do
   python ./benchmark.py $verbosity benchmark ${file} -O --chez -l 0 -r ${reps} -t ${timeout}
+done
+
+for file in ${rkt_files[@]}; do
+  python ./benchmark.py $verbosity benchmark ${file} -O --racket -l 0 -r ${reps} -t ${timeout}
 done
 
 # BBV runs
