@@ -3,7 +3,7 @@
 ;*    -------------------------------------------------------------    */
 ;*    Author      :  Manuel Serrano                                    */
 ;*    Creation    :  Sat Dec 26 08:30:11 1998                          */
-;*    Last change :  Thu Mar 21 14:45:54 2024 (serrano)                */
+;*    Last change :  Mon Mar 25 15:04:03 2024 (serrano)                */
 ;*    -------------------------------------------------------------    */
 ;*    An interpreter with lambda (from M. Feeley's one).               */
 ;*=====================================================================*/
@@ -415,7 +415,8 @@
        (lambda (dynamic-env) ((Scdr proc) ((Scar actuals) dynamic-env)
 					  ((Scadr actuals) dynamic-env))))
       ((3)
-       (lambda (dynamic-env) ((Scdr proc) ((Scar actuals) dynamic-env)
+       (lambda (dynamic-env)
+	  ((Scdr proc) ((Scar actuals) dynamic-env)
 					  ((Scadr actuals) dynamic-env)
 					  ((Scaddr actuals) dynamic-env))))
       ((4)
@@ -440,7 +441,8 @@
        (lambda (dynamic-env) (proc ((Scar actuals) dynamic-env)
 				((Scadr actuals) dynamic-env))))
       ((3)
-       (lambda (dynamic-env) (proc ((Scar actuals) dynamic-env)
+       (lambda (dynamic-env)
+	  (proc ((Scar actuals) dynamic-env)
 				((Scadr actuals) dynamic-env)
 				((Scaddr actuals) dynamic-env))))
       ((4)
@@ -467,7 +469,8 @@
 			      ((Scar actuals) dynamic-env)
 			      ((Scadr actuals) dynamic-env))))
       ((3)
-       (lambda (dynamic-env) ((proc dynamic-env)
+       (lambda (dynamic-env)
+	  ((proc dynamic-env)
 			      ((Scar actuals) dynamic-env)
 			      ((Scadr actuals) dynamic-env)
 			      ((Scaddr actuals) dynamic-env))))
