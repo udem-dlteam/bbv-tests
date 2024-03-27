@@ -244,10 +244,13 @@ db.generate_mapping(create_tables=True)
 # Utils
 ##############################################################################
 
-def run_command(command, timeout, env=None):
+def run_command(command, timeout, env=None, extend_env=None):
     logger.info(command)
 
-    env = env = os.environ.copy() if env is None else env
+    env = env = os.environ.copy() if env is None else env.copy()
+
+    if extend_env:
+        env.update(extend_end)
 
     if timeout is not None:
         logger.info(f"(with timeout: {timeout}s)")
@@ -539,15 +542,15 @@ def compile(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, tim
     else:
         return compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
 
-def run_benchmark(executable, arguments, timeout=None):
+def run_benchmark(executable, arguments, env=None, timeout=None):
     # Run program to measure time only
     time_command = f"perf stat {executable} {arguments}"
-    time_output = run_command(time_command, timeout)
+    time_output = run_command(time_command, timeout, extend_env=env)
 
     # Run program with all perf stat events on
     all_events = ' '.join(f"-e {e}" for e in PerfResultParser.event_names)
     all_command = f"perf stat {all_events} {executable} {arguments}"
-    all_output = run_command(all_command, timeout)
+    all_output = run_command(all_command, timeout, extend_env=env)
 
     # parse and join outputs
     time_parser = PerfResultParser(time_output)
@@ -696,8 +699,6 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
         if base_arguments is None:
             logger.warning(f"no CLI argument for {repr(benchmark.name)}")
             base_arguments = default_arguments
-        if compiler.name == 'gambit':
-            base_arguments = f"-:m100M {base_arguments}"
 
         if not force_execution:
             existing_run = Run.get(benchmark=benchmark,
@@ -732,12 +733,27 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
         StaticMeasure(name=SCHEME_COMPILE_TIME, value=scheme_compile_time, run=run)
         StaticMeasure(name=C_COMPILE_TIME, value=c_compile_time, run=run)
 
+        # Set heap size of all benchmarks to 100M
+        if compiler.name == "gambit":
+            arguments = f"-:m100M {arguments}"
+            env=None
+        elif compiler.name == "bigloo":
+            env = {"BIGLOOHEAP": 100}
+        elif compiler.name == 'node':
+            pass # Done by compilation script
+        elif compiler.name == 'chez':
+            pass # cannot adjust heap
+        elif compiler.name == 'racket':
+            pass # cannot adjust heap
+        else:
+            logger.error(f'cannot set heap size for {compiler.name}')
+
         align_stack_step = 3
         for i in range(repetitions):
             arguments = f"{base_arguments} align-stack: {i * align_stack_step}"
             if compiler.name == "node":
                 arguments = convert_to_node_arguments(arguments)
-            perf_results, scheme_stats = run_benchmark(executable, arguments, timeout)
+            perf_results, scheme_stats = run_benchmark(executable, arguments, timeout, env=env)
 
             rep = Repetition(run=run)
 

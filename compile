@@ -397,7 +397,7 @@ case "$SYSTEM" in
     fi
 
     echo "#!/bin/bash" > $OUTPUT_FILE_EXE
-    echo "$NODECOMP $INPUT_FILE \"\$@\"" >> $OUTPUT_FILE_EXE
+    echo "$NODECOMP --max-semi-space-size=100 $INPUT_FILE \"\$@\"" >> $OUTPUT_FILE_EXE
     ;;
 esac
 
