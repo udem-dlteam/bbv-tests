@@ -1,4 +1,5 @@
 #!/bin/bash
+sleep 5
 
 scm_files=$(find ../tests/paper -type f -regex '^.*/[^.]*\.scm$')
 js_files=$(find ../tests/paper -type f -regex '^.*/[^.]*\.js$')
