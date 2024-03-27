@@ -1639,18 +1639,25 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             unsafe_base_runs = None
 
         if absolute:
-            def ratio(value, base):
+            def ratio(value, base, base_run=None):
                 return value
         else:
-            def ratio(value, base):
-                return value / base
+            def ratio(value, base, base_run=None):
+                try:
+                    return value / base
+                except ZeroDivisionError:
+                    benchmark_name = "?" if not base_run else (f"{base_run.benchmark.name} "
+                                                               f"V={base_run.version_limit} "
+                                                               f"U={not base_run.safe_arithmetic} ")
+                    logger.error(f"base value is zero for {path_base} on {compiler_name} {benchmark_name}")
+                    return math.nan
 
         if subtract_unsafe_run:
             @nan_on(StopIteration)
             def _measure(run, base_run):
                 base_unsafe_run = next(r for r in unsafe_base_runs if run.benchmark == r.benchmark)
                 base_unsafe_measure = measure(base_unsafe_run)
-                return ratio((measure(run) - base_unsafe_measure), (measure(base_run) - base_unsafe_measure))
+                return ratio((measure(run) - base_unsafe_measure), (measure(base_run) - base_unsafe_measure), base_run=base_run)
 
         else:
             def _measure(run, base_run):

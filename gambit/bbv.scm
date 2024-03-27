@@ -72,6 +72,8 @@
 (define-macro (SFLsqrt x)        `(MAPop SFL sqrt ,x))
 (define-macro (SFLsin x)         `(MAPop SFL sin ,x))
 (define-macro (SFLcos x)         `(MAPop SFL cos ,x))
+(define-macro (SFLasin x)        `(MAPop SFL asin ,x))
+(define-macro (SFLacos x)        `(MAPop SFL acos ,x))
 (define-macro (SFLatan x)        `(MAPop SFL atan ,x))
 (define-macro (SFLatan2 x y)     `(MAPop SFL atan2 ,x ,y))
 
@@ -111,6 +113,8 @@
 (define-macro (FLsqrt x)        `(FLop sqrt ,x))
 (define-macro (FLsin x)         `(FLop sin ,x))
 (define-macro (FLcos x)         `(FLop cos ,x))
+(define-macro (FLasin x)        `(FLop asin ,x))
+(define-macro (FLacos x)        `(FLop acos ,x))
 (define-macro (FLatan x)        `(FLop atan ,x))
 (define-macro (FLatan2 x y)     `(FLop atan ,x ,y))
 
@@ -340,6 +344,20 @@
        (if (FLONUM? ,a)
            (FLsin ,a)
            (PRIMop sin ,a)))))
+
+(define-macro (BBVasin x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (if (FLONUM? ,a)
+           (FLasin ,a)
+           (PRIMop asin ,a)))))
+
+(define-macro (BBVacos x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (if (FLONUM? ,a)
+           (FLacos ,a)
+           (PRIMop acos ,a)))))
 
 (define-macro (BBVatan x)
   (let ((a (gensym)))
