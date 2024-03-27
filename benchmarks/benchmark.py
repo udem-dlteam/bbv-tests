@@ -542,7 +542,7 @@ def compile(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, tim
     else:
         return compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
 
-def run_benchmark(executable, arguments, env=None, timeout=None):
+def run_benchmark(executable, arguments, timeout=None, env=None):
     # Run program to measure time only
     time_command = f"perf stat {executable} {arguments}"
     time_output = run_command(time_command, timeout, extend_env=env)
@@ -734,9 +734,9 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
         StaticMeasure(name=C_COMPILE_TIME, value=c_compile_time, run=run)
 
         # Set heap size of all benchmarks to 100M
+        env=None
         if compiler.name == "gambit":
             arguments = f"-:m100M {arguments}"
-            env=None
         elif compiler.name == "bigloo":
             env = {"BIGLOOHEAP": 100}
         elif compiler.name == 'node':
@@ -753,7 +753,7 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
             arguments = f"{base_arguments} align-stack: {i * align_stack_step}"
             if compiler.name == "node":
                 arguments = convert_to_node_arguments(arguments)
-            perf_results, scheme_stats = run_benchmark(executable, arguments, timeout, env=env)
+            perf_results, scheme_stats = run_benchmark(executable, arguments, timeout=timeout, env=env)
 
             rep = Repetition(run=run)
 
