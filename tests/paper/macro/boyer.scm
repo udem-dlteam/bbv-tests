@@ -36,7 +36,7 @@
 ;;; BOYER -- Logic programming benchmark, originally written by Bob Boyer.
 ;;; Fairly CONS intensive.
 
-(define (list-deep-copy l)
+(define (list-deep-copy l) (set-bbv-version-limit! #f) 
    (if (pair? l)
        (cons (list-deep-copy (Scar l)) (list-deep-copy (Scdr l)))
        l))
@@ -47,15 +47,15 @@
 ;;; Rewritten as not to use get and put 
 (define lemmas-prop-list '())
 
-(define (get-lemmas s)
-  (cond  ((Sassq s lemmas-prop-list) => (lambda (x) (Scdr x)))
+(define (get-lemmas s) (set-bbv-version-limit! #f) 
+  (cond  ((Sassq s lemmas-prop-list) => (lambda (x) (set-bbv-version-limit! #f)  (Scdr x)))
 	 (else '())))
 
-(define (put-lemmas s v)
-  (cond ((Sassq s lemmas-prop-list) => (lambda (p) (Sset-cdr! p v)))
+(define (put-lemmas s v) (set-bbv-version-limit! #f) 
+  (cond ((Sassq s lemmas-prop-list) => (lambda (p) (set-bbv-version-limit! #f)  (Sset-cdr! p v)))
 	(else (set! lemmas-prop-list (cons (cons s v) lemmas-prop-list)))))
 
-(define (add-lemma term)
+(define (add-lemma term) (set-bbv-version-limit! #f) 
   (cond ((and (pair? term)
               (eq? (Scar term)
                    'equal)
@@ -64,13 +64,13 @@
 		     (cons term (get-lemmas (Scar (Scadr term))))))
         (else (error "ADD-LEMMA did not like term:  " term '()))))
 
-(define (add-lemma-lst lst)
+(define (add-lemma-lst lst) (set-bbv-version-limit! #f) 
   (cond ((null? lst)
          #t)
         (else (add-lemma (Scar lst))
               (add-lemma-lst (Scdr lst)))))
 
-(define (apply-subst alist term)
+(define (apply-subst alist term) (set-bbv-version-limit! #f) 
   (cond ((not (pair? term))
          (cond ((begin (set! temp-temp (Sassq term alist))
                        temp-temp)
@@ -79,21 +79,21 @@
         (else (cons (Scar term)
                     (apply-subst-lst alist (Scdr term))))))
 
-(define (apply-subst-lst alist lst)
+(define (apply-subst-lst alist lst) (set-bbv-version-limit! #f) 
   (cond ((null? lst)
          '())
         (else (cons (apply-subst alist (Scar lst))
                     (apply-subst-lst alist (Scdr lst))))))
 
-(define (falsep x lst)
+(define (falsep x lst) (set-bbv-version-limit! #f) 
   (or (Sequal? x (quote (f)))
       (Smember x lst)))
 
-(define (one-way-unify term1 term2)
+(define (one-way-unify term1 term2) (set-bbv-version-limit! #f) 
   (begin (set! unify-subst '())
          (one-way-unify1 term1 term2)))
 
-(define (one-way-unify1 term1 term2)
+(define (one-way-unify1 term1 term2) (set-bbv-version-limit! #f) 
   (cond ((not (pair? term2))
          (cond ((begin (set! temp-temp (Sassq term2 unify-subst))
                        temp-temp)
@@ -109,7 +109,7 @@
                              (Scdr term2)))
         (else #f)))
 
-(define (one-way-unify1-lst lst1 lst2)
+(define (one-way-unify1-lst lst1 lst2) (set-bbv-version-limit! #f) 
   (cond ((null? lst1)
          #t)
         ((one-way-unify1 (Scar lst1)
@@ -118,27 +118,27 @@
                              (Scdr lst2)))
         (else #f)))
 
-(define (rewrite term)
+(define (rewrite term) (set-bbv-version-limit! #f) 
   (cond ((not (pair? term))
          term)
         (else (rewrite-with-lemmas (cons (Scar term)
                                          (rewrite-args (Scdr term)))
 				   (get-lemmas (Scar term))))))
 
-(define (rewrite-args lst)
+(define (rewrite-args lst) (set-bbv-version-limit! #f) 
   (cond ((null? lst)
          '())
         (else (cons (rewrite (Scar lst))
                     (rewrite-args (Scdr lst))))))
 
-(define (rewrite-with-lemmas term lst)
+(define (rewrite-with-lemmas term lst) (set-bbv-version-limit! #f) 
   (cond ((null? lst)
          term)
         ((one-way-unify term (Scadr (Scar lst)))
          (rewrite (apply-subst unify-subst (Scaddr (Scar lst)))))
         (else (rewrite-with-lemmas term (Scdr lst)))))
 
-(define (setup)
+(define (setup) (set-bbv-version-limit! #f) 
    (set! unify-subst '())
    (set! temp-temp 0)
 
@@ -517,7 +517,7 @@
 		     val
 		     (get j mem))))))))
 
-(define (tautologyp x true-lst false-lst)
+(define (tautologyp x true-lst false-lst) (set-bbv-version-limit! #f) 
   (cond ((truep x true-lst)
          #t)
         ((falsep x false-lst)
@@ -544,16 +544,16 @@
                                             false-lst))))))
         (else #f)))
 
-(define (tautp x)
+(define (tautp x) (set-bbv-version-limit! #f) 
   (tautologyp (rewrite x)
               '() '()))
 
-(define (size term)
+(define (size term) (set-bbv-version-limit! #f) 
    (if (pair? term)
        (+ (size (Scar term)) (size (Scdr term)))
        1))
 
-(define (test)
+(define (test) (set-bbv-version-limit! #f) 
   (define ans #f)
   (define term #f)
   (set! term
@@ -576,13 +576,13 @@
   (set! ans (tautp term))
   (cons ans (size term)))
 
-(define (trans-of-implies n)
+(define (trans-of-implies n) (set-bbv-version-limit! #f) 
   (list (quote implies)
         (trans-of-implies1 n)
         (list (quote implies)
               0 n)))
 
-(define (trans-of-implies1 n)
+(define (trans-of-implies1 n) (set-bbv-version-limit! #f) 
   (cond ((GEN= n 1) ;; MS replaced equal? with SFX=
          (list (quote implies)
                0 1))
@@ -592,7 +592,7 @@
                           n)
                     (trans-of-implies1 (GEN- n 1))))))
 
-(define (truep x lst)
+(define (truep x lst) (set-bbv-version-limit! #f) 
   (or (Sequal? x (quote (t)))
       (Smember x lst)))
 
@@ -606,5 +606,5 @@
           (loop (SFX- n 1) (test)))
         result)))
 
-(define (check result)
+(define (check result) (set-bbv-version-limit! #f) 
    (equal? result '(#t . 136)))

@@ -1395,4 +1395,4 @@
       (let (,@(map get-key-binding keys))
         ,@body)))))
 
-(define-macro (set-bbv-version-limit! . rest) #f)
+(define-macro (set-bbv-version-limit! . rest) `(begin))

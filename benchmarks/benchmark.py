@@ -928,6 +928,7 @@ def replace_patterns(main_string, pattern, replacements):
 
 @db_session
 def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeout):
+    start_time = time.time()
     VERSION_LIMIT_PATTERN = r'\(set-bbv-version-limit!\s#f\)'
     MIN_STEP = 50
     MAX_CONSECUTIVE_FAILURES = 25
@@ -954,7 +955,8 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
                         yield tuple(new_limits)
 
     def get_runtime(limits):
-        replacements = [f"(set-bbv-version-limit! {l})" for l in limits]
+        lib_vlimit = limits[-1]
+        replacements = [f"(set-bbv-version-limit! {l})" for l in limits[:-1]]
         new_content = replace_patterns(content, VERSION_LIMIT_PATTERN, replacements)
 
         suffix=".custom-version-limit"
@@ -964,7 +966,7 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
         with open(new_file, 'w') as f:
             f.write(new_content)
 
-        executable, _, _ = compile(compiler, new_file, 'custom', True, True, timeout, only_executable=True)
+        executable, _, _ = compile(compiler, new_file, lib_vlimit, True, True, timeout, only_executable=True)
 
         base_argument = get_benchmark_cli_arguments(benchmark.name)
         heap_args, env = get_heap_size_arguments(compiler.name)
@@ -1001,7 +1003,7 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
     def walk():
         def choose():
             if not times:
-                return (default_limit,) * degrees
+                return (default_limit,) * (degrees + 1) # last version is for lib.scm
 
             def key(limits):
                 if next(get_unexplored_neighbors(limits), False):
@@ -1034,6 +1036,10 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
                 failures += 1
             else:
                 failures = 0
+
+            if (time.time() - start_time) > timeout:
+                logger.warning("timeout reached in walk")
+                break
 
 
     with open(file, 'r') as f:

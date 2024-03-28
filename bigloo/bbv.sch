@@ -1075,7 +1075,7 @@
       (else (cons (car lst) (replace (cdr lst))))))
   `(define ,(replace signature) ,@body))
 
-(define-macro (set-bbv-version-limit! . rest) #f)
+(define-macro (set-bbv-version-limit! . rest) `(begin))
 
 (register-exit-function! (lambda (status) (bbv-saw-statistics) status))
 

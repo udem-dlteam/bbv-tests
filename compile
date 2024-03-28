@@ -26,7 +26,7 @@ GENERATE_CFG=0          # enable cfg generation
 VIEW_CFG=0              # open cfg in pdf viewer
 USE_IGSC=0              # use gambit igsc instead of gsc
 COMPILER_DIR=           # compiler directory
-VERSION_LIMIT="custom"  # version limit
+VERSION_LIMIT=          # version limit
 SYSTEM=                 # system (gambit or bigloo)
 CUSTOM_OUTPUT_FILE=     # user's output file
 
@@ -54,14 +54,11 @@ while getopts "f:S:D:o:V:O:UPGWIEchv" opt; do
       CUSTOM_OUTPUT_FILE=$OPTARG
       ;;
     V)
-      if [ "$OPTARG" = "custom" ]; then
-        VERSION_LIMIT="custom"
-      elif ! [ "$OPTARG" -eq "$OPTARG" ] 2> /dev/null; then
+      if ! [ "$OPTARG" -eq "$OPTARG" ] 2> /dev/null; then
           echo "Version limit must be an integer not '$OPTARG'"
           exit 1
-      else
-        VERSION_LIMIT=$OPTARG
       fi
+      VERSION_LIMIT=$OPTARG
       ;;
     O)
       case $OPTARG in
@@ -147,6 +144,11 @@ if [[ "${INPUT_FILE##*.}" != "$EXPECTED_EXTENSION" ]]; then
     exit 1
 fi
 
+if [ "$VERSION_LIMIT" = "" ]; then
+  echo "*** no version limit provided: use -V <limit>" >&2
+  exit 1
+fi
+
 if [ "$USE_IGSC" = "1" ] && [ "$SYSTEM" != "gambit" ]; then
   echo "*** igsc only available with '-S gambit'" >&2
   exit 1
@@ -225,12 +227,7 @@ case "$SYSTEM" in
       INLINING_LIMIT=370
     fi
 
-    if [ "$VERSION_LIMIT" = "custom" ]; then
-      VERSION_LIMIT_DECL=""
-    else
-      VERSION_LIMIT_DECL="(version-limit $VERSION_LIMIT)"
-    fi
-
+    VERSION_LIMIT_DECL="(version-limit $VERSION_LIMIT)"
     PRELUDE="(declare
                $OPTIM_DECLARATIONS
                $VERSION_LIMIT_DECL
@@ -303,11 +300,6 @@ case "$SYSTEM" in
       BIGLOO_C_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_C_OPTIONS"
       BIGLOO_LD_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_LD_OPTIONS"
 
-    fi
-
-    if [ "$VERSION_LIMIT" = "custom" ]; then
-      >&2 echo "WARNING: no support for Bigloo custom version limit"
-      exit 1
     fi
 
     if [ "$VERSION_LIMIT" = "0" ]; then

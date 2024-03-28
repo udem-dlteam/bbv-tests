@@ -1070,4 +1070,4 @@
   `(define ,(replace signature) ,@body))
 
 (define-macro (set-bbv-version-limit! limit)
-  (and limit `(declare (version-limit ,limit))))
+  (if (not limit) `(begin) `(declare (version-limit ,limit))))
