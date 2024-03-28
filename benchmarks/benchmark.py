@@ -14,6 +14,7 @@ import operator
 import os
 import pathlib
 import platform
+import random
 import re
 import shlex
 import stat
@@ -252,6 +253,8 @@ def run_command(command, timeout, env=None, extend_env=None):
     if extend_env:
         env.update(extend_env)
 
+    env = {str(k): str(v) for k, v in env.items()}
+
     if timeout is not None:
         logger.info(f"(with timeout: {timeout}s)")
 
@@ -470,19 +473,23 @@ def extract_compile_times_from_compiler_output(content, dummy=False):
         }
 
 
-def compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
+def compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
     env = os.environ.copy()
 
     base_command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
-    command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
 
-    output_with_primitives = run_command(command_with_primitives, timeout, env)
-    primitive_count = PrimitivesCountParser(output_with_primitives)
-
-    if not primitive_count:
-        logger.warning("Failed to parse primitive count")
+    if only_executable:
+        primitive_count = None
     else:
-        logger.debug(f"Primitive count: {dict(primitive_count)}")
+        command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
+
+        output_with_primitives = run_command(command_with_primitives, timeout, env)
+        primitive_count = PrimitivesCountParser(output_with_primitives)
+
+        if not primitive_count:
+            logger.warning("Failed to parse primitive count")
+        else:
+            logger.debug(f"Primitive count: {dict(primitive_count)}")
 
     timed_command = f"perf stat {base_command}"
     output = run_command(timed_command, timeout, env)
@@ -500,17 +507,20 @@ def get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optim
     path_flag = f'-D {compiler.path}' if compiler.path else ''
     return f"{COMPILE_SCRIPT} -S {compiler.name} {path_flag} -V {vlimit} {arithmetic_flag} {optimization_flag} {primitive_count_flag} -f {file}"
 
-def compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
+def compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
     # First execution with primitive count
-    command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
+    if only_executable:
+        primitive_count = None
+    else:
+        command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
 
-    output = run_command(command_with_primitives, timeout)
+        output = run_command(command_with_primitives, timeout)
 
-    executable = extract_executable_from_compiler_output(output)
+        executable = extract_executable_from_compiler_output(output)
 
-    executable_output = run_command(executable, timeout)
+        executable_output = run_command(executable, timeout)
 
-    primitive_count = PrimitivesCountParser(executable_output)
+        primitive_count = PrimitivesCountParser(executable_output)
 
     # Second execution without primitive count
     base_command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
@@ -528,19 +538,19 @@ def compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizatio
 
     return executable, primitive_count, compile_times
 
-def compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
+def compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
     command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
     output = run_command(command, timeout)
     executable = extract_executable_from_compiler_output(output)
     return executable, PrimitivesCountParser(""), extract_compile_times_from_compiler_output("", dummy=True)
 
-def compile(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
+def compile(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
     if compiler.name == "bigloo":
-        return compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
+        return compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
     elif compiler.name == "gambit":
-        return compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
+        return compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
     else:
-        return compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
+        return compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
 
 def run_benchmark(executable, arguments, timeout=None, env=None):
     # Run program to measure time only
@@ -680,6 +690,28 @@ def get_or_create_run_compiler(compiler):
                                              commit_timestamp=-1)
         return compiler
 
+def get_benchmark_cli_arguments(name):
+    arguments = benchmark_args.get(name)
+    if arguments is None:
+        logger.warning(f"no CLI argument for {repr(name)}")
+        arguments = default_arguments
+    return arguments
+
+def get_heap_size_arguments(compiler_name):
+    if compiler_name == "gambit":
+        return f"-:m100M", None
+    elif compiler_name == "bigloo":
+        return "", {"BIGLOOHEAP": 100}
+    elif compiler_name == 'node':
+        return "", None # Done by compilation script
+    elif compiler_name == 'chez':
+        return "", None # cannot adjust heap
+    elif compiler_name == 'racket':
+        return "", None # cannot adjust heap
+    else:
+        logger.error(f'cannot set heap size for {compiler_name}')
+        return "", None
+
 @db_session
 def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repetitions, compiler_optimizations, force_execution=False, timeout=None):
     system, _ = System.get_or_create_current_system()
@@ -695,10 +727,7 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
                     f'- version limit: {v}\n'
                     f'- safe arithmetic: {safe_arithmetic}')
 
-        base_arguments = benchmark_args.get(benchmark.name)
-        if base_arguments is None:
-            logger.warning(f"no CLI argument for {repr(benchmark.name)}")
-            base_arguments = default_arguments
+        base_arguments = get_benchmark_cli_arguments(benchmark.name)
 
         if not force_execution:
             existing_run = Run.get(benchmark=benchmark,
@@ -734,19 +763,8 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
         StaticMeasure(name=C_COMPILE_TIME, value=c_compile_time, run=run)
 
         # Set heap size of all benchmarks to 100M
-        env=None
-        if compiler.name == "gambit":
-            arguments = f"-:m100M {arguments}"
-        elif compiler.name == "bigloo":
-            env = {"BIGLOOHEAP": 100}
-        elif compiler.name == 'node':
-            pass # Done by compilation script
-        elif compiler.name == 'chez':
-            pass # cannot adjust heap
-        elif compiler.name == 'racket':
-            pass # cannot adjust heap
-        else:
-            logger.error(f'cannot set heap size for {compiler.name}')
+        heap_args, env = get_heap_size_arguments(compiler.name)
+        arguments = f'{heap_args} {arguments}'
 
         align_stack_step = 3
         for i in range(repetitions):
@@ -877,6 +895,112 @@ def get_compiler_from_name(compiler_name):
         raise ValueError(f"could not find compiler {repr(compiler_name)}")
 
     return compiler
+
+##############################################################################
+# Profile guided-optimization of version limit
+##############################################################################
+
+def replace_patterns(main_string, pattern, replacements):
+    replacement_iter = iter(replacements)  # Create an iterator over the replacements list
+    parts = []  # List to hold parts of the string
+    last_end = 0  # Track end of the last match
+    
+    # Use re.finditer to find all matches of the pattern
+    for match in re.finditer(pattern, main_string):
+        start, end = match.span()
+        parts.append(main_string[last_end:start])  # Append the part before the match
+        
+        try:
+            # Get the next replacement, append it instead of the match
+            replacement = next(replacement_iter)
+            parts.append(replacement)
+        except StopIteration:
+            # If no more replacements, append the original match
+            parts.append(main_string[start:end])
+        
+        last_end = end  # Update the end of the last match
+    
+    # Append the remaining part of the string after the last match
+    parts.append(main_string[last_end:])
+    
+    return ''.join(parts)
+
+@db_session
+def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeout):
+    VERSION_LIMIT_PATTERN = r'\(set-bbv-version-limit!\s#f\)'
+    times = {}
+    compiler = get_or_create_run_compiler(compiler)
+
+    def get_unexplored_neighbors(limits):
+        if limits not in times:
+            yield limits
+        else:
+            for i in range(len(limits)):
+                new_limits = list(limits)
+                new_limits[i] += 1
+                if tuple(new_limits) not in times:
+                    yield tuple(new_limits)
+                new_limits = list(limits)
+                new_limits[i] -= 1
+                if tuple(new_limits) not in times:
+                    yield tuple(new_limits)
+
+    def get_runtime(limits):
+        replacements = [f"(set-bbv-version-limit! {l})" for l in limits]
+        new_content = replace_patterns(content, VERSION_LIMIT_PATTERN, replacements)
+
+        suffix=".custom-version-limit"
+        root, extension = os.path.splitext(file)
+        new_file = f"{root}{suffix}{extension}"
+
+        with open(new_file, 'w') as f:
+            f.write(new_content)
+
+        executable, _, _ = compile(compiler, new_file, 'custom', True, True, timeout, only_executable=True)
+
+        base_argument = get_benchmark_cli_arguments(benchmark.name)
+        heap_args, env = get_heap_size_arguments(compiler.name)
+        arguments = f'{heap_args} {base_argument}'
+
+        perf_results, scheme_stats = run_benchmark(executable, arguments, timeout=timeout, env=env)
+
+        time, _ = perf_results[PerfResultParser.time_event]
+
+        logger.info(f"runtime for {os.path.basename(file)} with Vs={', '.join(map(str, limits))}: {time}s")
+
+        return time
+
+    def walk():
+        def choose():
+            def key(limits):
+                if list(get_unexplored_neighbors(limits)):
+                    return times[limits]
+                else:
+                    return math.inf
+
+            limits = (default_limit,) * degrees if not times else min(times, key=key)
+            to_explore = list(get_unexplored_neighbors(limits))
+            return random.choice(to_explore)
+
+        def step(limits):
+            cost = get_runtime(limits)
+            logger.info(f"{limits, cost =}")
+            times[limits] = cost
+        
+        for _ in range(10):
+            next_step = choose()
+            step(next_step)
+
+
+    with open(file, 'r') as f:
+        name = os.path.splitext(os.path.basename(file))[0]
+        timestamp = int(os.path.getmtime(file))
+        content = f.read()
+        benchmark, _ = Benchmark.get_or_create(name=name, content=content, timestamp=timestamp)
+    
+    degrees = len(re.findall(VERSION_LIMIT_PATTERN, content))
+    walk()
+
 
 ##############################################################################
 # CSV dump
@@ -1632,6 +1756,39 @@ if __name__ == "__main__":
                                   action='store_true',
                                   help='rerun benchmark even if results already exist')
 
+    # Parser for profile-guided version limit selection
+    profile_guided_parser = subparsers.add_parser('profile_guided', help='Look for an optimial combination of version limits')
+
+    profile_guided_parser.add_argument('file', type=file_path)
+    
+    profile_compiler_parser_group = profile_guided_parser.add_mutually_exclusive_group()
+
+    profile_compiler_parser_group.add_argument('--gambit', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Gambit compiler. Optional directory path can follow.')
+    profile_compiler_parser_group.add_argument('--bigloo', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Bigloo compiler. Optional directory path can follow.')
+    profile_compiler_parser_group.add_argument('--chez',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Chez compiler. Optional directory path can follow.')
+    profile_compiler_parser_group.add_argument('--node',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use NodeJS compiler. Optional directory path can follow.')
+    profile_compiler_parser_group.add_argument('--racket', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Racket compiler. Optional directory path can follow.')
+
+    profile_guided_parser.add_argument('-l', '--limit',
+                                  dest="default_limit",
+                                  metavar="LIMIT",
+                                  default=5,
+                                  type=int,
+                                  help="BBV starting version limit")
+
+    profile_guided_parser.add_argument('-r', '--repetitions',
+                                  dest="repetitions",
+                                  metavar='N',
+                                  default=10,
+                                  type=int,
+                                  help="Number of repetition when executing")
+
+    profile_guided_parser.add_argument('-t', '--timeout',
+                                  dest="timeout",
+                                  metavar='T',
+                                  type=float,
+                                  help="Compilation timeout (in secondes)")
+
     # Parser for dumping results in CSV
     csv_parser = subparsers.add_parser('csv', help='Dumps benchmark data in csv')
 
@@ -1703,6 +1860,14 @@ if __name__ == "__main__":
                                repetitions=args.repetitions,
                                compiler_optimizations=args.compiler_optimizations,
                                force_execution=args.force_execution,
+                               timeout=args.timeout)
+    elif args.command == 'profile_guided':
+        if not args.compiler:
+            raise benchmark_parser.error("a compiler is required")
+        profile_optimize_benchmark(compiler=args.compiler,
+                               file=args.file,
+                               default_limit=args.default_limit,
+                               repetitions=args.repetitions,
                                timeout=args.timeout)
     elif args.command == 'csv':
         to_csv(system_name=args.system_name,

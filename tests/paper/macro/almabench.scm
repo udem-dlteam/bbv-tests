@@ -7,6 +7,7 @@
 
 ;;;;;;;;;;;;;HELPER;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (make-matrix rows cols)
+   (set-bbv-version-limit! #f)
    (let ((mx (make-vector rows (make-vector 0 0.0))))
       (do ((i 0 (SFX+ i 1)))
 	  ((SFX= i rows))
@@ -18,6 +19,7 @@
       mx))
 
 (define (flremainder x y)
+  (set-bbv-version-limit! #f)
   (let* ((sign (if (SFL> x 0.) 1. -1.))
          (absX (abs x))
          (absY (abs y)))
@@ -230,6 +232,7 @@
 ;;---------------------------------------------------------------------------
 ;;Normalize angle into the range -pi <= A < +pi.
 (define (anpm a)
+  (set-bbv-version-limit! #f)
   (let ((w (flremainder a TWOPI)))
     (if (SFL>= (abs w) *PI*)
     (set! w (SFL- w (if (SFL< a 0.0)
@@ -242,6 +245,7 @@ w))
 ;; The reference frame is equatorial and is with respect to the
 ;;    mean equator and equinox of epoch j2000.
 (define (planetpv epoch np pv)
+  (set-bbv-version-limit! #f)
    (let* ;; working storage
 	 ((t (SFL/ (SFL+ (SFL- (Svector-ref epoch 0) J2000)
 		       (Svector-ref epoch 1))
@@ -371,6 +375,7 @@ w))
 ;; Computes RA, Declination, and distance from a state vector returned by
 ;; planetpv.
 (define (radecdist state  rdd)
+  (set-bbv-version-limit! #f)
   ;;distance
   (Svector-set! rdd 2 (SFLsqrt (SFL+ (SFL* (Svector-ref (Svector-ref state 0) 0)
                  (Svector-ref (Svector-ref state 0) 0))
@@ -392,6 +397,7 @@ w))
 ;;Entry point
 ;;Calculate RA and Dec for noon on every day in 1900-2100
 (define-keys (run !key (K TEST_LENGTH))
+   (set-bbv-version-limit! #f)
    (let* ((jd (make-vector 2 0.0))
 	  (pv (make-matrix 2 3))
 	  (position (make-vector 3 0.0)))

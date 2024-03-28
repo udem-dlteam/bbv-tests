@@ -18,19 +18,20 @@ SCHEME_COMPILE_TIME_MARKER="***scheme-compile-time:"
 C_COMPILE_TIME_MARKER="***c-compile-time:"
 
 # Default parameters
-OPTIM_LEVEL=0     # optimization level
-SAFE_ARITHMETIC=1 # safe/unsafe arithmetic
-PRIMITIVE_COUNT=0 # enables primitive (0 to disable)
-SHOW_EXPANSION=0  # show macro expansion
-GENERATE_CFG=0    # enable cfg generation
-VIEW_CFG=0        # open cfg in pdf viewer
-USE_IGSC=0        # use gambit igsc instead of gsc
-COMPILER_DIR=     # compiler directory
-VERSION_LIMIT=    # version limit
-SYSTEM=           # system (gambit or bigloo)
+OPTIM_LEVEL=0           # optimization level
+SAFE_ARITHMETIC=1       # safe/unsafe arithmetic
+PRIMITIVE_COUNT=0       # enables primitive (0 to disable)
+SHOW_EXPANSION=0        # show macro expansion
+GENERATE_CFG=0          # enable cfg generation
+VIEW_CFG=0              # open cfg in pdf viewer
+USE_IGSC=0              # use gambit igsc instead of gsc
+COMPILER_DIR=           # compiler directory
+VERSION_LIMIT="custom"  # version limit
+SYSTEM=                 # system (gambit or bigloo)
+CUSTOM_OUTPUT_FILE=     # user's output file
 
 # Parse parameters
-while getopts "f:S:D:V:O:UPGWIEchv" opt; do
+while getopts "f:S:D:o:V:O:UPGWIEchv" opt; do
   case $opt in
     f)
       INPUT_FILE=$(readlink -f $OPTARG)
@@ -49,12 +50,18 @@ while getopts "f:S:D:V:O:UPGWIEchv" opt; do
     D)
       COMPILER_DIR=$OPTARG
       ;;
+    o)
+      CUSTOM_OUTPUT_FILE=$OPTARG
+      ;;
     V)
-      if ! [ "$OPTARG" -eq "$OPTARG" ] 2> /dev/null; then
+      if [ "$OPTARG" = "custom" ]; then
+        VERSION_LIMIT="custom"
+      elif ! [ "$OPTARG" -eq "$OPTARG" ] 2> /dev/null; then
           echo "Version limit must be an integer not '$OPTARG'"
           exit 1
+      else
+        VERSION_LIMIT=$OPTARG
       fi
-      VERSION_LIMIT=$OPTARG
       ;;
     O)
       case $OPTARG in
@@ -140,11 +147,6 @@ if [[ "${INPUT_FILE##*.}" != "$EXPECTED_EXTENSION" ]]; then
     exit 1
 fi
 
-if [ "$VERSION_LIMIT" = "" ]; then
-  echo "*** no version limit provided: use -V <limit>" >&2
-  exit 1
-fi
-
 if [ "$USE_IGSC" = "1" ] && [ "$SYSTEM" != "gambit" ]; then
   echo "*** igsc only available with '-S gambit'" >&2
   exit 1
@@ -176,6 +178,12 @@ OUTPUT_FILE_BASE="$INPUT_FILE_NO_EXT.${SYSTEM}.V${VERSION_LIMIT}.O${OPTIM_LEVEL}
 OUTPUT_FILE_C="$INPUT_FILE_NO_EXT.c"
 OUTPUT_FILE_EXE="$OUTPUT_FILE_BASE.exe"
 OUTPUT_FILE_CFG_DOT="$OUTPUT_FILE_BASE.cfg"
+
+if [ "$CUSTOM_OUTPUT_FILE" = "" ]; then
+  OUTPUT_FILE_EXE="$OUTPUT_FILE_BASE.exe"
+else
+  OUTPUT_FILE_EXE="$CUSTOM_OUTPUT_FILE"
+fi
 
 run_dot()
 {
@@ -217,9 +225,15 @@ case "$SYSTEM" in
       INLINING_LIMIT=370
     fi
 
+    if [ "$VERSION_LIMIT" = "custom" ]; then
+      VERSION_LIMIT_DECL=""
+    else
+      VERSION_LIMIT_DECL="(version-limit $VERSION_LIMIT)"
+    fi
+
     PRELUDE="(declare
                $OPTIM_DECLARATIONS
-               (version-limit $VERSION_LIMIT)
+               $VERSION_LIMIT_DECL
                (inlining-limit $INLINING_LIMIT))
              (define-macro (%%%)
                (eval '(define arithmetic '$ARITHMETIC))
@@ -290,6 +304,12 @@ case "$SYSTEM" in
       BIGLOO_LD_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_LD_OPTIONS"
 
     fi
+
+    if [ "$VERSION_LIMIT" = "custom" ]; then
+      >&2 echo "WARNING: no support for Bigloo custom version limit"
+      exit 1
+    fi
+
     if [ "$VERSION_LIMIT" = "0" ]; then
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -fno-saw-bbv"
     else

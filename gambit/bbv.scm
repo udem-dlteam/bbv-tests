@@ -1068,3 +1068,6 @@
       ((eq? (car lst) '!key) (cons '#!key (cdr lst)))
       (else (cons (car lst) (replace (cdr lst))))))
   `(define ,(replace signature) ,@body))
+
+(define-macro (set-bbv-version-limit! limit)
+  (and limit `(declare (version-limit ,limit))))

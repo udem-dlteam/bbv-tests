@@ -1394,3 +1394,5 @@
     `(define (,@base-signature . keywords)
       (let (,@(map get-key-binding keys))
         ,@body)))))
+
+(define-macro (set-bbv-version-limit! . rest) #f)
