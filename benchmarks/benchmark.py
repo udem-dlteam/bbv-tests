@@ -929,6 +929,11 @@ def replace_patterns(main_string, pattern, replacements):
 @db_session
 def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeout):
     VERSION_LIMIT_PATTERN = r'\(set-bbv-version-limit!\s#f\)'
+    MIN_STEP = 50
+    MAX_CONSECUTIVE_FAILURES = 25
+
+    random.seed(42)
+
     times = {}
     compiler = get_or_create_run_compiler(compiler)
     system, _ = System.get_or_create_current_system()
@@ -942,10 +947,11 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
                 new_limits[i] += 1
                 if tuple(new_limits) not in times:
                     yield tuple(new_limits)
-                new_limits = list(limits)
-                new_limits[i] -= 1
-                if tuple(new_limits) not in times:
-                    yield tuple(new_limits)
+                if limits[i] > 0:
+                    new_limits = list(limits)
+                    new_limits[i] -= 1
+                    if tuple(new_limits) not in times:
+                        yield tuple(new_limits)
 
     def get_runtime(limits):
         replacements = [f"(set-bbv-version-limit! {l})" for l in limits]
@@ -1015,10 +1021,19 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
             cost = get_runtime(limits)
             logger.info(f"{limits, cost =}")
             times[limits] = cost
+
+            return cost == min(times.values())
         
-        for _ in range(10):
+        steps = 0
+        failures = 0
+        while failures < MAX_CONSECUTIVE_FAILURES or steps < MIN_STEPS:
+            steps += 1
             next_step = choose()
-            step(next_step)
+            improved = step(next_step)
+            if not improved:
+                failures += 1
+            else:
+                failures = 0
 
 
     with open(file, 'r') as f:
