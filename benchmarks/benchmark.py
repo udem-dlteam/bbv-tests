@@ -250,7 +250,7 @@ def run_command(command, timeout, env=None, extend_env=None):
     env = env = os.environ.copy() if env is None else env.copy()
 
     if extend_env:
-        env.update(extend_end)
+        env.update(extend_env)
 
     if timeout is not None:
         logger.info(f"(with timeout: {timeout}s)")
