@@ -764,7 +764,7 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
 
         # Set heap size of all benchmarks to 100M
         heap_args, env = get_heap_size_arguments(compiler.name)
-        arguments = f'{heap_args} {arguments}'
+        base_arguments = f'{heap_args} {base_arguments}'
 
         align_stack_step = 3
         for i in range(repetitions):
