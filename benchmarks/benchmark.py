@@ -211,7 +211,7 @@ class StaticMeasure(db.Entity):
     run = Required('Run')
 
 class Repetition(db.Entity):
-    run = Required('Run')
+    run = Optional('Run')
     perf_events = Set('PerfEvent', reverse='rep')
     compiler_statistics = Set('CompilerStatistics', reverse='rep')
     timestamp = Required(int, default=lambda: int(time.time()))
@@ -222,6 +222,7 @@ class Run(db.Entity):
     compiler = Required('Compiler', reverse='runs')
     compiler_optimizations = Required(bool)
     version_limit = Required(int)
+    versions_limits = Optional(IntArray)
     safe_arithmetic = Required(bool)
     reps = Set('Repetition', reverse='run')
     primitives = Set('PrimitiveCount', reverse='run')
@@ -928,8 +929,14 @@ def replace_patterns(main_string, pattern, replacements):
 @db_session
 def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeout):
     VERSION_LIMIT_PATTERN = r'\(set-bbv-version-limit!\s#f\)'
+    MIN_STEP = 50
+    MAX_CONSECUTIVE_FAILURES = 25
+
+    random.seed(42)
+
     times = {}
     compiler = get_or_create_run_compiler(compiler)
+    system, _ = System.get_or_create_current_system()
 
     def get_unexplored_neighbors(limits):
         if limits not in times:
@@ -940,10 +947,11 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
                 new_limits[i] += 1
                 if tuple(new_limits) not in times:
                     yield tuple(new_limits)
-                new_limits = list(limits)
-                new_limits[i] -= 1
-                if tuple(new_limits) not in times:
-                    yield tuple(new_limits)
+                if limits[i] > 0:
+                    new_limits = list(limits)
+                    new_limits[i] -= 1
+                    if tuple(new_limits) not in times:
+                        yield tuple(new_limits)
 
     def get_runtime(limits):
         replacements = [f"(set-bbv-version-limit! {l})" for l in limits]
@@ -960,25 +968,52 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
 
         base_argument = get_benchmark_cli_arguments(benchmark.name)
         heap_args, env = get_heap_size_arguments(compiler.name)
-        arguments = f'{heap_args} {base_argument}'
+        base_arguments = f'{heap_args} {base_argument}'
 
-        perf_results, scheme_stats = run_benchmark(executable, arguments, timeout=timeout, env=env)
+        run = Run(benchmark=benchmark,
+                  system=system,
+                  compiler=compiler,
+                  version_limit=-1,
+                  versions_limits=limits,
+                  arguments=base_arguments,
+                  safe_arithmetic=True,
+                  compiler_optimizations=True)
 
-        time, _ = perf_results[PerfResultParser.time_event]
+        align_stack_step = 3
+        runtimes = []
+        for i in range(repetitions):
+            arguments = f"{base_arguments} align-stack: {i * align_stack_step}"
+            perf_results, scheme_stats = run_benchmark(executable, arguments, timeout=timeout, env=env)
 
-        logger.info(f"runtime for {os.path.basename(file)} with Vs={', '.join(map(str, limits))}: {time}s")
+            rep = Repetition(run=run)
 
-        return time
+            for event, (value, variance) in perf_results.items():
+                PerfEvent(event=event, value=value, rep=rep)
+
+            time, _ = perf_results[PerfResultParser.time_event]
+            runtimes.append(time)
+
+        average = statistics.mean(runtimes)
+        logger.info(f"average runtime for {os.path.basename(file)} with Vs={', '.join(map(str, limits))}: {average}s")
+
+        return average
 
     def walk():
         def choose():
+            if not times:
+                return (default_limit,) * degrees
+
             def key(limits):
-                if list(get_unexplored_neighbors(limits)):
+                if next(get_unexplored_neighbors(limits), False):
                     return times[limits]
                 else:
                     return math.inf
 
-            limits = (default_limit,) * degrees if not times else min(times, key=key)
+            # Sort results and calculate selection probabilities inversely proportional to ranking
+            sorted_limits = sorted([l for l in times if next(get_unexplored_neighbors(times[l]), False)], key=key)
+            probabilities = [1 / index for index, _ in enumerate(sorted_limits, start=1)]
+            selected_limit = random.choices(sorted_limits, weights=probabilities, k=1)[0]
+
             to_explore = list(get_unexplored_neighbors(limits))
             return random.choice(to_explore)
 
@@ -986,10 +1021,19 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
             cost = get_runtime(limits)
             logger.info(f"{limits, cost =}")
             times[limits] = cost
+
+            return cost == min(times.values())
         
-        for _ in range(10):
+        steps = 0
+        failures = 0
+        while failures < MAX_CONSECUTIVE_FAILURES or steps < MIN_STEPS:
+            steps += 1
             next_step = choose()
-            step(next_step)
+            improved = step(next_step)
+            if not improved:
+                failures += 1
+            else:
+                failures = 0
 
 
     with open(file, 'r') as f:
