@@ -45,6 +45,8 @@ import psutil
 
 import seaborn as sns
 
+import deap
+
 ##############################################################################
 ## Database
 ##############################################################################
@@ -216,13 +218,19 @@ class Repetition(db.Entity):
     compiler_statistics = Set('CompilerStatistics', reverse='rep')
     timestamp = Required(int, default=lambda: int(time.time()))
 
+def db_encode_int_array(int_array):
+    return ','.join((map(str, int_array)))
+
+def db_decode_int_array(encoded_int_array):
+    return [int(x) for x in encoded_int_array.split(',')]
+
 class Run(db.Entity):
     benchmark = Required('Benchmark', reverse='runs')
     system = Required('System', reverse='runs')
     compiler = Required('Compiler', reverse='runs')
     compiler_optimizations = Required(bool)
     version_limit = Required(int)
-    versions_limits = Optional(IntArray)
+    version_limits = Optional(str) # int array
     safe_arithmetic = Required(bool)
     reps = Set('Repetition', reverse='run')
     primitives = Set('PrimitiveCount', reverse='run')
@@ -553,21 +561,23 @@ def compile(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, tim
     else:
         return compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
 
-def run_benchmark(executable, arguments, timeout=None, env=None):
+def run_benchmark(executable, arguments, timeout=None, env=None, only_time=False):
     # Run program to measure time only
     time_command = f"perf stat {executable} {arguments}"
     time_output = run_command(time_command, timeout, extend_env=env)
-
-    # Run program with all perf stat events on
-    all_events = ' '.join(f"-e {e}" for e in PerfResultParser.event_names)
-    all_command = f"perf stat {all_events} {executable} {arguments}"
-    all_output = run_command(all_command, timeout, extend_env=env)
-
-    # parse and join outputs
     time_parser = PerfResultParser(time_output)
-    all_perf_parser = PerfResultParser(all_output)
 
-    all_perf_parser.update(time_parser)
+    if not only_time:
+        # Run program with all perf stat events on
+        all_events = ' '.join(f"-e {e}" for e in PerfResultParser.event_names)
+        all_command = f"perf stat {all_events} {executable} {arguments}"
+        all_output = run_command(all_command, timeout, extend_env=env)
+
+        # parse and join outputs
+        all_perf_parser = PerfResultParser(all_output)
+        all_perf_parser.update(time_parser)
+    else:
+        all_perf_parser = time_parser
 
     for event in PerfResultParser.event_names:
         if event not in all_perf_parser:
@@ -928,33 +938,18 @@ def replace_patterns(main_string, pattern, replacements):
 
 @db_session
 def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeout):
+    from deap import base, creator, tools, algorithms
+
     start_time = time.time()
     VERSION_LIMIT_PATTERN = r'\(set-bbv-version-limit!\s#f\)'
-    MIN_STEP = 50
-    MAX_CONSECUTIVE_FAILURES = 25
-
-    random.seed(42)
 
     times = {}
     compiler = get_or_create_run_compiler(compiler)
     system, _ = System.get_or_create_current_system()
 
-    def get_unexplored_neighbors(limits):
-        if limits not in times:
-            yield limits
-        else:
-            for i in range(len(limits)):
-                new_limits = list(limits)
-                new_limits[i] += 1
-                if tuple(new_limits) not in times:
-                    yield tuple(new_limits)
-                if limits[i] > 0:
-                    new_limits = list(limits)
-                    new_limits[i] -= 1
-                    if tuple(new_limits) not in times:
-                        yield tuple(new_limits)
-
     def get_runtime(limits):
+        logger.info(f'Getting runtime for limits: {",".join(map(str, limits))}')
+
         lib_vlimit = limits[-1]
         replacements = [f"(set-bbv-version-limit! {l})" for l in limits[:-1]]
         new_content = replace_patterns(content, VERSION_LIMIT_PATTERN, replacements)
@@ -966,26 +961,36 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
         with open(new_file, 'w') as f:
             f.write(new_content)
 
-        executable, _, _ = compile(compiler, new_file, lib_vlimit, True, True, timeout, only_executable=True)
-
         base_argument = get_benchmark_cli_arguments(benchmark.name)
         heap_args, env = get_heap_size_arguments(compiler.name)
         base_arguments = f'{heap_args} {base_argument}'
 
-        run = Run(benchmark=benchmark,
-                  system=system,
-                  compiler=compiler,
-                  version_limit=-1,
-                  versions_limits=limits,
-                  arguments=base_arguments,
-                  safe_arithmetic=True,
-                  compiler_optimizations=True)
+        run, created = Run.get_or_create(benchmark=benchmark,
+                                         system=system,
+                                         compiler=compiler,
+                                         version_limit=-1,
+                                         version_limits=db_encode_int_array(limits),
+                                         arguments=base_arguments,
+                                         safe_arithmetic=True,
+                                         compiler_optimizations=True)
+
+        if not created:
+            logger.info(f'run already existed')
+            # run already existed, get existing result
+            perf_times = select(p.value for p in PerfEvent if p.rep.run == run and p.event == PerfResultParser.time_event)
+            if len(perf_times) >= repetitions:
+                logger.info(f'run already existed with {len(perf_times)} repetitions')
+                return statistics.mean(perf_times)
+
+        logger.info(f'executing to get more time readings')
+
+        executable, _, _ = compile(compiler, new_file, lib_vlimit, True, True, timeout, only_executable=True)
 
         align_stack_step = 3
         runtimes = []
         for i in range(repetitions):
             arguments = f"{base_arguments} align-stack: {i * align_stack_step}"
-            perf_results, scheme_stats = run_benchmark(executable, arguments, timeout=timeout, env=env)
+            perf_results, _ = run_benchmark(executable, arguments, timeout=timeout, env=env, only_time=True)
 
             rep = Repetition(run=run)
 
@@ -998,49 +1003,55 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
         average = statistics.mean(runtimes)
         logger.info(f"average runtime for {os.path.basename(file)} with Vs={', '.join(map(str, limits))}: {average}s")
 
+        db.commit()
+        logger.info('commit profiling run to db')
+
         return average
 
-    def walk():
-        def choose():
-            if not times:
-                return (default_limit,) * (degrees + 1) # last version is for lib.scm
+    def optim():
+        def eval_runtime(individual):
+            return [get_runtime(individual)]
 
-            def key(limits):
-                if next(get_unexplored_neighbors(limits), False):
-                    return times[limits]
-                else:
-                    return math.inf
+        MIN_VLIMIT = 0
+        MAX_VLIMIT = 10
 
-            # Sort results and calculate selection probabilities inversely proportional to ranking
-            sorted_limits = sorted([l for l in times if next(get_unexplored_neighbors(times[l]), False)], key=key)
-            probabilities = [1 / index for index, _ in enumerate(sorted_limits, start=1)]
-            selected_limit = random.choices(sorted_limits, weights=probabilities, k=1)[0]
+        dimension = len(re.findall(VERSION_LIMIT_PATTERN, content)) + 1
 
-            to_explore = list(get_unexplored_neighbors(limits))
-            return random.choice(to_explore)
+        creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+        creator.create("Individual", list, fitness=creator.FitnessMin)
 
-        def step(limits):
-            cost = get_runtime(limits)
-            logger.info(f"{limits, cost =}")
-            times[limits] = cost
+        toolbox = base.Toolbox()
+        toolbox.register("attr_int", random.randint, MIN_VLIMIT, MAX_VLIMIT)
+        toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_int, n=dimension)
+        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-            return cost == min(times.values())
-        
-        steps = 0
-        failures = 0
-        while failures < MAX_CONSECUTIVE_FAILURES or steps < MIN_STEPS:
-            steps += 1
-            next_step = choose()
-            improved = step(next_step)
-            if not improved:
-                failures += 1
-            else:
-                failures = 0
+        toolbox.register("evaluate", eval_runtime)
+        toolbox.register("mate",   tools.cxTwoPoint)  # Crossover
+        toolbox.register("mutate", tools.mutUniformInt, low=MIN_VLIMIT, up=MAX_VLIMIT, indpb=0.2)  # Mutation
+        toolbox.register("select", tools.selTournament, tournsize=3)  # Selection
 
-            if (time.time() - start_time) > timeout:
-                logger.warning("timeout reached in walk")
-                break
+        # Genetic Algorithm Parameters
+        population_size = 10
+        crossover_probability = 0.7
+        mutation_probability = 0.2
+        number_of_generations = 40
 
+        # Creating the initial population
+        population = toolbox.population(n=population_size)
+
+        uniformly_5_version_limit = toolbox.individual()
+        uniformly_5_version_limit[:] = [5] * dimension  # Replace with your specific individual's attributes
+
+        # Add the specific individual to the population
+        population.append(uniformly_5_version_limit)
+
+        # Run the Genetic Algorithm
+        result, logbook = algorithms.eaSimple(population, toolbox, cxpb=crossover_probability, mutpb=mutation_probability, ngen=number_of_generations, verbose=True)
+
+        # Extracting the best solution
+        best_individual = tools.selBest(result, k=1)[0]
+        looger.info("Best Individual =", best_individual)
+        looger.info("Best Fitness =", best_individual.fitness.values[0])
 
     with open(file, 'r') as f:
         name = os.path.splitext(os.path.basename(file))[0]
@@ -1048,8 +1059,14 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
         content = f.read()
         benchmark, _ = Benchmark.get_or_create(name=name, content=content, timestamp=timestamp)
     
-    degrees = len(re.findall(VERSION_LIMIT_PATTERN, content))
-    walk()
+    optim()
+
+
+@db_session
+def profile_optimize_report(compiler):
+    profiling_runs = list(select(r for r in Run if r.version_limit == -1 and r.compiler.name == compiler))
+    print(len(profiling_runs))
+
 
 
 ##############################################################################
@@ -1829,7 +1846,7 @@ if __name__ == "__main__":
     profile_guided_parser.add_argument('-r', '--repetitions',
                                   dest="repetitions",
                                   metavar='N',
-                                  default=10,
+                                  default=5,
                                   type=int,
                                   help="Number of repetition when executing")
 
@@ -1838,6 +1855,17 @@ if __name__ == "__main__":
                                   metavar='T',
                                   type=float,
                                   help="Compilation timeout (in secondes)")
+
+
+    # Parser for profile-guided report
+    profile_report_parser = subparsers.add_parser('profile_report', help='Report on PGO version limit selection')
+
+    
+    profile_report_parser.add_argument('-c', '--compiler',
+                            metavar="COMPILER",
+                            dest="compiler_name",
+                            default="gambit",
+                            help="Compiler")
 
     # Parser for dumping results in CSV
     csv_parser = subparsers.add_parser('csv', help='Dumps benchmark data in csv')
@@ -1919,6 +1947,8 @@ if __name__ == "__main__":
                                default_limit=args.default_limit,
                                repetitions=args.repetitions,
                                timeout=args.timeout)
+    elif args.command == 'profile_report':
+        profile_optimize_report(compiler=args.compiler_name)
     elif args.command == 'csv':
         to_csv(system_name=args.system_name,
                version_limits=args.version_limits,
