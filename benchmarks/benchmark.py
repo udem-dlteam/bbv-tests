@@ -940,6 +940,8 @@ def replace_patterns(main_string, pattern, replacements):
 def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeout):
     from deap import base, creator, tools, algorithms
 
+    random.seed(42)
+
     start_time = time.time()
     VERSION_LIMIT_PATTERN = r'\(set-bbv-version-limit!\s#f\)'
 
