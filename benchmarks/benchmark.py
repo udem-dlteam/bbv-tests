@@ -1012,7 +1012,7 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
         def eval_runtime(individual):
             return [get_runtime(individual)]
 
-        MIN_VLIMIT = 0
+        MIN_VLIMIT = 1
         MAX_VLIMIT = 10
 
         dimension = len(re.findall(VERSION_LIMIT_PATTERN, content)) + 1
