@@ -792,7 +792,7 @@
   (lambda (rte) (set-bbv-version-limit! #f)  ((oper rte))))
 
 (define (gen-combination-1 oper arg1) (set-bbv-version-limit! #f) 
-  (lambda (rte) (set-bbv-version-limit! #f)  ((oper rte) (arg1 rte))))
+  (lambda (rte) (set-bbv-version-limit! #f) ((oper rte) (arg1 rte))))
 
 (define (gen-combination-2 oper arg1 arg2) (set-bbv-version-limit! #f) 
   (lambda (rte) (set-bbv-version-limit! #f)  ((oper rte) (arg1 rte) (arg2 rte))))
@@ -1048,19 +1048,19 @@
    (scheme-eval
       '(let ()
 	
-	(define (sort-list obj pred) (set-bbv-version-limit! #f) 
+	(define (sort-list obj pred) 
 	   
-	   (define (loop l) (set-bbv-version-limit! #f) 
+	   (define (loop l) 
 	      (if (and (pair? l) (pair? (cdr l)))
 		  (split l '() '())
 		  l))
 	   
-	   (define (split l one two) (set-bbv-version-limit! #f) 
+	   (define (split l one two) 
 	      (if (pair? l)
 		  (split (cdr l) two (cons (car l) one))
 		  (merge (loop one) (loop two))))
 	   
-	   (define (merge one two) (set-bbv-version-limit! #f) 
+	   (define (merge one two) 
 	      (cond ((null? one) two)
 		    ((pred (car two) (car one))
 		     (cons (car two)
