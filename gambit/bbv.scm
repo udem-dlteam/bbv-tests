@@ -1069,5 +1069,28 @@
       (else (cons (car lst) (replace (cdr lst))))))
   `(define ,(replace signature) ,@body))
 
-(define-macro (set-bbv-version-limit! limit)
-  (if (not limit) `(begin) `(declare (version-limit ,limit))))
+(define-macro (set-bbv-version-limit! limit #!optional print?)
+  (let ((result
+          (cond
+            (limit `(declare (version-limit ,limit)))
+            (use-custom-version-limits?
+              (let ((limit (car custom-version-limits)))
+                (set! custom-version-limits (cdr custom-version-limits))
+                `(declare (version-limit ,limit))))
+            (else `(begin)))))
+    (if print? (pp result))
+    result))
+
+(define-macro (init-use-custom-version-limits!)
+  ;; do not use custom version limits by default
+  (eval `(define use-custom-version-limits? #f))
+  (eval `(define custom-version-limits #f))
+  #f)
+
+(define-macro (use-custom-version-limits!)
+  (eval `(set! use-custom-version-limits? #t)))
+
+(define-macro (set-custom-version-limits! . limits)
+  (eval `(set! custom-version-limits (quote (,@limits)))))
+
+(init-use-custom-version-limits!)

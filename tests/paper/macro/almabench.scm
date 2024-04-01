@@ -6,6 +6,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;HELPER;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(set-custom-version-limits! 2 1 5 4 4 3)
+
 (define (make-matrix rows cols)
    (set-bbv-version-limit! #f)
    (let ((mx (make-vector rows (make-vector 0 0.0))))

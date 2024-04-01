@@ -581,6 +581,9 @@
 ;;;  _/ \_/ \/ \_/ \
 ;;; /        
 
+(set-custom-version-limits! 2 1 5 4 4 3 2 9 2 10 7 1 1 2 4 4 9 10 1 9 4 9 7 4 8
+  10 5 1 3 7 6 5 3 4 6 2 2 7 2 6 6)
+
 (define output #f) ; the list of all characters written out, in reverse order.
 
 (define (write-ch c) (set-bbv-version-limit! #f) 

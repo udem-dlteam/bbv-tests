@@ -18,6 +18,7 @@ SCHEME_COMPILE_TIME_MARKER="***scheme-compile-time:"
 C_COMPILE_TIME_MARKER="***c-compile-time:"
 
 # Default parameters
+INPUT_FILE=             # file to compile
 OPTIM_LEVEL=0           # optimization level
 SAFE_ARITHMETIC=1       # safe/unsafe arithmetic
 PRIMITIVE_COUNT=0       # enables primitive (0 to disable)
@@ -27,11 +28,13 @@ VIEW_CFG=0              # open cfg in pdf viewer
 USE_IGSC=0              # use gambit igsc instead of gsc
 COMPILER_DIR=           # compiler directory
 VERSION_LIMIT=          # version limit
+GLOBAL_VERSION_LIMIT=   # global version limit used when custom limits provided
+                        # the global version limit is used for lib.scm
 SYSTEM=                 # system (gambit or bigloo)
 CUSTOM_OUTPUT_FILE=     # user's output file
 
 # Parse parameters
-while getopts "f:S:D:o:V:O:UPGWIEchv" opt; do
+while getopts "f:S:D:o:V:G:O:UPGWIEchv" opt; do
   case $opt in
     f)
       INPUT_FILE=$(readlink -f $OPTARG)
@@ -54,11 +57,24 @@ while getopts "f:S:D:o:V:O:UPGWIEchv" opt; do
       CUSTOM_OUTPUT_FILE=$OPTARG
       ;;
     V)
-      if ! [ "$OPTARG" -eq "$OPTARG" ] 2> /dev/null; then
-          echo "Version limit must be an integer not '$OPTARG'"
-          exit 1
-      fi
       VERSION_LIMIT=$OPTARG
+      if [ "$VERSION_LIMIT" = "custom" ]; then
+        :
+      elif [ "$VERSION_LIMIT" -eq "$VERSION_LIMIT" ] 2> /dev/null; then
+        :
+      else
+        echo "Version limit must be an integer or 'custom' not '$VERSION_LIMIT'"
+        exit 1
+      fi
+      ;;
+    G)
+      GLOBAL_VERSION_LIMIT=$OPTARG
+      if [ "$GLOBAL_VERSION_LIMIT" -eq "$GLOBAL_VERSION_LIMIT" ] 2> /dev/null; then
+        :
+      else
+        echo "Global limit must be an integer not '$GLOBAL_VERSION_LIMIT'"
+        exit 1
+      fi
       ;;
     O)
       case $OPTARG in
@@ -227,7 +243,18 @@ case "$SYSTEM" in
       INLINING_LIMIT=370
     fi
 
-    VERSION_LIMIT_DECL="(version-limit $VERSION_LIMIT)"
+    if [ "$VERSION_LIMIT" = "custom" ]; then
+      if [ "$GLOBAL_VERSION_LIMIT" != "" ]; then
+        VERSION_LIMIT_DECL="(version-limit $GLOBAL_VERSION_LIMIT)"
+      else
+        VERSION_LIMIT_DECL=""
+      fi
+      VERSION_LIMIT_POSTFIX="(use-custom-version-limits!)"
+    else
+      VERSION_LIMIT_DECL="(version-limit $VERSION_LIMIT)"
+      VERSION_LIMIT_POSTFIX=""
+    fi
+
     PRELUDE="(declare
                $OPTIM_DECLARATIONS
                $VERSION_LIMIT_DECL
@@ -236,7 +263,8 @@ case "$SYSTEM" in
                (eval '(define arithmetic '$ARITHMETIC))
                #f)
              (%%%)
-             (##include \"$SCRIPT_DIR/gambit/bbv.scm\")"
+             (##include \"$SCRIPT_DIR/gambit/bbv.scm\")
+             $VERSION_LIMIT_POSTFIX"
 
     FLAGS="-keep-temp -gvm"
 
@@ -299,7 +327,11 @@ case "$SYSTEM" in
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -srfi bbvcountprimitive"
       BIGLOO_C_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_C_OPTIONS"
       BIGLOO_LD_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_LD_OPTIONS"
+    fi
 
+    if [ "$VERSION_LIMIT" = "custom" ]; then
+      echo "Bigloo does not support custom version limits"
+      exit 1
     fi
 
     if [ "$VERSION_LIMIT" = "0" ]; then
