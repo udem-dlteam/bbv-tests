@@ -13,6 +13,11 @@ timeout=3600
 verbosity="-v"
 
 for file in ${scm_files[@]}; do
+  # Gambit
+  python ./benchmark.py $verbosity benchmark ${file} -O --gambit ${gambit} -l 0 -r ${reps} -t ${timeout}
+done
+
+for file in ${scm_files[@]}; do
   python ./benchmark.py $verbosity profile_guided ${file} --gambit ${gambit} -r ${reps} -t ${timeout}
 done
 
