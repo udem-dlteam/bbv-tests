@@ -608,7 +608,7 @@ benchmark_args = {
     "sum": "repeat: 10000 n: 10000",
     "sumfp": "repeat: 200 n: 1e6",
     "triangl": "repeat: 20 i: 22 depth: 1",
-    "almabench": "repeat: 1 K: 36525",
+    "almabench": "repeat: 2 K: 36525",
     "fft": "repeat: 1 n: 1048576",
     "primes": "repeat: 1000000",
     "rev": "repeat: 100000000",
