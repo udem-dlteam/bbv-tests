@@ -964,9 +964,7 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
         with open(new_file, 'w') as f:
             f.write(new_content)
 
-        base_argument = get_benchmark_cli_arguments(benchmark.name)
-        heap_args, env = get_heap_size_arguments(compiler.name)
-        base_arguments = f'{heap_args} {base_argument}'
+        base_arguments = get_benchmark_cli_arguments(benchmark.name)
 
         run, created = Run.get_or_create(benchmark=benchmark,
                                          system=system,
@@ -976,6 +974,11 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
                                          arguments=base_arguments,
                                          safe_arithmetic=True,
                                          compiler_optimizations=True)
+
+        heap_args, env = get_heap_size_arguments(compiler.name)
+        base_arguments = f'{heap_args} {base_arguments}'
+
+        
 
         if not created:
             logger.info(f'run already existed')
@@ -1031,22 +1034,20 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
         toolbox.register("evaluate", eval_runtime)
         toolbox.register("mate",   tools.cxTwoPoint)  # Crossover
         toolbox.register("mutate", tools.mutUniformInt, low=MIN_VLIMIT, up=MAX_VLIMIT, indpb=0.2)  # Mutation
-        toolbox.register("select", tools.selTournament, tournsize=3)  # Selection
+        toolbox.register("select", tools.selTournament, tournsize=7)  # Selection
 
         # Genetic Algorithm Parameters
-        population_size = 10
+        random_population_size = 10
         crossover_probability = 0.7
         mutation_probability = 0.2
-        number_of_generations = 40
+        number_of_generations = 100
 
         # Creating the initial population
-        population = toolbox.population(n=population_size)
-
-        uniformly_5_version_limit = toolbox.individual()
-        uniformly_5_version_limit[:] = [5] * dimension  # Replace with your specific individual's attributes
-
-        # Add the specific individual to the population
-        population.append(uniformly_5_version_limit)
+        population = toolbox.population(n=random_population_size)
+        for v in range(MIN_VLIMIT, MAX_VLIMIT + 1):
+            uniform_version_limit = toolbox.individual()
+            uniform_version_limit[:] = [v] * dimension
+            population.append(uniform_version_limit)
 
         # Run the Genetic Algorithm
         result, logbook = algorithms.eaSimple(population, toolbox, cxpb=crossover_probability, mutpb=mutation_probability, ngen=number_of_generations, verbose=True)
@@ -1070,10 +1071,14 @@ def profile_optimize_report(compiler):
     def wrap_text(text, width=80):
         return textwrap.fill(text, width)
 
-    profiling_runs = list(select(r for r in Run if r.version_limit == -1 and r.compiler.name == compiler))
+    profiling_runs = list(select(r for r in Run if r.version_limit == -1 \
+                                                   and r.compiler.name == compiler \
+                                                   and r.compiler_optimizations \
+                                                   and r.safe_arithmetic))
     
-    benchmarks = ['almabench', 'boyer', 'compiler', 'conform', 'dynamic', 'earley', 'leval', 'maze',
-                  'nucleic', 'peval', 'scheme', 'slatex']
+    benchmarks = MACRO_BENCHMARKS
+
+    ratios = []
 
     for benchmark in benchmarks:
 
@@ -1084,14 +1089,18 @@ def profile_optimize_report(compiler):
         print(f"runs: {len(benchmark_runs)}")
 
         if benchmark_runs:
+            base_time = average_base_time(benchmark_runs[0])
+            ratio = times[0][0] / base_time
+            ratios.append(ratio)
             print(f"BEST TIME: {times[0][0]}s")
+            print(f"RATIO: {ratio}")
             print(f"global version limit: {times[0][1].version_limits.split(',')[-1]}")
             print(wrap_text(f"(set-custom-version-limits! {' '.join(times[0][1].version_limits.split(',')[:-1])})"))
             print()
         else:
             print("NO RUNS\n")
-    
 
+    print(f"GEOMEAN: {statistics.geometric_mean(ratios)}")
 
 
 ##############################################################################
@@ -1123,9 +1132,10 @@ def choose_csv_output_path(output, system_name):
         raise ValueError(f"output must be a folder of .csv target, got {output}")
 
 
-def is_macro(name):
-    return name in ('almabench', 'boyer', 'compiler', 'conform', 'dynamic',
+MACRO_BENCHMARKS = ('almabench', 'boyer', 'compiler', 'conform', 'dynamic',
                     'earley', 'leval', 'maze', 'nucleic', 'peval', 'scheme', 'slatex')
+def is_macro(name):
+    return name in MACRO_BENCHMARKS
 
 def run_is_macro(run):
     return is_macro(run.benchmark.name)
@@ -1139,6 +1149,16 @@ def nan_on(*exceptions):
                 return math.nan
         return inner_wrapper
     return wrapper
+
+def average_base_time(run):
+    base_runs = select(r for r in Run if r.benchmark == run.benchmark \
+                                       and r.compiler == run.compiler \
+                                       and r.system == run.system \
+                                       and r.compiler_optimizations == run.compiler_optimizations
+                                       and r.safe_arithmetic == run.safe_arithmetic \
+                                       and r.version_limit == 0)
+    base_run = max(base_runs, key=lambda r: r.timestamp)
+    return average_time(base_run)
 
 def average_time(run):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
