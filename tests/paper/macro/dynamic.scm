@@ -23,7 +23,6 @@
 ;; env->list: Env -> Binding*
 ;; env-show: Env -> Symbol*
 
-
 ;; bindings
 
 (define gen-binding cons)

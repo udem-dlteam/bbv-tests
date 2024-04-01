@@ -22,6 +22,7 @@ import statistics
 import string
 import subprocess
 import sys
+import textwrap
 import time
 
 try:
@@ -1066,8 +1067,30 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
 
 @db_session
 def profile_optimize_report(compiler):
+    def wrap_text(text, width=80):
+        return textwrap.fill(text, width)
+
     profiling_runs = list(select(r for r in Run if r.version_limit == -1 and r.compiler.name == compiler))
-    print(len(profiling_runs))
+    
+    benchmarks = ['almabench', 'boyer', 'compiler', 'conform', 'dynamic', 'earley', 'leval', 'maze',
+                  'nucleic', 'peval', 'scheme', 'slatex']
+
+    for benchmark in benchmarks:
+
+        benchmark_runs = [r for r in profiling_runs if r.benchmark.name == benchmark]
+
+        times = [(average_time(r), r) for r in benchmark_runs]
+        print(benchmark)
+        print(f"runs: {len(benchmark_runs)}")
+
+        if benchmark_runs:
+            print(f"BEST TIME: {times[0][0]}s")
+            print(f"global version limit: {times[0][1].version_limits.split(',')[-1]}")
+            print(wrap_text(f"(set-custom-version-limits! {' '.join(times[0][1].version_limits.split(',')[:-1])})"))
+            print()
+        else:
+            print("NO RUNS\n")
+    
 
 
 

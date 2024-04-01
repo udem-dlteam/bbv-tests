@@ -1076,6 +1076,7 @@
   `(define ,(replace signature) ,@body))
 
 (define-macro (set-bbv-version-limit! . rest) `(begin))
+(define-macro (set-custom-version-limits! . rest) `(begin))
 
 (register-exit-function! (lambda (status) (bbv-saw-statistics) status))
 

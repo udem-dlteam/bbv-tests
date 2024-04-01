@@ -35,6 +35,7 @@
 
 ;;; BOYER -- Logic programming benchmark, originally written by Bob Boyer.
 ;;; Fairly CONS intensive.
+(set-custom-version-limits! 2 1 5 4 4 3 2 9 2 10 7 1 1 2 4 4 9 10 1 9 4 9 7 4 8)
 
 (define (list-deep-copy l) (set-bbv-version-limit! #f) 
    (if (pair? l)

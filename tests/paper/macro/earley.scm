@@ -123,6 +123,9 @@
 ;   Enders of V     = (5 19 20)
 ;   Predictors of V = (15 17)
 
+(set-custom-version-limits! 2 1 5 4 4 3 2 9 2 10 7 1 1 2 4 4 9 10 1 9 4 9 7 4 8
+  10 5 1 3 7 6 5 3 4 6 2 2 7 2 6 6 10 5 1 8 9)
+
 (define (make-parser grammar lexer) (set-bbv-version-limit! #f) 
 
   (define (non-terminals grammar) (set-bbv-version-limit! #f)  ; return vector of non-terminals in grammar

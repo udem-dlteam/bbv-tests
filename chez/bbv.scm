@@ -1396,3 +1396,4 @@
         ,@body)))))
 
 (define-macro (set-bbv-version-limit! . rest) `(begin))
+(define-macro (set-custom-version-limits! . rest) `(begin))
