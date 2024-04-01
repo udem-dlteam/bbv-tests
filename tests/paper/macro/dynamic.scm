@@ -2304,7 +2304,7 @@
 (define no-ops 0)
 
 (define-macro (init-content)
-  (define (show x) (set-bbv-version-limit! #f) 
+  (define (show x)
     (if #f (pp x))
     x)
   (define path
