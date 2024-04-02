@@ -48,6 +48,8 @@ import seaborn as sns
 
 import deap
 
+import sexpdata
+
 ##############################################################################
 ## Database
 ##############################################################################
@@ -1071,6 +1073,51 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
     
     optim()
 
+class Sexp:
+    def __init__(self, elements, parent=None):
+        self.elements = [Sexp(e, self) if isinstance(e, list) else e for e in elements]
+        self.parent = parent
+
+    def append(self, x):
+        self.elements.append(x)
+
+    def __getitem__(self, i):
+        return self.elements[i]
+
+    def __setitem__(self, i, v):
+        self.elements[i] = v
+
+    def __repr__(self):
+        return f"Sexp({' '.join(map(repr, self.elements))})"
+
+    def __eq__(self, other):
+        if isinstance(other, Sexp):
+            return self.elements == other.elements
+        return False
+
+    def __iter__(self):
+        yield from self.elements
+
+    def __len__(self):
+        return len(self.elements)
+
+    def sizeof(self):
+        size = 0
+        for el in self:
+            if isinstance(el, Sexp):
+                size += el.sizeof()
+            else:
+                size += 1
+        return size
+
+    def findall(self, target):
+        results = []
+        for i, el in enumerate(self):
+            if el == target:
+                results.append((self, i))
+            elif isinstance(el, Sexp):
+                results.extend(el.findall(target))
+        return results
 
 @db_session
 def profile_optimize_report(compiler):
@@ -1090,7 +1137,10 @@ def profile_optimize_report(compiler):
 
         benchmark_runs = [r for r in profiling_runs if r.benchmark.name == benchmark]
 
-        times = [(average_time(r), r) for r in benchmark_runs]
+        times = sorted([(average_time(r), r) for r in benchmark_runs])
+
+        #if len(benchmark_runs) < 200: continue
+
         print(benchmark)
         print(f"runs: {len(benchmark_runs)}")
 
@@ -1102,7 +1152,31 @@ def profile_optimize_report(compiler):
             print(f"RATIO: {ratio}")
             print(f"global version limit: {times[0][1].version_limits.split(',')[-1]}")
             print(wrap_text(f"(set-custom-version-limits! {' '.join(times[0][1].version_limits.split(',')[:-1])})"))
+
+            try:
+                points = []
+
+                limits = db_decode_int_array(benchmark_runs[0].version_limits)
+
+                benchmark_code = benchmark_runs[0].benchmark.content
+                sexp = Sexp(sexpdata.loads("(" + benchmark_code + ")"))
+                limit_sexp = Sexp(sexpdata.loads("(set-bbv-version-limit! #f)"))
+
+                for limit, (proc, _) in zip(limits, sexp.findall(limit_sexp)):
+                    points.append((limit, proc.sizeof()))
+
+                x, y = zip(*points)
+                x_array = np.array(x)
+                y_array = np.log(np.array(y))
+                corr_matrix = np.corrcoef(x_array, y_array)
+                corr_coefficient = corr_matrix[0, 1]
+
+                print(f"COEFF: {corr_coefficient}")
+            except sexpdata.ExpectClosingBracket:
+                pass
+
             print()
+
         else:
             print("NO RUNS\n")
 
