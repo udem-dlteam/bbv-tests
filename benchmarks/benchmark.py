@@ -1062,8 +1062,8 @@ def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeo
 
         # Extracting the best solution
         best_individual = tools.selBest(result, k=1)[0]
-        looger.info("Best Individual =", best_individual)
-        looger.info("Best Fitness =", best_individual.fitness.values[0])
+        logger.info("Best Individual =", best_individual)
+        logger.info("Best Fitness =", best_individual.fitness.values[0])
 
     with open(file, 'r') as f:
         name = os.path.splitext(os.path.basename(file))[0]
