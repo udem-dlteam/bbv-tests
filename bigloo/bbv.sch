@@ -40,6 +40,26 @@
       ((vector-set!) `(vector-set-ur! ,@args))
       ((vector-ref) `(vector-ref-ur ,@args))
       ((atan2) `(atan-2fl ,@args))
+      ((car cdr set-car! set-cdr!
+	  fixnum? flonum? remainder
+	  sqrt cos sin
+	  vector-map vector->list string->list
+	  vector-length string-ref string-set!
+	  string-length substring)
+       `(,(symbol-append '$ op) ,@args))
+      ((string->symbol symbol->string string->number fixnum->string
+	  fixnum->flonum truncate
+	  char<? char<=? char>=? char>? char=? char->integer)
+       `(,(symbol-append 'c- op) ,@args))
+      ((modulo quotient)
+       `(,(symbol-append op 'fx) ,@args))
+      ((make-vector) `($make-vector ,@args ,@(if (pair? (cdr args)) '() '(#f))))
+      ((make-string) `($make-string ,@args ,@(if (pair? (cdr args)) '() '(#\space))))
+      ((bit-lsh) `($bitlsh ,@args))
+      ((bit-rsh) `($bitrsh ,@args))
+      ((bit-and) `($bitand ,@args))
+      ((bit-or) `($bitor ,@args))
+      ((bit-not) `($bitnot ,@args))
       (else `(,op ,@args))))
 
 (define (unknown x . rest)
