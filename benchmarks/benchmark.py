@@ -461,7 +461,13 @@ COMPILE_SCRIPT = "../compile"
 
 
 def extract_executable_from_compiler_output(content):
-    return re.search(r"\*\*\*executable: (.+)", content).group(1)
+    match = re.search(r"\*\*\*executable: (.+)", content)
+    if match:
+        return match.group(1)
+    
+    logger.error('Output contains no executable name')
+    logger.error(f'CONTENT:\n{content}')
+    raise ValueError
 
 
 SCHEME_COMPILE_TIME = "scheme-compile-time"
