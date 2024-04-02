@@ -10,13 +10,13 @@
 
 ;;; Rehacked by Olin 4/1995.
 
-(define (random-state n)
+(define (random-state n) (set-bbv-version-limit! #f) 
   (cons n #f))
 
-(define (fx32 a)
+(define (fx32 a) (set-bbv-version-limit! #f) 
    (SFXbit-and (SFX- (SFXbit-lsh 1 31) 1) a))
 
-(define (rand state)
+(define (rand state) (set-bbv-version-limit! #f) 
   (let ((seed (Scar state))
         (A 2813) ; 48271
         (M 8388607) ; 2147483647
@@ -29,7 +29,7 @@
       (Sset-car! state val)
       val)))
 
-(define (random-int n state)
+(define (random-int n state) (set-bbv-version-limit! #f) 
    (fx32 (SFXmodulo (rand state) n)))
 
 ; poker test
@@ -47,7 +47,7 @@
 ; Pair           (aabcd)      0.504       0.501
 ; Bust           (abcde)      0.3024      0.3058
 
-; (define (random n)
+; (define (random n) (set-bbv-version-limit! #f) 
 ;   (let* ((M 2147483647)
 ;        (slop (SFXmodulo M n)))
 ;     (let loop ((r (rand)))
@@ -55,7 +55,7 @@
 ;         (SFXmodulo r n)  
 ;         (loop (rand))))))
 ; 
-; (define (rngtest)
+; (define (rngtest) (set-bbv-version-limit! #f) 
 ;   (display "implementation ")
 ;   (srand 1)
 ;   (let loop ((n 0))
@@ -109,12 +109,12 @@
 ;;; we walk the cdr-chain, we'll go directly to the representative in one hop.
 
 
-(define (base-set nelts) (cons nelts '()))
+(define (base-set nelts) (set-bbv-version-limit! #f)  (cons nelts '()))
 
 ;;; Sets are chained together through cdr links. Last guy in the chain
 ;;; is the root of the set.
 
-(define (get-set-root s)
+(define (get-set-root s) (set-bbv-version-limit! #f) 
   (let lp ((r s))                       ; Find the last pair
     (let ((next (Scdr r)))               ; in the list. That's
       (cond ((pair? next) (lp next))    ; the root r.
@@ -128,11 +128,11 @@
                             (lp next))))))
              r)))))                     ; Then return r.
 
-(define (set-equal? s1 s2) (eq? (get-set-root s1) (get-set-root s2)))
+(define (set-equal? s1 s2) (set-bbv-version-limit! #f)  (eq? (get-set-root s1) (get-set-root s2)))
 
-(define (set-size s) (Scar (get-set-root s)))
+(define (set-size s) (set-bbv-version-limit! #f)  (Scar (get-set-root s)))
 
-(define (union! s1 s2)
+(define (union! s1 s2) (set-bbv-version-limit! #f) 
   (let* ((r1 (get-set-root s1))
          (r2 (get-set-root s2))
          (n1 (set-size r1))
@@ -196,13 +196,13 @@
 
 ;;; Iterates in reverse order.
 
-(define (vector-for-each proc v)
+(define (vector-for-each proc v) (set-bbv-version-limit! #f) 
   (let lp ((i (SFX- (Svector-length v) 1)))
     (cond ((SFX>= i 0)
            (proc (Svector-ref v i))
            (lp (SFX- i 1))))))
 
-(define (vector-for-each-exit-if proc v)
+(define (vector-for-each-exit-if proc v) (set-bbv-version-limit! #f) 
   (let lp ((i (SFX- (Svector-length v) 1)))
     (cond ((SFX>= i 0)
            (or (proc (Svector-ref v i))
@@ -211,7 +211,7 @@
 
 ;;; Randomly permute a vector.
 
-(define (permute-vec! v random-state)
+(define (permute-vec! v random-state) (set-bbv-version-limit! #f) 
   (let lp ((i (SFX- (Svector-length v) 1)))
     (cond ((SFX> i 1)
            (let ((elt-i (Svector-ref v i))
@@ -224,9 +224,9 @@
 
 ;;; This is the core of the algorithm.
 
-(define (dig-maze walls ncells)
+(define (dig-maze walls ncells) (set-bbv-version-limit! #f) 
   (vector-for-each-exit-if
-   (lambda (wall)                        ; For each wall,
+   (lambda (wall) (set-bbv-version-limit! #f)                         ; For each wall,
      (let* ((c1   (wall:owner wall))     ; find the cells on
             (set1 (cell:reachable c1))
 
@@ -254,17 +254,17 @@
 ;;; We assume there are no loops in the maze; if this is incorrect, the
 ;;; algorithm will diverge.
 
-(define (dfs-maze maze root do-children)
+(define (dfs-maze maze root do-children) (set-bbv-version-limit! #f) 
   (let search ((node root) (parent #f))
     (set-cell:parent node parent)
-    (do-children (lambda (child)
+    (do-children (lambda (child) (set-bbv-version-limit! #f) 
                    (if (not (eq? child parent))
                        (search child node)))
                  maze node)))
 
 ;;; Move the root to NEW-ROOT.
 
-(define (reroot-maze new-root)
+(define (reroot-maze new-root) (set-bbv-version-limit! #f) 
   (let lp ((node new-root) (new-parent #f))
     (let ((old-parent (cell:parent node)))
       (set-cell:parent node new-parent)
@@ -272,14 +272,14 @@
 
 ;;; How far from CELL to the root?
 
-(define (path-length cell)
+(define (path-length cell) (set-bbv-version-limit! #f) 
   (do ((len 0 (SFX+ len 1))
        (node (cell:parent cell) (cell:parent node)))
       ((not node) len)))
 
 ;;; Mark the nodes from NODE back to root. Used to mark the winning path.
 
-(define (mark-path node)
+(define (mark-path node) (set-bbv-version-limit! #f) 
   (let lp ((node node))
     (set-cell:mark node #t)
     (cond ((cell:parent node) => lp))))
@@ -341,27 +341,27 @@
   `(let ((r ,r) (c ,c))
     (make-harr r c (Smake-vector1 (SFX* r c)))))
 
-(define (href ha x y)
+(define (href ha x y) (set-bbv-version-limit! #f) 
   (let ((r (SFXquotient y 2))
         (c (SFXquotient x 3)))
     (Svector-ref (harr:elts ha)
                 (SFX+ (SFX* (harr:ncols ha) r) c))))
 
-(define (hset! ha x y val)
+(define (hset! ha x y val) (set-bbv-version-limit! #f) 
   (let ((r (SFXquotient y 2))
         (c (SFXquotient x 3)))
     (Svector-set! (harr:elts ha)
                  (SFX+ (SFX* (harr:ncols ha) r) c)
                  val)))
 
-(define (href/rc ha r c)
+(define (href/rc ha r c) (set-bbv-version-limit! #f) 
     (Svector-ref (harr:elts ha)
                 (SFX+ (SFX* (harr:ncols ha) r) c)))
 
 ;;; Create a nrows x ncols hex array. The elt centered on coord (x, y)
 ;;; is the value returned by (PROC x y).
 
-(define (harr-tabulate nrows ncols proc)
+(define (harr-tabulate nrows ncols proc) (set-bbv-version-limit! #f) 
   (let ((v (Smake-vector1 (SFX* nrows ncols))))
 
     (do ((r (SFX- nrows 1) (SFX- r 1)))
@@ -374,7 +374,7 @@
     (make-harr nrows ncols v)))
 
 
-(define (harr-for-each proc harr)
+(define (harr-for-each proc harr) (set-bbv-version-limit! #f) 
   (vector-for-each proc (harr:elts harr)))
 
 ;------------------------------------------------------------------------------
@@ -417,18 +417,18 @@
 (define south      2)
 (define south-east 4)
 
-(define (gen-maze-array r c)
-  (harr-tabulate r c (lambda (x y) (make-cell (base-set 1) (cons x y)))))
+(define (gen-maze-array r c) (set-bbv-version-limit! #f) 
+  (harr-tabulate r c (lambda (x y) (set-bbv-version-limit! #f)  (make-cell (base-set 1) (cons x y)))))
 
 ;;; This could be made more efficient.
-(define (make-wall-vec harr)
+(define (make-wall-vec harr) (set-bbv-version-limit! #f) 
   (let* ((nrows (harr:nrows harr))
          (ncols (harr:ncols harr))
          (xmax (SFX* 3 (SFX- ncols 1)))
 
          ;; Accumulate walls.
          (walls '())
-         (add-wall (lambda (o n b) ; owner neighbor bit
+         (add-wall (lambda (o n b) (set-bbv-version-limit! #f)  ; owner neighbor bit
                      (set! walls (cons (make-wall o n b) walls)))))
         
     ;; Do everything but the bottom row.
@@ -461,14 +461,14 @@
             (add-wall (href harr x 1) (href harr (SFX- x 3) 0) south-west)
             (add-wall (href harr x 1) (href harr (SFX+ x 3) 0) south-east))))
 
-    (list->vector walls)))
+    (Slist->vector walls)))
 
 
 ;;; Find the cell ctop from the top row, and the cell cbot from the bottom
 ;;; row such that cbot is furthest from ctop. 
 ;;; Return [ctop-x, ctop-y, cbot-x, cbot-y].
 
-(define (pick-entrances harr)
+(define (pick-entrances harr) (set-bbv-version-limit! #f) 
   (dfs-maze harr (href/rc harr 0 0) for-each-hex-child)
   (let ((nrows (harr:nrows harr))
         (ncols (harr:ncols harr)))
@@ -498,7 +498,7 @@
 
 
 ;;; Apply PROC to each node reachable from CELL.
-(define (for-each-hex-child proc harr cell)
+(define (for-each-hex-child proc harr cell) (set-bbv-version-limit! #f) 
   (let* ((walls (cell:walls cell))
          (id (cell:id cell))
          (x (Scar id))
@@ -533,7 +533,7 @@
 
 
 ;;; The top-level
-(define (make-maze nrows ncols)
+(define (make-maze nrows ncols) (set-bbv-version-limit! #f) 
   (let* ((cells (gen-maze-array nrows ncols))
          (walls (permute-vec! (make-wall-vec cells) (random-state 20))))
     (dig-maze walls (SFX* nrows ncols))
@@ -548,7 +548,7 @@
           (vector cells entrance exit))))))
 
 
-(define (pmaze nrows ncols)
+(define (pmaze nrows ncols) (set-bbv-version-limit! #f) 
   (let ((result (make-maze nrows ncols)))
     (let ((cells (Svector-ref result 0))
           (entrance (Svector-ref result 1))
@@ -581,12 +581,15 @@
 ;;;  _/ \_/ \/ \_/ \
 ;;; /        
 
+(set-custom-version-limits! 2 1 5 4 4 3 2 9 2 10 7 1 1 2 4 4 9 10 1 9 4 9 7 4 8
+  10 5 1 3 7 6 5 3 4 6 2 2 7 2 6 6)
+
 (define output #f) ; the list of all characters written out, in reverse order.
 
-(define (write-ch c)
+(define (write-ch c) (set-bbv-version-limit! #f) 
   (set! output (cons c output)))
 
-(define (print-hexmaze harr entrance)
+(define (print-hexmaze harr entrance) (set-bbv-version-limit! #f) 
   (let* ((nrows  (harr:nrows harr))
          (ncols  (harr:ncols harr))
          (ncols2 (SFX* 2 (SFXquotient ncols 2))))
@@ -649,16 +652,16 @@
 ;     (newline)
       (write-ch #\newline))))
 
-(define (bit-test j bit)
+(define (bit-test j bit) (set-bbv-version-limit! #f) 
   (not (SFXzero? (SFXbit-and j bit))))
 
 ;;; Return a . if harr[r,c] is marked, otherwise a space.
 ;;; We use the dot to mark the solution path.
-(define (dot/space harr r c)
+(define (dot/space harr r c) (set-bbv-version-limit! #f) 
   (if (and (SFX>= r 0) (cell:mark (href/rc harr r c))) #\. #\space))
 
 ;;; Print a \_/ hex bottom.
-(define (display-hexbottom hexwalls)
+(define (display-hexbottom hexwalls) (set-bbv-version-limit! #f) 
   (write-ch (if (bit-test hexwalls south-west) #\\ #\space))
   (write-ch (if (bit-test hexwalls south     ) #\_ #\space))
   (write-ch (if (bit-test hexwalls south-east) #\/ #\space)))
@@ -676,7 +679,7 @@
 
 ;------------------------------------------------------------------------------
 
-(define (run1 nrows ncols)
+(define (run1 nrows ncols) (set-bbv-version-limit! #f) 
   (set! output '())
   (pmaze nrows ncols)
   (Sreverse output))
@@ -725,11 +728,11 @@
 \\_/ \\_/ \\_/ \\ /
 ")
 
-(define (run #!key (n (unknown 50000 1)) (nrows (unknown 20)) (ncols (unknown 7)))
+(define-keys (run !key (n (unknown 50000 1)) (nrows (unknown 20)) (ncols (unknown 7)))
   (let loop ((n n) (result #f))
     (if (SFX> n 0)
         (loop (SFX- n 1) (run1 nrows ncols))
         result)))
 
-(define (check result)
+(define (check result) (set-bbv-version-limit! #f) 
   (string=? (list->string result) output-expected))

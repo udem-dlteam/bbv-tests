@@ -1,8 +1,15 @@
+(set-custom-version-limits! 2 1 5 4 4 3 2 9 2 10 7 1 1 2 4 4 9 10 1 9 4 9 7 4 8
+  10 5 1 3 7 6 5 3 4 6 2 2 7 2 6 6 10 5 1 8 9 2 7 2 9 5 10 6 10 4 2 1 4 5 2 4 2 7
+  5 8 6 3 6 6 4 5 2 10 3 9 4 3 8 7 5 9 4 6 1 4 1 6 7 5 2 4 10 6 4 8 7 8 3 5 3 4 9
+  9 5 10 7 10 7 6 4 3 9 8 2 1 2 3 3 7 10 2 7 7 10 8 9 5 9 1 2 9 5 6 2 5 7 3 8 1 5
+  9 3 9 2 5 9 10 4 3 6 3 9 9 1 10 6 8 1 2 6 5 4 1 4 10 2 2 8 2 9 3 3 8 9 3 5 9 10
+  7 4 9 4 5 7 6 8 9 8 2 4 4 2 6 1)
+
 ;;; SCHEME -- A Scheme interpreter evaluating a sort, written by Marc Feeley.
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (scheme-eval expr)
+(define (scheme-eval expr) (set-bbv-version-limit! #f) 
   (let ((code (scheme-comp expr scheme-global-environment)))
     (code #f)))
 
@@ -10,17 +17,17 @@
   (cons '()   ; environment chain
         '())) ; macros
 
-(define (scheme-add-macro name proc)
+(define (scheme-add-macro name proc) (set-bbv-version-limit! #f) 
   (Sset-cdr! scheme-global-environment
     (cons (cons name proc) (Scdr scheme-global-environment)))
   name)
 
-(define (scheme-error msg . args)
+(define (scheme-error msg . args) (set-bbv-version-limit! #f) 
   (fatal-error msg args))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (lst->vector l)
+(define (lst->vector l) (set-bbv-version-limit! #f) 
   (let* ((n (Slength l))
          (v (make-vector n)))
     (let loop ((l l) (i 0))
@@ -30,7 +37,7 @@
           (loop (Scdr l) (SFX+ i 1)))
         v))))
 
-(define (vector->lst v)
+(define (vector->lst v) (set-bbv-version-limit! #f) 
   (let loop ((l '()) (i (SFX- (Svector-length v) 1)))
     (if (SFX< i 0)
       l
@@ -46,12 +53,12 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (push-frame frame env)
+(define (push-frame frame env) (set-bbv-version-limit! #f) 
   (if (null? frame)
     env
     (cons (cons (Scar env) frame) (Scdr env))))
 
-(define (lookup-var name env)
+(define (lookup-var name env) (set-bbv-version-limit! #f) 
   (let loop1 ((chain (Scar env)) (up 0))
     (if (null? chain)
       name
@@ -66,24 +73,24 @@
               (else
                (loop2 chain up (Scdr frame) (SFX+ over 1))))))))
 
-(define (macro? name env)
+(define (macro? name env) (set-bbv-version-limit! #f) 
   (Sassq name (Scdr env)))
 
-(define (push-macro name proc env)
+(define (push-macro name proc env) (set-bbv-version-limit! #f) 
   (cons (Scar env) (cons (cons name proc) (Scdr env))))
 
-(define (lookup-macro name env)
+(define (lookup-macro name env) (set-bbv-version-limit! #f) 
   (Scdr (Sassq name (Scdr env))))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (variable x)
+(define (variable x) (set-bbv-version-limit! #f) 
   (if (not (symbol? x))
     (scheme-error "Identifier expected" x))
   (if (Smemq x scheme-syntactic-keywords)
     (scheme-error "Variable name can not be a syntactic keyword" x)))
 
-(define (shape form n)
+(define (shape form n) (set-bbv-version-limit! #f) 
   (let loop ((form form) (n n) (l form))
     (cond ((SFX<= n 0))
           ((pair? l)
@@ -93,32 +100,32 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (macro-expand expr env)
+(define (macro-expand expr env) (set-bbv-version-limit! #f) 
   (apply (lookup-macro (Scar expr) env) (Scdr expr)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-var expr env)
+(define (comp-var expr env) (set-bbv-version-limit! #f) 
   (variable expr)
   (gen-var-ref (lookup-var expr env)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-self-eval expr env)
+(define (comp-self-eval expr env) (set-bbv-version-limit! #f) 
   (gen-cst expr))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-quote expr env)
+(define (comp-quote expr env) (set-bbv-version-limit! #f) 
   (shape expr 2)
   (gen-cst (Scadr expr)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-quasiquote expr env)
+(define (comp-quasiquote expr env) (set-bbv-version-limit! #f) 
   (comp-quasiquotation (Scadr expr) 1 env))
 
-(define (comp-quasiquotation form level env)
+(define (comp-quasiquotation form level env) (set-bbv-version-limit! #f) 
   (cond ((SFX= level 0)
          (scheme-comp form env))
         ((pair? form)
@@ -141,7 +148,7 @@
         (else
          (gen-cst form))))
 
-(define (comp-quasiquotation-list l level env)
+(define (comp-quasiquotation-list l level env) (set-bbv-version-limit! #f) 
   (if (pair? l)
     (let ((first (Scar l)))
       (if (SFX= level 1)
@@ -156,31 +163,31 @@
                        (comp-quasiquotation (Scdr l) level env))))
     (comp-quasiquotation l level env)))
 
-(define (unquote-splicing? x)
+(define (unquote-splicing? x) (set-bbv-version-limit! #f) 
   (if (pair? x)
     (if (eq? (Scar x) 'unquote-splicing) #t #f)
     #f))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-unquote expr env)
+(define (comp-unquote expr env) (set-bbv-version-limit! #f) 
   (scheme-error "Ill-placed 'unquote'" expr))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-unquote-splicing expr env)
+(define (comp-unquote-splicing expr env) (set-bbv-version-limit! #f) 
   (scheme-error "Ill-placed 'unquote-splicing'" expr))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-set! expr env)
+(define (comp-set! expr env) (set-bbv-version-limit! #f) 
   (shape expr 3)
   (variable (Scadr expr))
   (gen-var-set (lookup-var (Scadr expr) env) (scheme-comp (Scaddr expr) env)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-lambda expr env)
+(define (comp-lambda expr env) (set-bbv-version-limit! #f) 
   (shape expr 3)
   (let ((parms (Scadr expr)))
     (let ((frame (parms->frame parms)))
@@ -190,7 +197,7 @@
           (gen-lambda-rest nb-vars code)
           (gen-lambda nb-vars code))))))
 
-(define (parms->frame parms)
+(define (parms->frame parms) (set-bbv-version-limit! #f) 
   (cond ((null? parms)
          '())
         ((pair? parms)
@@ -201,7 +208,7 @@
          (variable parms)
          (list parms))))
 
-(define (rest-param? parms)
+(define (rest-param? parms) (set-bbv-version-limit! #f) 
   (cond ((pair? parms)
          (rest-param? (Scdr parms)))
         ((null? parms)
@@ -209,9 +216,9 @@
         (else
          #t)))
 
-(define (comp-body body env)
+(define (comp-body body env) (set-bbv-version-limit! #f) 
 
-  (define (letrec-defines vars vals body env)
+  (define (letrec-defines vars vals body env) (set-bbv-version-limit! #f) 
     (if (pair? body)
 
       (let ((expr (Scar body)))
@@ -250,14 +257,14 @@
 
       (scheme-error "Body must contain at least one evaluable expression")))
 
-  (define (letrec-defines* vars vals body env)
+  (define (letrec-defines* vars vals body env) (set-bbv-version-limit! #f) 
     (if (null? vars)
       (comp-sequence body env)
       (comp-letrec-aux vars vals body env)))
 
   (letrec-defines '() '() body env))
 
-(define (definition-name expr)
+(define (definition-name expr) (set-bbv-version-limit! #f) 
   (shape expr 3)
   (let ((pattern (Scadr expr)))
     (let ((name (if (pair? pattern) (Scar pattern) pattern)))
@@ -265,7 +272,7 @@
         (scheme-error "Identifier expected" name))
       name)))
 
-(define (definition-value expr)
+(define (definition-value expr) (set-bbv-version-limit! #f) 
   (let ((pattern (Scadr expr)))
     (if (pair? pattern)
       (cons 'lambda (cons (Scdr pattern) (Scddr expr)))
@@ -273,7 +280,7 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-if expr env)
+(define (comp-if expr env) (set-bbv-version-limit! #f) 
   (shape expr 3)
   (let ((code1 (scheme-comp (Scadr expr) env))
         (code2 (scheme-comp (Scaddr expr) env)))
@@ -283,10 +290,10 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-cond expr env)
+(define (comp-cond expr env) (set-bbv-version-limit! #f) 
   (comp-cond-aux (Scdr expr) env))
 
-(define (comp-cond-aux clauses env)
+(define (comp-cond-aux clauses env) (set-bbv-version-limit! #f) 
   (if (pair? clauses)
     (let ((clause (Scar clauses)))
       (shape clause 1)
@@ -309,34 +316,34 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-and expr env)
+(define (comp-and expr env) (set-bbv-version-limit! #f) 
   (let ((rest (Scdr expr)))
     (if (pair? rest) (comp-and-aux rest env) (gen-cst #t))))
 
-(define (comp-and-aux l env)
+(define (comp-and-aux l env) (set-bbv-version-limit! #f) 
   (let ((code (scheme-comp (Scar l) env))
         (rest (Scdr l)))
     (if (pair? rest) (gen-and code (comp-and-aux rest env)) code)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-or expr env)
+(define (comp-or expr env) (set-bbv-version-limit! #f) 
   (let ((rest (Scdr expr)))
     (if (pair? rest) (comp-or-aux rest env) (gen-cst #f))))
 
-(define (comp-or-aux l env)
+(define (comp-or-aux l env) (set-bbv-version-limit! #f) 
   (let ((code (scheme-comp (Scar l) env))
         (rest (Scdr l)))
     (if (pair? rest) (gen-or code (comp-or-aux rest env)) code)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-case expr env)
+(define (comp-case expr env) (set-bbv-version-limit! #f) 
   (shape expr 3)
   (gen-case (scheme-comp (Scadr expr) env)
             (comp-case-aux (Scddr expr) env)))
 
-(define (comp-case-aux clauses env)
+(define (comp-case-aux clauses env) (set-bbv-version-limit! #f) 
   (if (pair? clauses)
     (let ((clause (Scar clauses)))
       (shape clause 2)
@@ -349,7 +356,7 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-let expr env)
+(define (comp-let expr env) (set-bbv-version-limit! #f) 
   (shape expr 3)
   (let ((x (Scadr expr)))
     (cond ((symbol? x)
@@ -366,7 +373,7 @@
           (else
            (comp-body (Scddr expr) env)))))
 
-(define (bindings->vars bindings)
+(define (bindings->vars bindings) (set-bbv-version-limit! #f) 
   (if (pair? bindings)
     (let ((binding (Scar bindings)))
       (shape binding 2)
@@ -375,7 +382,7 @@
         (cons x (bindings->vars (Scdr bindings)))))
     '()))
 
-(define (bindings->vals bindings)
+(define (bindings->vals bindings) (set-bbv-version-limit! #f) 
   (if (pair? bindings)
     (let ((binding (Scar bindings)))
       (cons (Scadr binding) (bindings->vals (Scdr bindings))))
@@ -383,7 +390,7 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-let* expr env)
+(define (comp-let* expr env) (set-bbv-version-limit! #f) 
   (shape expr 3)
   (let ((bindings (Scadr expr)))
     (if (pair? bindings)
@@ -395,7 +402,7 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-letrec expr env)
+(define (comp-letrec expr env) (set-bbv-version-limit! #f) 
   (shape expr 3)
   (let ((bindings (Scadr expr)))
     (comp-letrec-aux (bindings->vars bindings)
@@ -403,37 +410,37 @@
                      (Scddr expr)
                      env)))
 
-(define (comp-letrec-aux vars vals body env)
+(define (comp-letrec-aux vars vals body env) (set-bbv-version-limit! #f) 
   (if (pair? vars)
     (let ((new-env (push-frame vars env)))
       (gen-letrec (comp-vals vals new-env)
                   (comp-body body new-env)))
     (comp-body body env)))
 
-(define (comp-vals l env)
+(define (comp-vals l env) (set-bbv-version-limit! #f) 
   (if (pair? l)
     (cons (scheme-comp (Scar l) env) (comp-vals (Scdr l) env))
     '()))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-begin expr env)
+(define (comp-begin expr env) (set-bbv-version-limit! #f) 
   (shape expr 2)
   (comp-sequence (Scdr expr) env))
 
-(define (comp-sequence exprs env)
+(define (comp-sequence exprs env) (set-bbv-version-limit! #f) 
   (if (pair? exprs)
     (comp-sequence-aux exprs env)
     (gen-cst '())))
 
-(define (comp-sequence-aux exprs env)
+(define (comp-sequence-aux exprs env) (set-bbv-version-limit! #f) 
   (let ((code (scheme-comp (Scar exprs) env))
         (rest (Scdr exprs)))
     (if (pair? rest) (gen-sequence code (comp-sequence-aux rest env)) code)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-do expr env)
+(define (comp-do expr env) (set-bbv-version-limit! #f) 
   (shape expr 3)
   (let ((bindings (Scadr expr))
         (exit (Scaddr expr)))
@@ -457,7 +464,7 @@
           (gen-var-ref '(0 . 1))
           (comp-vals (bindings->vals bindings) new-env1))))))
 
-(define (bindings->steps bindings)
+(define (bindings->steps bindings) (set-bbv-version-limit! #f) 
   (if (pair? bindings)
     (let ((binding (Scar bindings)))
       (cons (if (pair? (Scddr binding)) (Scaddr binding) (Scar binding))
@@ -466,7 +473,7 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-define expr env)
+(define (comp-define expr env) (set-bbv-version-limit! #f) 
   (shape expr 3)
   (let ((pattern (Scadr expr)))
     (let ((x (if (pair? pattern) (Scar pattern) pattern)))
@@ -481,142 +488,142 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-define-macro expr env)
+(define (comp-define-macro expr env) (set-bbv-version-limit! #f) 
   (let ((x (definition-name expr)))
     (gen-macro x (scheme-eval (definition-value expr)))))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (comp-combination expr env)
+(define (comp-combination expr env) (set-bbv-version-limit! #f) 
   (gen-combination (scheme-comp (Scar expr) env) (comp-vals (Scdr expr) env)))
 
 ;------------------------------------------------------------------------------
 
-(define (gen-var-ref var)
+(define (gen-var-ref var) (set-bbv-version-limit! #f) 
   (if (pair? var)
     (gen-rte-ref (Scar var) (Scdr var))
     (gen-glo-ref (scheme-global-var var))))
 
-(define (gen-rte-ref up over)
+(define (gen-rte-ref up over) (set-bbv-version-limit! #f) 
   (case up
     ((0)  (gen-slot-ref-0 over))
     ((1)  (gen-slot-ref-1 over))
     (else (gen-slot-ref-up-2 (gen-rte-ref (- up 2) over)))))
 
-(define (gen-slot-ref-0 i)
+(define (gen-slot-ref-0 i) (set-bbv-version-limit! #f) 
   (case i
-    ((0)  (lambda (rte) (Svector-ref rte 0)))
-    ((1)  (lambda (rte) (Svector-ref rte 1)))
-    ((2)  (lambda (rte) (Svector-ref rte 2)))
-    ((3)  (lambda (rte) (Svector-ref rte 3)))
-    (else (lambda (rte) (Svector-ref rte i)))))
+    ((0)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-ref rte 0)))
+    ((1)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-ref rte 1)))
+    ((2)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-ref rte 2)))
+    ((3)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-ref rte 3)))
+    (else (lambda (rte) (set-bbv-version-limit! #f)  (Svector-ref rte i)))))
 
-(define (gen-slot-ref-1 i)
+(define (gen-slot-ref-1 i) (set-bbv-version-limit! #f) 
   (case i
-    ((0)  (lambda (rte) (Svector-ref (Svector-ref rte 0) 0)))
-    ((1)  (lambda (rte) (Svector-ref (Svector-ref rte 0) 1)))
-    ((2)  (lambda (rte) (Svector-ref (Svector-ref rte 0) 2)))
-    ((3)  (lambda (rte) (Svector-ref (Svector-ref rte 0) 3)))
-    (else (lambda (rte) (Svector-ref (Svector-ref rte 0) i)))))
+    ((0)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-ref (Svector-ref rte 0) 0)))
+    ((1)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-ref (Svector-ref rte 0) 1)))
+    ((2)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-ref (Svector-ref rte 0) 2)))
+    ((3)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-ref (Svector-ref rte 0) 3)))
+    (else (lambda (rte) (set-bbv-version-limit! #f)  (Svector-ref (Svector-ref rte 0) i)))))
 
-(define (gen-slot-ref-up-2 code)
-  (lambda (rte) (code (Svector-ref (Svector-ref rte 0) 0))))
+(define (gen-slot-ref-up-2 code) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  (code (Svector-ref (Svector-ref rte 0) 0))))
 
-(define (gen-glo-ref i)
-  (lambda (rte) (scheme-global-var-ref i)))
+(define (gen-glo-ref i) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  (scheme-global-var-ref i)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-cst val)
+(define (gen-cst val) (set-bbv-version-limit! #f) 
   (case val
-    ((()) (lambda (rte) '()))
-    ((#f) (lambda (rte) #f))
-    ((#t) (lambda (rte) #t))
-    ((-2) (lambda (rte) -2))
-    ((-1) (lambda (rte) -1))
-    ((0)  (lambda (rte) 0))
-    ((1)  (lambda (rte) 1))
-    ((2)  (lambda (rte) 2))
-    (else (lambda (rte) val))))
+    ((()) (lambda (rte) (set-bbv-version-limit! #f)  '()))
+    ((#f) (lambda (rte) (set-bbv-version-limit! #f)  #f))
+    ((#t) (lambda (rte) (set-bbv-version-limit! #f)  #t))
+    ((-2) (lambda (rte) (set-bbv-version-limit! #f)  -2))
+    ((-1) (lambda (rte) (set-bbv-version-limit! #f)  -1))
+    ((0)  (lambda (rte) (set-bbv-version-limit! #f)  0))
+    ((1)  (lambda (rte) (set-bbv-version-limit! #f)  1))
+    ((2)  (lambda (rte) (set-bbv-version-limit! #f)  2))
+    (else (lambda (rte) (set-bbv-version-limit! #f)  val))))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-append-form code1 code2)
-  (lambda (rte) (append (code1 rte) (code2 rte))))
+(define (gen-append-form code1 code2) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  (append (code1 rte) (code2 rte))))
 
-(define (gen-cons-form code1 code2)
-  (lambda (rte) (cons (code1 rte) (code2 rte))))
+(define (gen-cons-form code1 code2) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  (cons (code1 rte) (code2 rte))))
 
-(define (gen-vector-form code)
-  (lambda (rte) (lst->vector (code rte))))
+(define (gen-vector-form code) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  (lst->vector (code rte))))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-var-set var code)
+(define (gen-var-set var code) (set-bbv-version-limit! #f) 
   (if (pair? var)
     (gen-rte-set (Scar var) (Scdr var) code)
     (gen-glo-set (scheme-global-var var) code)))
 
-(define (gen-rte-set up over code)
+(define (gen-rte-set up over code) (set-bbv-version-limit! #f) 
   (case up
     ((0)  (gen-slot-set-0 over code))
     ((1)  (gen-slot-set-1 over code))
     (else (gen-slot-set-n (gen-rte-ref (SFX- up 2) 0) over code))))
 
-(define (gen-slot-set-0 i code)
+(define (gen-slot-set-0 i code) (set-bbv-version-limit! #f) 
   (case i
-    ((0)  (lambda (rte) (Svector-set! rte 0 (code rte))))
-    ((1)  (lambda (rte) (Svector-set! rte 1 (code rte))))
-    ((2)  (lambda (rte) (Svector-set! rte 2 (code rte))))
-    ((3)  (lambda (rte) (Svector-set! rte 3 (code rte))))
-    (else (lambda (rte) (Svector-set! rte i (code rte))))))
+    ((0)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! rte 0 (code rte))))
+    ((1)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! rte 1 (code rte))))
+    ((2)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! rte 2 (code rte))))
+    ((3)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! rte 3 (code rte))))
+    (else (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! rte i (code rte))))))
 
-(define (gen-slot-set-1 i code)
+(define (gen-slot-set-1 i code) (set-bbv-version-limit! #f) 
   (case i
-    ((0)  (lambda (rte) (Svector-set! (Svector-ref rte 0) 0 (code rte))))
-    ((1)  (lambda (rte) (Svector-set! (Svector-ref rte 0) 1 (code rte))))
-    ((2)  (lambda (rte) (Svector-set! (Svector-ref rte 0) 2 (code rte))))
-    ((3)  (lambda (rte) (Svector-set! (Svector-ref rte 0) 3 (code rte))))
-    (else (lambda (rte) (Svector-set! (Svector-ref rte 0) i (code rte))))))
+    ((0)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! (Svector-ref rte 0) 0 (code rte))))
+    ((1)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! (Svector-ref rte 0) 1 (code rte))))
+    ((2)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! (Svector-ref rte 0) 2 (code rte))))
+    ((3)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! (Svector-ref rte 0) 3 (code rte))))
+    (else (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! (Svector-ref rte 0) i (code rte))))))
 
-(define (gen-slot-set-n up i code)
+(define (gen-slot-set-n up i code) (set-bbv-version-limit! #f) 
   (case i
-    ((0)  (lambda (rte) (Svector-set! (up (Svector-ref rte 0)) 0 (code rte))))
-    ((1)  (lambda (rte) (Svector-set! (up (Svector-ref rte 0)) 1 (code rte))))
-    ((2)  (lambda (rte) (Svector-set! (up (Svector-ref rte 0)) 2 (code rte))))
-    ((3)  (lambda (rte) (Svector-set! (up (Svector-ref rte 0)) 3 (code rte))))
-    (else (lambda (rte) (Svector-set! (up (Svector-ref rte 0)) i (code rte))))))
+    ((0)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! (up (Svector-ref rte 0)) 0 (code rte))))
+    ((1)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! (up (Svector-ref rte 0)) 1 (code rte))))
+    ((2)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! (up (Svector-ref rte 0)) 2 (code rte))))
+    ((3)  (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! (up (Svector-ref rte 0)) 3 (code rte))))
+    (else (lambda (rte) (set-bbv-version-limit! #f)  (Svector-set! (up (Svector-ref rte 0)) i (code rte))))))
 
-(define (gen-glo-set i code)
-  (lambda (rte) (scheme-global-var-set! i (code rte))))
+(define (gen-glo-set i code) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  (scheme-global-var-set! i (code rte))))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-lambda-rest nb-vars body)
+(define (gen-lambda-rest nb-vars body) (set-bbv-version-limit! #f) 
   (case nb-vars
     ((1)  (gen-lambda-1-rest body))
     ((2)  (gen-lambda-2-rest body))
     ((3)  (gen-lambda-3-rest body))
     (else (gen-lambda-n-rest nb-vars body))))
 
-(define (gen-lambda-1-rest body)
-  (lambda (rte)
+(define (gen-lambda-1-rest body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (lambda a
       (body (vector rte a)))))
 
-(define (gen-lambda-2-rest body)
-  (lambda (rte)
-    (lambda (a . b)
+(define (gen-lambda-2-rest body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
+    (lambda (a . b) (set-bbv-version-limit! #f) 
       (body (vector rte a b)))))
 
-(define (gen-lambda-3-rest body)
-  (lambda (rte)
-    (lambda (a b . c)
+(define (gen-lambda-3-rest body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
+    (lambda (a b . c) (set-bbv-version-limit! #f) 
       (body (vector rte a b c)))))
 
-(define (gen-lambda-n-rest nb-vars body)
-  (lambda (rte)
-    (lambda (a b c . d)
+(define (gen-lambda-n-rest nb-vars body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
+    (lambda (a b c . d) (set-bbv-version-limit! #f) 
       (let ((x (make-vector (SFX+ nb-vars 1))))
         (Svector-set! x 0 rte)
         (Svector-set! x 1 a)
@@ -628,7 +635,7 @@
             (Svector-set! x i l)))
         (body x)))))
 
-(define (gen-lambda nb-vars body)
+(define (gen-lambda nb-vars body) (set-bbv-version-limit! #f) 
   (case nb-vars
     ((0)  (gen-lambda-0 body))
     ((1)  (gen-lambda-1 body))
@@ -636,29 +643,29 @@
     ((3)  (gen-lambda-3 body))
     (else (gen-lambda-n nb-vars body))))
 
-(define (gen-lambda-0 body)
-  (lambda (rte)
+(define (gen-lambda-0 body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (lambda ()
       (body rte))))
 
-(define (gen-lambda-1 body)
-  (lambda (rte)
-    (lambda (a)
+(define (gen-lambda-1 body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
+    (lambda (a) (set-bbv-version-limit! #f) 
       (body (vector rte a)))))
 
-(define (gen-lambda-2 body)
-  (lambda (rte)
-    (lambda (a b)
+(define (gen-lambda-2 body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
+    (lambda (a b) (set-bbv-version-limit! #f) 
       (body (vector rte a b)))))
 
-(define (gen-lambda-3 body)
-  (lambda (rte)
-    (lambda (a b c)
+(define (gen-lambda-3 body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
+    (lambda (a b c) (set-bbv-version-limit! #f) 
       (body (vector rte a b c)))))
 
-(define (gen-lambda-n nb-vars body)
-  (lambda (rte)
-    (lambda (a b c . d)
+(define (gen-lambda-n nb-vars body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
+    (lambda (a b c . d) (set-bbv-version-limit! #f) 
       (let ((x (make-vector (SFX+ nb-vars 1))))
         (Svector-set! x 0 rte)
         (Svector-set! x 1 a)
@@ -671,27 +678,27 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-sequence code1 code2)
-  (lambda (rte) (code1 rte) (code2 rte)))
+(define (gen-sequence code1 code2) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  (code1 rte) (code2 rte)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-when code1 code2)
-  (lambda (rte)
+(define (gen-when code1 code2) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (if (code1 rte)
       (code2 rte)
       '())))
 
-(define (gen-if code1 code2 code3)
-  (lambda (rte)
+(define (gen-if code1 code2 code3) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (if (code1 rte)
       (code2 rte)
       (code3 rte))))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-cond-send code1 code2 code3)
-  (lambda (rte)
+(define (gen-cond-send code1 code2 code3) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (let ((temp (code1 rte)))
       (if temp
         ((code2 rte) temp)
@@ -699,8 +706,8 @@
               
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-and code1 code2)
-  (lambda (rte)
+(define (gen-and code1 code2) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (let ((temp (code1 rte)))
       (if temp
         (code2 rte)
@@ -708,8 +715,8 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-or code1 code2)
-  (lambda (rte)
+(define (gen-or code1 code2) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (let ((temp (code1 rte)))
       (if temp
         temp
@@ -717,18 +724,18 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-case code1 code2)
-  (lambda (rte) (code2 rte (code1 rte))))
+(define (gen-case code1 code2) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  (code2 rte (code1 rte))))
 
-(define (gen-case-clause datums code1 code2)
-  (lambda (rte key) (if (memv key datums) (code1 rte) (code2 rte key))))
+(define (gen-case-clause datums code1 code2) (set-bbv-version-limit! #f) 
+  (lambda (rte key) (set-bbv-version-limit! #f)  (if (memv key datums) (code1 rte) (code2 rte key))))
 
-(define (gen-case-else code)
-  (lambda (rte key) (code rte)))
+(define (gen-case-else code) (set-bbv-version-limit! #f) 
+  (lambda (rte key) (set-bbv-version-limit! #f)  (code rte)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-letrec vals body)
+(define (gen-letrec vals body) (set-bbv-version-limit! #f) 
   (let ((nb-vals (Slength vals)))
     (case nb-vals
       ((1)  (gen-letrec-1 (Scar vals) body))
@@ -736,29 +743,29 @@
       ((3)  (gen-letrec-3 (Scar vals) (Scadr vals) (Scaddr vals) body))
       (else (gen-letrec-n nb-vals vals body)))))
 
-(define (gen-letrec-1 val1 body)
-  (lambda (rte)
+(define (gen-letrec-1 val1 body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (let ((x (vector rte #f)))
       (Svector-set! x 1 (val1 x))
       (body x))))
 
-(define (gen-letrec-2 val1 val2 body)
-  (lambda (rte)
+(define (gen-letrec-2 val1 val2 body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (let ((x (vector rte #f #f)))
       (Svector-set! x 1 (val1 x))
       (Svector-set! x 2 (val2 x))
       (body x))))
 
-(define (gen-letrec-3 val1 val2 val3 body)
-  (lambda (rte)
+(define (gen-letrec-3 val1 val2 val3 body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (let ((x (vector rte #f #f #f)))
       (Svector-set! x 1 (val1 x))
       (Svector-set! x 2 (val2 x))
       (Svector-set! x 3 (val3 x))
       (body x))))
 
-(define (gen-letrec-n nb-vals vals body)
-  (lambda (rte)
+(define (gen-letrec-n nb-vals vals body) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
     (let ((x (make-vector (SFX+ nb-vals 1))))
       (Svector-set! x 0 rte)
       (let loop ((x x) (i 1) (l vals))
@@ -768,12 +775,12 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-macro name proc)
-  (lambda (rte) (scheme-add-macro name proc)))
+(define (gen-macro name proc) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  (scheme-add-macro name proc)))
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (gen-combination oper args)
+(define (gen-combination oper args) (set-bbv-version-limit! #f)
   (case (Slength args)
     ((0)  (gen-combination-0 oper))
     ((1)  (gen-combination-1 oper (Scar args)))
@@ -781,21 +788,21 @@
     ((3)  (gen-combination-3 oper (Scar args) (Scadr args) (Scaddr args)))
     (else (gen-combination-n oper args))))
 
-(define (gen-combination-0 oper)
-  (lambda (rte) ((oper rte))))
+(define (gen-combination-0 oper) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  ((oper rte))))
 
-(define (gen-combination-1 oper arg1)
-  (lambda (rte) ((oper rte) (arg1 rte))))
+(define (gen-combination-1 oper arg1) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) ((oper rte) (arg1 rte))))
 
-(define (gen-combination-2 oper arg1 arg2)
-  (lambda (rte) ((oper rte) (arg1 rte) (arg2 rte))))
+(define (gen-combination-2 oper arg1 arg2) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  ((oper rte) (arg1 rte) (arg2 rte))))
 
-(define (gen-combination-3 oper arg1 arg2 arg3)
-  (lambda (rte) ((oper rte) (arg1 rte) (arg2 rte) (arg3 rte))))
+(define (gen-combination-3 oper arg1 arg2 arg3) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f)  ((oper rte) (arg1 rte) (arg2 rte) (arg3 rte))))
 
-(define (gen-combination-n oper args)
-  (lambda (rte)
-    (define (evaluate l rte)
+(define (gen-combination-n oper args) (set-bbv-version-limit! #f) 
+  (lambda (rte) (set-bbv-version-limit! #f) 
+    (define (evaluate l rte) (set-bbv-version-limit! #f) 
       (if (pair? l)
         (cons ((Scar l) rte) (evaluate (Scdr l) rte))
         '()))
@@ -803,7 +810,7 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (scheme-comp expr env)
+(define (scheme-comp expr env) (set-bbv-version-limit! #f) 
   (cond ((symbol? expr)
          (comp-var expr env))
         ((not (pair? expr))
@@ -834,7 +841,7 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (scheme-global-var name)
+(define (scheme-global-var name) (set-bbv-version-limit! #f) 
   (let ((x (assq name scheme-global-variables)))
     (if x
       x
@@ -842,27 +849,27 @@
         (set! scheme-global-variables (cons y scheme-global-variables))
         y))))
 
-(define (scheme-global-var-ref i)
+(define (scheme-global-var-ref i) (set-bbv-version-limit! #f) 
   (Scdr i))
 
-(define (scheme-global-var-set! i val)
+(define (scheme-global-var-set! i val) (set-bbv-version-limit! #f) 
   (set-cdr! i val)
   '())
 
 (define scheme-global-variables '())
 
-(define (def-proc name value)
+(define (def-proc name value) (set-bbv-version-limit! #f) 
   (scheme-global-var-set!
     (scheme-global-var name)
     value))
 
-(def-proc 'not                            (lambda (x) (not x)))
+(def-proc 'not                            (lambda (x) (set-bbv-version-limit! #f)  (not x)))
 (def-proc 'boolean?                       boolean?)
 (def-proc 'eqv?                           eqv?)
 (def-proc 'eq?                            eq?)
 (def-proc 'equal?                         equal?)
-(def-proc 'pair?                          (lambda (obj) (pair? obj)))
-(def-proc 'cons                           (lambda (x y) (cons x y)))
+(def-proc 'pair?                          (lambda (obj) (set-bbv-version-limit! #f)  (pair? obj)))
+(def-proc 'cons                           (lambda (x y) (set-bbv-version-limit! #f)  (cons x y)))
 (def-proc 'car                            car)
 (def-proc 'cdr                            cdr)
 (def-proc 'set-car!                       set-car!)
@@ -895,7 +902,7 @@
 (def-proc 'cddadr                         cddadr)
 (def-proc 'cdddar                         cdddar)
 (def-proc 'cddddr                         cddddr)
-(def-proc 'null?                          (lambda (x) (null? x)))
+(def-proc 'null?                          (lambda (x) (set-bbv-version-limit! #f)  (null? x)))
 (def-proc 'list?                          list?)
 (def-proc 'list                           list)
 (def-proc 'length                         length)
@@ -1037,23 +1044,23 @@
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-(define (run-benchmark)
+(define (run-benchmark) (set-bbv-version-limit! #f) 
    (scheme-eval
       '(let ()
 	
-	(define (sort-list obj pred)
+	(define (sort-list obj pred) 
 	   
-	   (define (loop l)
+	   (define (loop l) 
 	      (if (and (pair? l) (pair? (cdr l)))
 		  (split l '() '())
 		  l))
 	   
-	   (define (split l one two)
+	   (define (split l one two) 
 	      (if (pair? l)
 		  (split (cdr l) two (cons (car l) one))
 		  (merge (loop one) (loop two))))
 	   
-	   (define (merge one two)
+	   (define (merge one two) 
 	      (cond ((null? one) two)
 		    ((pred (car two) (car one))
 		     (cons (car two)
@@ -1068,7 +1075,7 @@
 		     "seven" "eight" "nine" "ten" "eleven" "twelve")
 	   string<?))))
 
-(define (run #!key (n (unknown 100000 1)))
+(define-keys (run !key (n (unknown 100000 1)))
    (let loop ((n n) (result #f))
       (if (SFX> n 0)
 	  (begin
@@ -1080,5 +1087,5 @@
    '("eight" "eleven" "five" "four" "nine" "one"
      "seven" "six" "ten" "three" "twelve" "two"))
 
-(define (check result)
+(define (check result) (set-bbv-version-limit! #f) 
    (equal? result expected-result))

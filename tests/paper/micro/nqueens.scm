@@ -31,7 +31,7 @@
 
   (my-try (iota1 n) '() '()))
 
-(define (run #!key (n (unknown 13 8)))
+(define-keys (run !key (n (unknown 13 8)))
   (nqueens n))
 
 (define (check result)

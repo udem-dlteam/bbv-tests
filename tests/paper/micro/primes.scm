@@ -1,6 +1,6 @@
 ;; primes.scm benchmark from r7rs-benchmarks
 
-(define (run #!key (n (unknown 100)))
+(define-keys (run !key (n (unknown 100)))
 
   (define  (interval-list m n)
     (if (SFX> m n)

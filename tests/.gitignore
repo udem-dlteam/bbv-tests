@@ -6,3 +6,6 @@
 *.gvm
 *.c
 !*.c.c
+*.chez.*
+*.racket.*
+*.custom-version-limit.*

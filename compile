@@ -18,26 +18,30 @@ SCHEME_COMPILE_TIME_MARKER="***scheme-compile-time:"
 C_COMPILE_TIME_MARKER="***c-compile-time:"
 
 # Default parameters
-OPTIM_LEVEL=0     # optimization level
-SAFE_ARITHMETIC=1 # safe/unsafe arithmetic
-PRIMITIVE_COUNT=0 # enables primitive (0 to disable)
-SHOW_EXPANSION=0  # show macro expansion
-GENERATE_CFG=0    # enable cfg generation
-VIEW_CFG=0        # open cfg in pdf viewer
-USE_IGSC=0        # use gambit igsc instead of gsc
-COMPILER_DIR=     # compiler directory
-VERSION_LIMIT=    # version limit
-SYSTEM=           # system (gambit or bigloo)
+INPUT_FILE=             # file to compile
+OPTIM_LEVEL=0           # optimization level
+SAFE_ARITHMETIC=1       # safe/unsafe arithmetic
+PRIMITIVE_COUNT=0       # enables primitive (0 to disable)
+SHOW_EXPANSION=0        # show macro expansion
+GENERATE_CFG=0          # enable cfg generation
+VIEW_CFG=0              # open cfg in pdf viewer
+USE_IGSC=0              # use gambit igsc instead of gsc
+COMPILER_DIR=           # compiler directory
+VERSION_LIMIT=          # version limit
+GLOBAL_VERSION_LIMIT=   # global version limit used when custom limits provided
+                        # the global version limit is used for lib.scm
+SYSTEM=                 # system (gambit or bigloo)
+CUSTOM_OUTPUT_FILE=     # user's output file
 
 # Parse parameters
-while getopts "f:S:D:V:O:UPGWIEchv" opt; do
+while getopts "f:S:D:o:V:G:O:UPGWIEchv" opt; do
   case $opt in
     f)
       INPUT_FILE=$(readlink -f $OPTARG)
       ;;
     S)
       case $OPTARG in
-        'gambit'|'bigloo')
+        'gambit'|'bigloo'|'chez'|'racket'|'node')
           SYSTEM=$OPTARG
           ;;
         *)
@@ -49,12 +53,28 @@ while getopts "f:S:D:V:O:UPGWIEchv" opt; do
     D)
       COMPILER_DIR=$OPTARG
       ;;
+    o)
+      CUSTOM_OUTPUT_FILE=$OPTARG
+      ;;
     V)
-      if ! [ "$OPTARG" -eq "$OPTARG" ] 2> /dev/null; then
-          echo "Version limit must be an integer not '$OPTARG'"
-          exit 1
-      fi
       VERSION_LIMIT=$OPTARG
+      if [ "$VERSION_LIMIT" = "custom" ]; then
+        :
+      elif [ "$VERSION_LIMIT" -eq "$VERSION_LIMIT" ] 2> /dev/null; then
+        :
+      else
+        echo "Version limit must be an integer or 'custom' not '$VERSION_LIMIT'"
+        exit 1
+      fi
+      ;;
+    G)
+      GLOBAL_VERSION_LIMIT=$OPTARG
+      if [ "$GLOBAL_VERSION_LIMIT" -eq "$GLOBAL_VERSION_LIMIT" ] 2> /dev/null; then
+        :
+      else
+        echo "Global limit must be an integer not '$GLOBAL_VERSION_LIMIT'"
+        exit 1
+      fi
       ;;
     O)
       case $OPTARG in
@@ -123,14 +143,21 @@ if [ "$INPUT_FILE" = "" ]; then
   exit 1
 fi
 
-if [[ "${INPUT_FILE##*.}" != "scm" ]]; then
-    echo "** provided file must be a .scm file, not '$INPUT_FILE'"
-    exit 1
-fi
-
 if [ "$SYSTEM" = "" ]; then
   echo "*** no system provided: use -S <system>" >&2
   exit 1
+fi
+
+EXPECTED_EXTENSION="scm"
+if [ "$SYSTEM" = "node" ]; then
+  EXPECTED_EXTENSION="js"
+fi
+if [ "$SYSTEM" = "racket" ]; then
+  EXPECTED_EXTENSION="rkt"
+fi
+if [[ "${INPUT_FILE##*.}" != "$EXPECTED_EXTENSION" ]]; then
+    echo "** provided file must be a .$EXPECTED_EXTENSION file, not '$INPUT_FILE'"
+    exit 1
 fi
 
 if [ "$VERSION_LIMIT" = "" ]; then
@@ -151,7 +178,9 @@ if [ "$COMPILER_DIR" = "" ]; then
     COMPILER_DIR="$SCRIPT_DIR/gambit/bbv-gambit"
   fi
 fi
-COMPILER_DIR=$(readlink -f $COMPILER_DIR)
+if [ "$COMPILER_DIR" != "" ]; then
+  COMPILER_DIR=$(readlink -f $COMPILER_DIR)
+fi
 
 if [ "$SAFE_ARITHMETIC" = "0" ]; then
   ARITHMETIC=S
@@ -167,6 +196,12 @@ OUTPUT_FILE_BASE="$INPUT_FILE_NO_EXT.${SYSTEM}.V${VERSION_LIMIT}.O${OPTIM_LEVEL}
 OUTPUT_FILE_C="$INPUT_FILE_NO_EXT.c"
 OUTPUT_FILE_EXE="$OUTPUT_FILE_BASE.exe"
 OUTPUT_FILE_CFG_DOT="$OUTPUT_FILE_BASE.cfg"
+
+if [ "$CUSTOM_OUTPUT_FILE" = "" ]; then
+  OUTPUT_FILE_EXE="$OUTPUT_FILE_BASE.exe"
+else
+  OUTPUT_FILE_EXE="$CUSTOM_OUTPUT_FILE"
+fi
 
 run_dot()
 {
@@ -208,15 +243,28 @@ case "$SYSTEM" in
       INLINING_LIMIT=370
     fi
 
+    if [ "$VERSION_LIMIT" = "custom" ]; then
+      if [ "$GLOBAL_VERSION_LIMIT" != "" ]; then
+        VERSION_LIMIT_DECL="(version-limit $GLOBAL_VERSION_LIMIT)"
+      else
+        VERSION_LIMIT_DECL=""
+      fi
+      VERSION_LIMIT_POSTFIX="(use-custom-version-limits!)"
+    else
+      VERSION_LIMIT_DECL="(version-limit $VERSION_LIMIT)"
+      VERSION_LIMIT_POSTFIX=""
+    fi
+
     PRELUDE="(declare
                $OPTIM_DECLARATIONS
-               (version-limit $VERSION_LIMIT)
+               $VERSION_LIMIT_DECL
                (inlining-limit $INLINING_LIMIT))
              (define-macro (%%%)
                (eval '(define arithmetic '$ARITHMETIC))
                #f)
              (%%%)
-             (##include \"$SCRIPT_DIR/gambit/bbv.scm\")"
+             (##include \"$SCRIPT_DIR/gambit/bbv.scm\")
+             $VERSION_LIMIT_POSTFIX"
 
     FLAGS="-keep-temp -gvm"
 
@@ -279,8 +327,13 @@ case "$SYSTEM" in
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -srfi bbvcountprimitive"
       BIGLOO_C_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_C_OPTIONS"
       BIGLOO_LD_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_LD_OPTIONS"
-
     fi
+
+    if [ "$VERSION_LIMIT" = "custom" ]; then
+      echo "Bigloo does not support custom version limits"
+      exit 1
+    fi
+
     if [ "$VERSION_LIMIT" = "0" ]; then
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -fno-saw-bbv"
     else
@@ -303,8 +356,96 @@ case "$SYSTEM" in
     fi
     ;;
 
+  chez)
+    CHEZ_OPTIONS="--quiet"
+
+    if [ "$PRIMITIVE_COUNT" = "1" ]; then
+      >&2 echo "WARNING: no support for Chez Scheme primitive count"
+    fi
+    if [ "$VERSION_LIMIT" != "0" ]; then
+      >&2 echo "WARNING: no support for Chez Scheme BBV"
+    fi
+
+    if  [ "$COMPILER_DIR" = "" ]; then
+      CHEZCOMP="scheme"
+    else
+      CHEZCOMP="$COMPILER_DIR/ta6le/bin/ta6le/scheme"
+    fi
+
+    if [ "$SAFE_ARITHMETIC" = "0" ]; then
+      CHEZ_OPTIONS="$CHEZ_OPTIONS --optimize-level 3"
+    else
+      CHEZ_OPTIONS="$CHEZ_OPTIONS --optimize-level $(( OPTIM_LEVEL > 2 ? 2 : OPTIM_LEVEL ))"
+    fi
+
+    BBV_FILE="$SCRIPT_DIR/chez/bbv.scm"
+    LIB_FILE="$SCRIPT_DIR/chez/lib.scm"
+    MAIN_FILE="$SCRIPT_DIR/chez/main.scm"
+    BUNDLE_FILE="$OUTPUT_FILE_BASE.scm"
+    cat $BBV_FILE $LIB_FILE $INPUT_FILE $MAIN_FILE > $BUNDLE_FILE
+
+    echo "#!/bin/bash" > $OUTPUT_FILE_EXE
+    echo -n "(cd $INPUT_FILE_DIRNAME && " >> $OUTPUT_FILE_EXE
+    echo "$CHEZCOMP $CHEZ_OPTIONS --script $BUNDLE_FILE \"\$@\")" >> $OUTPUT_FILE_EXE
+
+    ;;
+  racket)
+    RACKET_OPTIONS="exe"
+
+    if [ "$PRIMITIVE_COUNT" = "1" ]; then
+      >&2 echo "WARNING: no support for Racket primitive count"
+    fi
+    if [ "$VERSION_LIMIT" != "0" ]; then
+      >&2 echo "WARNING: no support for Racket BBV"
+    fi
+
+    if  [ "$COMPILER_DIR" = "" ]; then
+      RACKETCOMP="raco"
+    else
+      RACKETCOMP="$COMPILER_DIR/racket/bin/raco"
+    fi
+
+    if [ "$SAFE_ARITHMETIC" = "0" ]; then
+      >&2 echo "WARNING: no support for Racket usnafe arithmetic"
+    fi
+
+    BBV_FILE="$SCRIPT_DIR/racket/bbv.scm"
+    LIB_FILE="$SCRIPT_DIR/racket/lib.scm"
+    MAIN_FILE="$SCRIPT_DIR/racket/main.scm"
+    RACKET_FILE="$OUTPUT_FILE_BASE.rkt"
+
+    echo "#lang racket" > $RACKET_FILE
+    cat $BBV_FILE $LIB_FILE $INPUT_FILE $MAIN_FILE >> $RACKET_FILE
+
+    (cd $INPUT_FILE_DIRNAME && \
+        $RACKETCOMP $RACKET_OPTIONS -o $OUTPUT_FILE_EXE $RACKET_FILE)
+    ;;
+  node)
+    if [ "$PRIMITIVE_COUNT" = "1" ]; then
+      >&2 echo "WARNING: no support for NodeJS primitive count"
+    fi
+    if [ "$VERSION_LIMIT" != "0" ]; then
+      >&2 echo "WARNING: no support for NodeJS BBV"
+    fi
+    if [ "$SAFE_ARITHMETIC" = "0" ]; then
+      >&2 echo "WARNING: no unsafe mode for NodeJS"
+    fi
+    if [ "$OPTIM_LEVEL" != "0" ]; then
+      >&2 echo "WARNING: no optimisation level for NodeJS"
+    fi
+
+    if  [ "$COMPILER_DIR" = "" ]; then
+      NODECOMP="node"
+    else
+      NODECOMP="$COMPILER_DIR/bin/node"
+    fi
+
+    echo "#!/bin/bash" > $OUTPUT_FILE_EXE
+    echo "$NODECOMP --max-semi-space-size=100 $INPUT_FILE \"\$@\"" >> $OUTPUT_FILE_EXE
+    ;;
 esac
 
+chmod u+x $OUTPUT_FILE_EXE
 echo "$EXECUTABLE_NAME_MARKER $OUTPUT_FILE_EXE"
 
 if [ "$GENERATE_CFG" = "1" ]; then

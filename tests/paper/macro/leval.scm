@@ -3,21 +3,25 @@
 ;*    -------------------------------------------------------------    */
 ;*    Author      :  Manuel Serrano                                    */
 ;*    Creation    :  Sat Dec 26 08:30:11 1998                          */
-;*    Last change :  Thu Mar 21 14:45:54 2024 (serrano)                */
+;*    Last change :  Mon Mar 25 15:04:03 2024 (serrano)                */
 ;*    -------------------------------------------------------------    */
 ;*    An interpreter with lambda (from M. Feeley's one).               */
 ;*=====================================================================*/
+
+(set-custom-version-limits! 2 1 5 4 4 3 2 9 2 10 7 1 1 2 4 4 9 10 1 9 4 9 7 4 8
+	10 5 1 3 7 6 5 3 4 6 2 2 7 2 6 6 10 5 1 8 9 2 7 2 9 5 10 6 10 4 2 1 4 5 2 4 2 7
+	5 8 6 3 6 6 4 5 2 10 3 9 4 3 8 7 5 9 4 6 1 4 1 6 7 5)
 
 ;*---------------------------------------------------------------------*/
 ;*    Les environments ...                                             */
 ;*---------------------------------------------------------------------*/
 (define the-global-environment '())
 
-(define (errow . l)
+(define (errow . l) (set-bbv-version-limit! #f) 
    (for-each display l)
    (newline))
 
-(define (local-assq obj alist)
+(define (local-assq obj alist) (set-bbv-version-limit! #f) 
    (let loop ((alist alist))
       (if (null? alist)
           #f
@@ -30,13 +34,13 @@
 ;*    ewal ...                                                         */
 ;*    sexp x env --> sexp                                              */
 ;*---------------------------------------------------------------------*/
-(define (ewal exp)
+(define (ewal exp) (set-bbv-version-limit! #f) 
    (meaning (comp exp '() #f) '()))
 
 ;*---------------------------------------------------------------------*/
 ;*    meaning ...                                                      */
 ;*---------------------------------------------------------------------*/
-(define (meaning pre-compd-expression dynamic-env)
+(define (meaning pre-compd-expression dynamic-env) (set-bbv-version-limit! #f) 
    (pre-compd-expression dynamic-env))
 
 ;*---------------------------------------------------------------------*/
@@ -46,7 +50,7 @@
 ;*    La phase d'expansion a genere une syntaxe correcte. On n'a donc  */
 ;*    plus du tout a la tester maintenant.                             */
 ;*---------------------------------------------------------------------*/
-(define (comp exp env tail?)
+(define (comp exp env tail?) (set-bbv-version-limit! #f) 
    (cond
       ((not (pair? exp))
        (let ((atom exp))
@@ -56,7 +60,7 @@
 	     (else
 	      (comp-cnst atom tail?)))))
       ((eq? (Scar exp) 'module)
-       (lambda (dynamic-env) #f))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  #f))
       ((eq? (Scar exp) 'quote)
        (let ((cnst (Scadr exp)))
 	  (comp-cnst cnst tail?)))
@@ -87,7 +91,7 @@
       ((not (pair? (Scar exp)))
        (let ((fun (Scar exp))
 	     (args (Scdr exp)))
-	  (let ((actuals (map (lambda (a) (comp a env #f)) args)))
+	  (let ((actuals (Smap2 (lambda (a) (set-bbv-version-limit! #f)  (comp a env #f)) args)))
 	     (cond
 		((symbol? fun)
 		 (let ((proc (variable fun env)))
@@ -107,14 +111,14 @@
       (else
        (let ((fun (Scar exp))
 	     (args (Scdr exp)))
-	  (let ((actuals (map (lambda (a) (comp a env #f)) args))
+	  (let ((actuals (Smap2 (lambda (a) (set-bbv-version-limit! #f)  (comp a env #f)) args))
 		(proc    (comp fun env #f)))
 	     (comp-application proc actuals tail?))))))
 
 ;*---------------------------------------------------------------------*/
 ;*    variable ...                                                     */
 ;*---------------------------------------------------------------------*/
-(define (variable symbol env)
+(define (variable symbol env) (set-bbv-version-limit! #f) 
    (let ((offset (let loop ((env   env)
 			    (count 0))
 		    (cond
@@ -134,42 +138,42 @@
 ;*---------------------------------------------------------------------*/
 ;*    global? ...                                                      */
 ;*---------------------------------------------------------------------*/
-(define (global? variable)
+(define (global? variable) (set-bbv-version-limit! #f) 
    (pair? variable))
 
 ;*---------------------------------------------------------------------*/
 ;*    dynamic? ...                                                     */
 ;*---------------------------------------------------------------------*/
-(define (dynamic? variable)
+(define (dynamic? variable) (set-bbv-version-limit! #f) 
    (vector? variable))
 
 ;*---------------------------------------------------------------------*/
 ;*    comp-ref ...                                                     */
 ;*---------------------------------------------------------------------*/
-(define (comp-ref variable tail?)
+(define (comp-ref variable tail?) (set-bbv-version-limit! #f) 
    (cond
       ((global? variable)
-       (lambda (dynamic-env) (Scdr variable)))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  (Scdr variable)))
       ((dynamic? variable)
-       (lambda (dynamic-env) (let ((global (local-assq (vector-ref variable 0)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  (let ((global (local-assq (Svector-ref variable 0)
 					      the-global-environment)))
 				(if (not global)
 				    (errow "ewal"
 				       "Unbound variable"
-				       (vector-ref variable 0))
+				       (Svector-ref variable 0))
 				    (Scdr global)))))
       (else
        (case variable
 	  ((0)
-	   (lambda (dynamic-env) (Scar dynamic-env)))
+	   (lambda (dynamic-env) (set-bbv-version-limit! #f)  (Scar dynamic-env)))
 	  ((1)
-	   (lambda (dynamic-env) (Scadr dynamic-env)))
+	   (lambda (dynamic-env) (set-bbv-version-limit! #f)  (Scadr dynamic-env)))
 	  ((2)
-	   (lambda (dynamic-env) (Scaddr dynamic-env)))
+	   (lambda (dynamic-env) (set-bbv-version-limit! #f)  (Scaddr dynamic-env)))
 	  ((3)
-	   (lambda (dynamic-env) (Scadddr dynamic-env)))
+	   (lambda (dynamic-env) (set-bbv-version-limit! #f)  (Scadddr dynamic-env)))
 	  (else
-	   (lambda (dynamic-env)
+	   (lambda (dynamic-env) (set-bbv-version-limit! #f) 
 	      (do ((i 0 (SFX+ i 1))
 		   (env dynamic-env (Scdr env)))
 		  ((SFX= i variable) (Scar env)))))))))
@@ -177,35 +181,35 @@
 ;*---------------------------------------------------------------------*/
 ;*    comp-set ...                                                     */
 ;*---------------------------------------------------------------------*/
-(define (comp-set variable value)
+(define (comp-set variable value) (set-bbv-version-limit! #f) 
    (cond
       ((global? variable)
-       (lambda (dynamic-env) (update! variable value dynamic-env)))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  (update! variable value dynamic-env)))
       ((dynamic? variable)
-       (lambda (dynamic-env)
-	  (let ((global (local-assq (vector-ref variable 0)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (let ((global (local-assq (Svector-ref variable 0)
 			   the-global-environment)))
 	     (if (not global)
 		 (errow "ewal"
 		    "Unbound variable"
-		    (vector-ref variable 0))
+		    (Svector-ref variable 0))
 		 (update! global value dynamic-env)))))
       (else
        (case variable
 	  ((0)
-	   (lambda (dynamic-env) (Sset-car! dynamic-env
+	   (lambda (dynamic-env) (set-bbv-version-limit! #f)  (Sset-car! dynamic-env
 				    (value dynamic-env))))
 	  ((1)
-	   (lambda (dynamic-env) (Sset-car! (Scdr dynamic-env)
+	   (lambda (dynamic-env) (set-bbv-version-limit! #f)  (Sset-car! (Scdr dynamic-env)
 				    (value dynamic-env))))
 	  ((2)
-	   (lambda (dynamic-env) (Sset-car! (cddr dynamic-env)
+	   (lambda (dynamic-env) (set-bbv-version-limit! #f)  (Sset-car! (Scddr dynamic-env)
 				    (value dynamic-env))))
 	  ((3)
-	   (lambda (dynamic-env) (Sset-car! (cdddr dynamic-env)
+	   (lambda (dynamic-env) (set-bbv-version-limit! #f)  (Sset-car! (Scdddr dynamic-env)
 				    (value dynamic-env))))
 	  (else
-	   (lambda (dynamic-env)
+	   (lambda (dynamic-env) (set-bbv-version-limit! #f) 
 	      (do ((i 0 (SFX+ i 1))
 		   (env dynamic-env (Scdr env)))
 		  ((SFX= i variable) (Sset-car! env
@@ -214,14 +218,14 @@
 ;*---------------------------------------------------------------------*/
 ;*    comp-cnst ...                                                    */
 ;*---------------------------------------------------------------------*/
-(define (comp-cnst cnst tail?)
-   (lambda (dynamic-env) cnst))
+(define (comp-cnst cnst tail?) (set-bbv-version-limit! #f) 
+   (lambda (dynamic-env) (set-bbv-version-limit! #f)  cnst))
 
 ;*---------------------------------------------------------------------*/
 ;*    comp-if ...                                                      */
 ;*---------------------------------------------------------------------*/
-(define (comp-if test then sinon)
-   (lambda (dynamic-env)
+(define (comp-if test then sinon) (set-bbv-version-limit! #f) 
+   (lambda (dynamic-env) (set-bbv-version-limit! #f) 
       (if (test dynamic-env)
 	  (then dynamic-env)
 	  (sinon dynamic-env))))
@@ -229,12 +233,12 @@
 ;*---------------------------------------------------------------------*/
 ;*    comp-begin ...                                                   */
 ;*---------------------------------------------------------------------*/
-(define (comp-begin body env)
+(define (comp-begin body env) (set-bbv-version-limit! #f) 
    (cond
       ((and (pair? body) (and (null? (Scdr body))))
        ;; le cas degenere
        (let ((rest (comp (Scar body) env #t)))
-	  (lambda (dynamic-env) (rest dynamic-env))))
+	  (lambda (dynamic-env) (set-bbv-version-limit! #f)  (rest dynamic-env))))
       (else
        (let ((body (let loop ((rest body))
 		      (cond
@@ -245,7 +249,7 @@
 			 (else
 			  (cons (comp (Scar rest) env #f)
 			     (loop (Scdr rest))))))))
-	  (lambda (dynamic-env) (let _loop_ ((body body))
+	  (lambda (dynamic-env) (set-bbv-version-limit! #f)  (let _loop_ ((body body))
 				   (if (null? (Scdr body))
 				       ((Scar body) dynamic-env)
 				       (begin
@@ -255,7 +259,7 @@
 ;*---------------------------------------------------------------------*/
 ;*    init-the-global-environment! ...                                 */
 ;*---------------------------------------------------------------------*/
-(define (linit-the-global-environment!)
+(define (linit-the-global-environment!) (set-bbv-version-limit! #f) 
    (if (pair? the-global-environment)
        'done
        ;; je ne peux pas utiliser de constante car quand cette fonction
@@ -268,8 +272,8 @@
 ;*    On ne rajoute pas en tete car elle contient la definition de     */
 ;*    `the-module-environment'. On rajoute donc en deuxieme.           */
 ;*---------------------------------------------------------------------*/
-(define (comp-define var val)
-   (lambda (dynamic-env)
+(define (comp-define var val) (set-bbv-version-limit! #f) 
+   (lambda (dynamic-env) (set-bbv-version-limit! #f) 
       (let ((cell (local-assq var the-global-environment)))
 	 (if (pair? cell)
 	     (update! cell val dynamic-env)
@@ -287,7 +291,7 @@
 ;*    Cette fonction est juste une forme abregee de la precedente, qui */
 ;*    construit le `(lambda () ...)' absent                            */
 ;*---------------------------------------------------------------------*/
-(define (ldefine-primitive! var val)
+(define (ldefine-primitive! var val) (set-bbv-version-limit! #f) 
    (Sset-cdr! the-global-environment
       (cons (Scar the-global-environment)
 	 (Scdr the-global-environment)))
@@ -296,14 +300,14 @@
 ;*---------------------------------------------------------------------*/
 ;*      update! ...                                                    */
 ;*---------------------------------------------------------------------*/
-(define (update! variable val dynamic-env)
+(define (update! variable val dynamic-env) (set-bbv-version-limit! #f) 
    (Sset-cdr! variable (val dynamic-env))
    (Scar variable))
 
 ;*---------------------------------------------------------------------*/
 ;*    extend-env! ...                                                  */
 ;*---------------------------------------------------------------------*/
-(define (extend-env! extend old-env)
+(define (extend-env! extend old-env) (set-bbv-version-limit! #f) 
    (let _loop_ ((extend extend))
       (cond
 	 ((null? extend)
@@ -316,8 +320,8 @@
 ;*---------------------------------------------------------------------*/
 ;*    pair ...                                                         */
 ;*---------------------------------------------------------------------*/
-(define (pair n l)
-   (if (<fx n 0)
+(define (pair n l) (set-bbv-version-limit! #f) 
+   (if (SFX< n 0)
        (let loop ((n n)
 		  (l l))
 	  (cond
@@ -340,46 +344,46 @@
 ;*---------------------------------------------------------------------*/
 ;*    comp-lambda ...                                                  */
 ;*---------------------------------------------------------------------*/
-(define (comp-lambda formals body tail?)
+(define (comp-lambda formals body tail?) (set-bbv-version-limit! #f) 
    (cond
       ((null? formals)
-       (lambda (dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
 	  (lambda ()
 	     (body dynamic-env))))
       ((pair 1 formals)
-       (lambda (dynamic-env)
-	  (lambda (x)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (lambda (x) (set-bbv-version-limit! #f) 
 	     (body (cons x dynamic-env)))))
       ((pair 2 formals)
-       (lambda (dynamic-env)
-	  (lambda (x y)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (lambda (x y) (set-bbv-version-limit! #f) 
 	     (body (cons x (cons y dynamic-env))))))
       ((pair 3 formals)
-       (lambda (dynamic-env)
-	  (lambda (x y z)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (lambda (x y z) (set-bbv-version-limit! #f) 
 	     (body (cons x (cons y (cons z dynamic-env)))))))
       ((pair 4 formals)
-       (lambda (dynamic-env)
-	  (lambda (x y z t)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (lambda (x y z t) (set-bbv-version-limit! #f) 
 	     (body (cons x (cons y (cons z (cons z dynamic-env))))))))
       ((symbol? formals)
-       (lambda (dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
 	  (lambda x
 	     (body (cons x dynamic-env)))))
       ((pair -1 formals)
-       (lambda (dynamic-env)
-	  (lambda (x . y)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (lambda (x . y) (set-bbv-version-limit! #f) 
 	     (body (cons x (cons y dynamic-env))))))
       ((pair -2 formals)
-       (lambda (dynamic-env)
-	  (lambda (x y . z)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (lambda (x y . z) (set-bbv-version-limit! #f) 
 	     (body (cons x (cons y (cons z dynamic-env)))))))
       ((pair -3 formals)
-       (lambda (dynamic-env)
-	  (lambda (x y z . t)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (lambda (x y z . t) (set-bbv-version-limit! #f) 
 	     (body (cons x (cons y (cons z (cons z dynamic-env))))))))
       (else
-       (lambda (dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
 	  (lambda x
 	     (let ((new-env (let _loop_ ((actuals x)
 					 (formals formals))
@@ -405,81 +409,84 @@
 ;*---------------------------------------------------------------------*/
 ;*    comp-global-application ...                                      */
 ;*---------------------------------------------------------------------*/
-(define (comp-global-application proc actuals tail?)
+(define (comp-global-application proc actuals tail?) (set-bbv-version-limit! #f) 
    (case (Slength actuals)
       ((0)
-       (lambda (dynamic-env) ((Scdr proc))))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  ((Scdr proc))))
       ((1)
-       (lambda (dynamic-env) ((Scdr proc) ((Scar actuals) dynamic-env))))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  ((Scdr proc) ((Scar actuals) dynamic-env))))
       ((2)
-       (lambda (dynamic-env) ((Scdr proc) ((Scar actuals) dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  ((Scdr proc) ((Scar actuals) dynamic-env)
 					  ((Scadr actuals) dynamic-env))))
       ((3)
-       (lambda (dynamic-env) ((Scdr proc) ((Scar actuals) dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  ((Scdr proc) ((Scar actuals) dynamic-env)
 					  ((Scadr actuals) dynamic-env)
 					  ((Scaddr actuals) dynamic-env))))
       ((4)
-       (lambda (dynamic-env) ((Scdr proc) ((Scar actuals) dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  ((Scdr proc) ((Scar actuals) dynamic-env)
 					  ((Scadr actuals) dynamic-env)
 					  ((Scaddr actuals) dynamic-env)
 					  ((Scadddr actuals) dynamic-env))))
       (else
-       (lambda (dynamic-env)
-	  (apply (Scdr proc) (map (lambda (v) (v dynamic-env)) actuals))))))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (apply (Scdr proc) (Smap2 (lambda (v) (set-bbv-version-limit! #f)  (v dynamic-env)) actuals))))))
 
 ;*---------------------------------------------------------------------*/
 ;*    comp-compd-application ...                                       */
 ;*---------------------------------------------------------------------*/
-(define (comp-compd-application proc actuals tail?)
+(define (comp-compd-application proc actuals tail?) (set-bbv-version-limit! #f) 
    (case (Slength actuals)
       ((0)
-       (lambda (dynamic-env) (proc)))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  (proc)))
       ((1)
-       (lambda (dynamic-env) (proc ((Scar actuals) dynamic-env))))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  (proc ((Scar actuals) dynamic-env))))
       ((2)
-       (lambda (dynamic-env) (proc ((Scar actuals) dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  (proc ((Scar actuals) dynamic-env)
 				((Scadr actuals) dynamic-env))))
       ((3)
-       (lambda (dynamic-env) (proc ((Scar actuals) dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (proc ((Scar actuals) dynamic-env)
 				((Scadr actuals) dynamic-env)
 				((Scaddr actuals) dynamic-env))))
       ((4)
-       (lambda (dynamic-env) (proc ((Scar actuals) dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  (proc ((Scar actuals) dynamic-env)
 				((Scadr actuals) dynamic-env)
 				((Scaddr actuals) dynamic-env)
 				((Scadddr actuals) dynamic-env))))
       (else
-       (lambda (dynamic-env)
-	  (apply proc (map (lambda (v) (v dynamic-env)) actuals))))))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (apply proc (Smap2 (lambda (v) (set-bbv-version-limit! #f)  (v dynamic-env)) actuals))))))
    
 ;*---------------------------------------------------------------------*/
 ;*    comp-application ...                                             */
 ;*---------------------------------------------------------------------*/
-(define (comp-application proc actuals tail?)
+(define (comp-application proc actuals tail?) (set-bbv-version-limit! #f) 
    (case (Slength actuals)
       ((0)
-       (lambda (dynamic-env) ((proc dynamic-env))))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  ((proc dynamic-env))))
       ((1)
-       (lambda (dynamic-env) ((proc dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  ((proc dynamic-env)
 			      ((Scar actuals) dynamic-env))))
       ((2)
-       (lambda (dynamic-env) ((proc dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  ((proc dynamic-env)
 			      ((Scar actuals) dynamic-env)
 			      ((Scadr actuals) dynamic-env))))
       ((3)
-       (lambda (dynamic-env) ((proc dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  ((proc dynamic-env)
 			      ((Scar actuals) dynamic-env)
 			      ((Scadr actuals) dynamic-env)
 			      ((Scaddr actuals) dynamic-env))))
       ((4)
-       (lambda (dynamic-env) ((proc dynamic-env)
+       (lambda (dynamic-env) (set-bbv-version-limit! #f)  ((proc dynamic-env)
 			      ((Scar actuals) dynamic-env)
 			      ((Scadr actuals) dynamic-env)
 			      ((Scaddr actuals) dynamic-env)
 			      ((Scadddr actuals) dynamic-env))))
       (else
-       (lambda (dynamic-env)
-	  (apply (proc dynamic-env) (map (lambda (v) (v dynamic-env))
+       (lambda (dynamic-env) (set-bbv-version-limit! #f) 
+	  (apply (proc dynamic-env) (Smap2 (lambda (v) (set-bbv-version-limit! #f)  (v dynamic-env))
 				       actuals))))))
 
 ;*---------------------------------------------------------------------*/
@@ -487,10 +494,10 @@
 ;*---------------------------------------------------------------------*/
 (linit-the-global-environment!)
 
-(ldefine-primitive! '+ (lambda (x y) (SFX+ x y)))
-(ldefine-primitive! '- (lambda (x y) (SFX- x y)))
-(ldefine-primitive! '< (lambda (x y) (SFX< x y)))
-(ldefine-primitive! '>= (lambda (x y) (SFX>= x y)))
+(ldefine-primitive! '+ (lambda (x y) (set-bbv-version-limit! #f)  (SFX+ x y)))
+(ldefine-primitive! '- (lambda (x y) (set-bbv-version-limit! #f)  (SFX- x y)))
+(ldefine-primitive! '< (lambda (x y) (set-bbv-version-limit! #f)  (SFX< x y)))
+(ldefine-primitive! '>= (lambda (x y) (set-bbv-version-limit! #f)  (SFX>= x y)))
 
 ;*---------------------------------------------------------------------*/
 ;*    cnt                                                              */
@@ -511,7 +518,7 @@
 			     (tak (- y 1) z x)
 			     (tak (- z 1) x y)))))))
 (define takcall
-   '(tak 20 10 3))
+   (unknown '(tak 20 10 3) '(tak 10 5 3)))
 
 ;*---------------------------------------------------------------------*/
 ;*    fib ...                                                          */
@@ -524,14 +531,14 @@
 			  1
 			  (+ (fib (- x 1)) (fib (- x 2))))))))
 (define fibcall
-   '(fib 20))
+	(unknown '(fib 20) '(fib 10)))
 
 ;*---------------------------------------------------------------------*/
 ;*    run                                                              */
 ;*---------------------------------------------------------------------*/
-(define (run #!key (n (unknown 60 1)))
+(define-keys (run !key (n (unknown 60 1)))
    
-   (define (test)
+   (define (test) (set-bbv-version-limit! #f) 
       (ewal cnt)
       (ewal tak)
       (ewal fib)
@@ -545,6 +552,6 @@
 ;*---------------------------------------------------------------------*/
 ;*    check ...                                                        */
 ;*---------------------------------------------------------------------*/
-(define (check result)
-   (print "result=" result)
-   (equal? result '#(4 10946 1452256)))
+(define (check result) (set-bbv-version-limit! #f) 
+   ;(print "result=" result)
+   (equal? result (unknown '#(4 10946 1452256) '#(5 89 366))))

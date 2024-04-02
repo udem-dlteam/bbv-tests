@@ -1,34 +1,38 @@
+(set-custom-version-limits! 2 1 5 4 4 3 2 9 2 10 7 1 1 2 4 4 9 10 1 9 4 9 7 4 8
+  10 5 1 3 7 6 5 3 4 6 2 2 7 2 6 6 10 5 1 8 9 2 7 2 9 5 10 6 10 4 2 1 4 5 2 4 2 7
+  5 8 6 3 6)
+
 ; Utilities
 
-(define (pevery? pred? l)
+(define (pevery? pred? l) (set-bbv-version-limit! #f) 
   (let loop ((l l))
     (or (null? l) (and (pred? (Scar l)) (loop (Scdr l))))))
 
-(define (some? pred? l)
+(define (some? pred? l) (set-bbv-version-limit! #f) 
   (let loop ((l l))
     (if (null? l) #f (or (pred? (Scar l)) (loop (Scdr l))))))
 
-(define (map2 f l1 l2)
+(define (map2 f l1 l2) (set-bbv-version-limit! #f) 
   (let loop ((l1 l1) (l2 l2))
     (if (pair? l1)
       (cons (f (Scar l1) (Scar l2)) (loop (Scdr l1) (Scdr l2)))
       '())))
 
-(define (plast-pair l)
+(define (plast-pair l) (set-bbv-version-limit! #f) 
   (let loop ((l l))
     (let ((x (Scdr l))) (if (pair? x) (loop x) l))))
 
-(define (proper-list? l) (list? l))
+(define (proper-list? l) (set-bbv-version-limit! #f)  (list? l))
 
 ;------------------------------------------------------------------------------
 ;
 ; The partial evaluator.
 
-(define (partial-evaluate proc args)
+(define (partial-evaluate proc args) (set-bbv-version-limit! #f) 
   (peval (alphatize proc '()) args))
 
-(define (alphatize exp env) ; return a copy of 'exp' where each bound var has
-  (define (alpha exp)       ; been renamed (to prevent aliasing problems)
+(define (alphatize exp env) (set-bbv-version-limit! #f)  ; return a copy of 'exp' where each bound var has
+  (define (alpha exp) (set-bbv-version-limit! #f)        ; been renamed (to prevent aliasing problems)
     (cond ((const-expr? exp)
            (quot (const-value exp)))
           ((symbol? exp)
@@ -36,9 +40,9 @@
           ((or (eq? (Scar exp) 'if) (eq? (Scar exp) 'begin))
            (cons (Scar exp) (Smap2 alpha (Scdr exp))))
           ((or (eq? (Scar exp) 'let) (eq? (Scar exp) 'letrec))
-           (let ((new-env (new-variables (Smap2 (lambda (x) (Scar x)) (Scadr exp)) env)))
+           (let ((new-env (new-variables (Smap2 (lambda (x) (set-bbv-version-limit! #f)  (Scar x)) (Scadr exp)) env)))
              (list (Scar exp)
-                   (Smap2 (lambda (x)
+                   (Smap2 (lambda (x) (set-bbv-version-limit! #f) 
                           (list (Scdr (Sassq (Scar x) new-env))
                                 (if (eq? (Scar exp) 'let)
                                   (alpha (Scadr x))
@@ -48,31 +52,31 @@
           ((eq? (Scar exp) 'lambda)
            (let ((new-env (new-variables (Scadr exp) env)))
              (list 'lambda
-                   (Smap2 (lambda (x) (Scdr (Sassq x new-env))) (Scadr exp))
+                   (Smap2 (lambda (x) (set-bbv-version-limit! #f)  (Scdr (Sassq x new-env))) (Scadr exp))
                    (alphatize (Scaddr exp) new-env))))
           (else
            (Smap2 alpha exp))))
   (alpha exp))
 
-(define (const-expr? expr) ; is 'expr' a constant expression?
+(define (const-expr? expr) (set-bbv-version-limit! #f)  ; is 'expr' a constant expression?
    (and (not (symbol? expr))
 	(or (not (pair? expr))
 	    (eq? (Scar expr) 'quote))))
 
-(define (const-value expr) ; return the value of a constant expression
+(define (const-value expr) (set-bbv-version-limit! #f)  ; return the value of a constant expression
   (if (pair? expr) ; then it must be a quoted constant
     (Scadr expr)
     expr))
 
-(define (quot val) ; make a quoted constant whose value is 'val'
+(define (quot val) (set-bbv-version-limit! #f)  ; make a quoted constant whose value is 'val'
   (list 'quote val))
 
-(define (new-variables parms env)
-  (Sappend (Smap2 (lambda (x) (cons x (new-variable x))) parms) env))
+(define (new-variables parms env) (set-bbv-version-limit! #f) 
+  (Sappend (Smap2 (lambda (x) (set-bbv-version-limit! #f)  (cons x (new-variable x))) parms) env))
 
 (define *current-num* 0)
 
-(define (new-variable name)
+(define (new-variable name) (set-bbv-version-limit! #f) 
   (set! *current-num* (+ *current-num* 1))
   (Sstring->symbol
     (Sstring-append (Ssymbol->string name)
@@ -95,12 +99,12 @@
 ; For example:
 ;
 ;   (peval
-;     '(lambda (x y z) (f z x y)) ; the procedure
+;     '(lambda (x y z) (set-bbv-version-limit! #f)  (f z x y)) ; the procedure
 ;     (list 1 not-constant #t))   ; the knowledge about x, y and z
 ;
-; will return: (lambda (y) (f '#t '1 y))
+; will return: (lambda (y) (set-bbv-version-limit! #f)  (f '#t '1 y))
 
-(define (peval proc args)
+(define (peval proc args) (set-bbv-version-limit! #f) 
   (simplify!
     (let ((parms (Scadr proc))  ; get the parameter list
           (body (Scaddr proc))) ; get the body of the procedure
@@ -108,16 +112,16 @@
             (remove-constant parms args) ; remove the constant parameters
             (beta-subst ; in the body, replace variable refs to the constant
               body      ; parameters by the corresponding constant
-              (map2 (lambda (x y) (if (not-constant? y)
+              (map2 (lambda (x y) (set-bbv-version-limit! #f)  (if (not-constant? y)
 				      '(()) (cons x (quot y))))
                     parms
                     args))))))
 
 (define not-constant (list '?)) ; special value indicating non-constant parms.
 
-(define (not-constant? x) (eq? x not-constant))
+(define (not-constant? x) (set-bbv-version-limit! #f)  (eq? x not-constant))
 
-(define (remove-constant l a) ; remove from list 'l' all elements whose
+(define (remove-constant l a) (set-bbv-version-limit! #f)  ; remove from list 'l' all elements whose
   (cond ((null? l)            ; corresponding element in 'a' is a constant
          '())
         ((not-constant? (Scar a))
@@ -125,7 +129,7 @@
         (else
          (remove-constant (Scdr l) (Scdr a)))))
 
-(define (extract-constant l a) ; extract from list 'l' all elements whose
+(define (extract-constant l a) (set-bbv-version-limit! #f)  ; extract from list 'l' all elements whose
   (cond ((null? l)             ; corresponding element in 'a' is a constant
          '())
         ((not-constant? (Scar a))
@@ -133,8 +137,8 @@
         (else
          (cons (Scar l) (extract-constant (Scdr l) (Scdr a))))))
 
-(define (beta-subst exp env) ; return a modified 'exp' where each var named in
-  (define (bs exp)           ; 'env' is replaced by the corresponding expr (it
+(define (beta-subst exp env) (set-bbv-version-limit! #f)  ; return a modified 'exp' where each var named in
+  (define (bs exp) (set-bbv-version-limit! #f)            ; 'env' is replaced by the corresponding expr (it
     (cond ((const-expr? exp) ; is assumed that the code has been alphatized)
            (quot (const-value exp)))
           ((symbol? exp)
@@ -144,7 +148,7 @@
            (cons (Scar exp) (Smap2 bs (Scdr exp))))
           ((or (eq? (Scar exp) 'let) (eq? (Scar exp) 'letrec))
            (list (Scar exp)
-                 (Smap2 (lambda (x) (list (Scar x) (bs (Scadr x)))) (Scadr exp))
+                 (Smap2 (lambda (x) (set-bbv-version-limit! #f)  (list (Scar x) (bs (Scadr x)))) (Scadr exp))
                  (bs (Scaddr exp))))
           ((eq? (Scar exp) 'lambda)
            (list 'lambda
@@ -158,11 +162,11 @@
 ;
 ; The expression simplifier.
 
-(define (simplify! exp)     ; simplify the expression 'exp' destructively (it
+(define (simplify! exp) (set-bbv-version-limit! #f)      ; simplify the expression 'exp' destructively (it
                             ; is assumed that the code has been alphatized)
-  (define (simp! where env)
+  (define (simp! where env) (set-bbv-version-limit! #f) 
 
-    (define (s! where)
+    (define (s! where) (set-bbv-version-limit! #f) 
       (let ((exp (Scar where)))
 
         (cond ((const-expr? exp))  ; leave constants the way they are
@@ -195,7 +199,7 @@
 
               ((or (eq? (Scar exp) 'let) (eq? (Scar exp) 'letrec))
                (let ((new-env (cons exp env)))
-                 (define (keep i)
+                 (define (keep i) (set-bbv-version-limit! #f) 
                    (if (SFX>= i (Slength (Scadar where)))
                      '()
                      (let* ((var (Scar (list-ref (Scadar where) i)))
@@ -222,14 +226,14 @@
                              (else
                               (cons var (keep (SFX+ i 1))))))))
                  (simp! (Scddr exp) new-env)
-                 (for-each! (lambda (x) (simp! (cdar x) new-env)) (Scadr exp))
+                 (for-each! (lambda (x) (set-bbv-version-limit! #f)  (simp! (cdar x) new-env)) (Scadr exp))
                  (let ((to-keep (keep 0)))
                    (if (SFX< (Slength to-keep) (Slength (Scadar where)))
                      (begin
                        (if (null? to-keep)
                          (Sset-car! where (caddar where))
                          (Sset-car! (cdar where)
-                           (Smap2 (lambda (v) (Sassq v (Scadar where))) to-keep)))
+                           (Smap2 (lambda (v) (set-bbv-version-limit! #f)  (Sassq v (Scadar where))) to-keep)))
                        (s! where))
                      (if (null? to-keep)
                        (Sset-car! where (caddar where)))))))
@@ -265,9 +269,9 @@
 
     (s! where))
 
-  (define (remove-empty-calls! where env)
+  (define (remove-empty-calls! where env) (set-bbv-version-limit! #f) 
 
-    (define (rec! where)
+    (define (rec! where) (set-bbv-version-limit! #f) 
       (let ((exp (Scar where)))
 
         (cond ((const-expr? exp))
@@ -281,7 +285,7 @@
               ((or (eq? (Scar exp) 'let) (eq? (Scar exp) 'letrec))
                (let ((new-env (cons exp env)))
                  (remove-empty-calls! (Scddr exp) new-env)
-                 (for-each! (lambda (x) (remove-empty-calls! (cdar x) new-env))
+                 (for-each! (lambda (x) (set-bbv-version-limit! #f)  (remove-empty-calls! (cdar x) new-env))
                             (Scadr exp))))
               ((eq? (Scar exp) 'lambda)
                (rec! (Scddr exp)))
@@ -308,11 +312,11 @@
       (remove-empty-calls! x '())
       (if changed? (loop) (Scar x)))))
 
-(define (ref-count exp var) ; compute how many references to variable 'var'
+(define (ref-count exp var) (set-bbv-version-limit! #f)  ; compute how many references to variable 'var'
   (let ((total 0)           ; are contained in 'exp'
         (oper 0)
         (always-evaled #t))
-    (define (rc exp ae)
+    (define (rc exp ae) (set-bbv-version-limit! #f) 
       (cond ((const-expr? exp))
             ((symbol? exp)
              (if (eq? exp var)
@@ -321,22 +325,22 @@
                  (set! always-evaled (and ae always-evaled)))))
             ((eq? (Scar exp) 'if)
              (rc (Scadr exp) ae)
-             (Sfor-each2 (lambda (x) (rc x #f)) (Scddr exp)))
+             (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (rc x #f)) (Scddr exp)))
             ((eq? (Scar exp) 'begin)
-             (Sfor-each2 (lambda (x) (rc x ae)) (Scdr exp)))
+             (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (rc x ae)) (Scdr exp)))
             ((or (eq? (Scar exp) 'let) (eq? (Scar exp) 'letrec))
-             (Sfor-each2 (lambda (x) (rc (Scadr x) ae)) (Scadr exp))
+             (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (rc (Scadr x) ae)) (Scadr exp))
              (rc (Scaddr exp) ae))
             ((eq? (Scar exp) 'lambda)
              (rc (Scaddr exp) #f))
             (else
-             (Sfor-each2 (lambda (x) (rc x ae)) exp)
+             (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (rc x ae)) exp)
              (if (symbol? (Scar exp))
                (if (eq? (Scar exp) var) (set! oper (SFX+ oper 1)))))))
     (rc exp #t)
     (list total oper always-evaled)))
 
-(define (binding-frame var env)
+(define (binding-frame var env) (set-bbv-version-limit! #f) 
   (cond ((null? env) #f)
         ((or (eq? (caar env) 'let) (eq? (caar env) 'letrec))
          (if (Sassq var (Scadar env)) (Scar env) (binding-frame var (Scdr env))))
@@ -345,7 +349,7 @@
         (else
          (error '() '() "ill-formed environment"))))
 
-(define (bound-expr var frame)
+(define (bound-expr var frame) (set-bbv-version-limit! #f) 
   (cond ((or (eq? (Scar frame) 'let) (eq? (Scar frame) 'letrec))
          (Scadr (Sassq var (Scadr frame))))
         ((eq? (Scar frame) 'lambda)
@@ -353,8 +357,8 @@
         (else
          (error '() '() "ill-formed frame"))))
 
-(define (add-binding val frame name)
-  (define (find-val val bindings)
+(define (add-binding val frame name) (set-bbv-version-limit! #f) 
+  (define (find-val val bindings) (set-bbv-version-limit! #f) 
     (cond ((null? bindings) #f)
           ((Sequal? val (Scadar bindings)) ; *kludge* equal? is not exactly what
            (caar bindings))              ; we want...
@@ -365,11 +369,11 @@
         (Sset-cdr! (plast-pair (Scadr frame)) (list (list var val)))
         var)))
 
-(define (for-each! proc! l) ; call proc! on each CONS CELL in the list 'l'
+(define (for-each! proc! l) (set-bbv-version-limit! #f)  ; call proc! on each CONS CELL in the list 'l'
   (if (not (null? l))
     (begin (proc! l) (for-each! proc! (Scdr l)))))
 
-(define (arg-pattern exps) ; return the argument pattern (i.e. the list of
+(define (arg-pattern exps) (set-bbv-version-limit! #f)  ; return the argument pattern (i.e. the list of
   (if (null? exps)         ; constants in 'exps' but with the not-constant
     '()                    ; value wherever the corresponding expression in
     (cons (if (const-expr? (Scar exps)) ; 'exps' is not a constant)
@@ -383,67 +387,67 @@
 
 (define *primitives*
   (list
-    (cons 'car (lambda (args)
+    (cons 'car (lambda (args) (set-bbv-version-limit! #f) 
                  (and (SFX= (Slength args) 1)
                       (pair? (Scar args))
                       (quot (Scar (Scar args))))))
-    (cons 'cdr (lambda (args)
+    (cons 'cdr (lambda (args) (set-bbv-version-limit! #f) 
                  (and (SFX= (Slength args) 1)
                       (pair? (Scar args))
                       (quot (Scdr (Scar args))))))
-    (cons '+ (lambda (args)
+    (cons '+ (lambda (args) (set-bbv-version-limit! #f) 
                (and (pevery? number? args) (quot (apply + args)))))
-    (cons '* (lambda (args)
+    (cons '* (lambda (args) (set-bbv-version-limit! #f) 
                (and (pevery? number? args) (quot (apply * args)))))
-    (cons '- (lambda (args)
+    (cons '- (lambda (args) (set-bbv-version-limit! #f) 
                (and (SFX> (Slength args) 0)
                     (pevery? number? args)
                     (quot (apply - args)))))
-    (cons '/ (lambda (args)
+    (cons '/ (lambda (args) (set-bbv-version-limit! #f) 
                (and (SFX> (Slength args) 1)
                     (pevery? number? args)
                     (quot (apply / args)))))
-    (cons '< (lambda (args)
+    (cons '< (lambda (args) (set-bbv-version-limit! #f) 
                (and (SFX= (Slength args) 2)
                     (pevery? number? args)
                     (quot (< (Scar args) (Scadr args))))))
-    (cons '= (lambda (args)
+    (cons '= (lambda (args) (set-bbv-version-limit! #f) 
                (and (SFX= (Slength args) 2)
                     (pevery? number? args)
                     (quot (= (Scar args) (Scadr args))))))
-    (cons '> (lambda (args)
+    (cons '> (lambda (args) (set-bbv-version-limit! #f) 
                (and (SFX= (Slength args) 2)
                     (pevery? number? args)
                     (quot (> (Scar args) (Scadr args))))))
-    (cons 'eq? (lambda (args)
+    (cons 'eq? (lambda (args) (set-bbv-version-limit! #f) 
                  (and (SFX= (Slength args) 2)
                       (quot (eq? (Scar args) (Scadr args))))))
-    (cons 'not (lambda (args)
+    (cons 'not (lambda (args) (set-bbv-version-limit! #f) 
                  (and (SFX= (Slength args) 1)
                       (quot (not (Scar args))))))
-    (cons 'null? (lambda (args)
+    (cons 'null? (lambda (args) (set-bbv-version-limit! #f) 
                    (and (SFX= (Slength args) 1)
                         (quot (null? (Scar args))))))
-    (cons 'pair? (lambda (args)
+    (cons 'pair? (lambda (args) (set-bbv-version-limit! #f) 
                    (and (SFX= (Slength args) 1)
                         (quot (pair? (Scar args))))))
-    (cons 'symbol? (lambda (args)
+    (cons 'symbol? (lambda (args) (set-bbv-version-limit! #f) 
                      (and (SFX= (Slength args) 1)
                           (quot (symbol? (Scar args))))))
-    (cons 'length (lambda (args)
+    (cons 'length (lambda (args) (set-bbv-version-limit! #f) 
                     (and (SFX= (Slength args) 1)
                          (proper-list? (Scar args))
                          (quot (Slength (Scar args))))))
   )
 )
 
-(define (reduce-global name args)
+(define (reduce-global name args) (set-bbv-version-limit! #f) 
   (let ((x (Sassq name *primitives*)))
     (and x ((Scdr x) args))))
 
-(define (constant-fold-global name exprs)
+(define (constant-fold-global name exprs) (set-bbv-version-limit! #f) 
 
-  (define (flatten args op)
+  (define (flatten args op) (set-bbv-version-limit! #f) 
     (cond ((null? args)
            '())
           ((and (pair? (Scar args)) (eq? (caar args) op))
@@ -489,7 +493,7 @@
 ;
 ; Examples:
 
-(define (my-try proc args)
+(define (my-try proc args) (set-bbv-version-limit! #f) 
   (partial-evaluate proc args))
 
 ; . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -598,7 +602,7 @@
 
 ; . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
-(define (run #!key (n (unknown 3000 1)))
+(define-keys (run !key (n (unknown 3000 1)))
    (let loop ((n n) (result #f))
       (if (SFX> n 0)
 	  (begin
@@ -621,5 +625,5 @@
 (define expected-result
    '((lambda (b_2) (quote 11)) (lambda (x_4) (if (< x_4 (quote 0)) (- x_4) (- (quote 10) x_4))) (lambda (l_11) (letrec ((add-list_13_16 (lambda (l_14) (if (null? l_14) (quote ()) (cons (+ (quote 1) (car l_14)) (add-list_13_16 (cdr l_14))))))) (add-list_13_16 l_11))) (lambda (n_18) (list (+ (quote 1) n_18) (+ (quote 2) n_18) (+ (quote 3) n_18))) (lambda (env_27) (lookup (quote x) env_27)) (lambda (env_36) (apply (lookup (quote f) env_36) (list (quote 1) (quote 2) (quote 3)))) (lambda (b_53) (+ (quote 15) b_53 b_53 b_53 b_53 b_53 b_53)) (lambda () (quote 55)) (lambda () (list (quote a) (quote b) (quote c) (quote d) (quote e) (quote f) (quote g) (quote h) (quote i) (quote j) (quote k) (quote l) (quote m) (quote n) (quote o) (quote p) (quote q) (quote r) (quote s) (quote t) (quote u) (quote v) (quote w) (quote x) (quote y) (quote z))) (lambda () (list (quote z) (quote y) (quote x) (quote w) (quote v) (quote u) (quote t) (quote s) (quote r) (quote q) (quote p) (quote o) (quote n) (quote m) (quote l) (quote k) (quote j) (quote i) (quote h) (quote g) (quote f) (quote e) (quote d) (quote c) (quote b) (quote a)))))
 
-(define (check result)
+(define (check result) (set-bbv-version-limit! #f) 
    (equal? result expected-result))

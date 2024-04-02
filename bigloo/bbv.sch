@@ -123,6 +123,8 @@
 (define-macro-arithmetic (SFLsqrt x)        `(MAPop SFL sqrt ,x))
 (define-macro-arithmetic (SFLsin x)         `(MAPop SFL sin ,x))
 (define-macro-arithmetic (SFLcos x)         `(MAPop SFL cos ,x))
+(define-macro-arithmetic (SFLasin x)        `(MAPop SFL asin ,x))
+(define-macro-arithmetic (SFLacos x)        `(MAPop SFL acos ,x))
 (define-macro-arithmetic (SFLatan2 x y)     `(MAPop SFL atan2 ,x ,y))
 (define-macro-arithmetic (SFLatan x)        `(MAPop SFL atan ,x))
 
@@ -163,7 +165,9 @@
 (define-macro-arithmetic (FLzero? x)       `(FLop zero? ,x))
 (define-macro-arithmetic (FLsqrt x)        `(FLop sqrt ,x))
 (define-macro-arithmetic (FLsin x)         `(FLop sin ,x))
+(define-macro-arithmetic (FLasin x)        `(FLop asin ,x))
 (define-macro-arithmetic (FLcos x)         `(FLop cos ,x))
+(define-macro-arithmetic (FLacos x)        `(FLop acos ,x))
 (define-macro-arithmetic (FLatan2 x y)     `(FLop atan2 ,x ,y))
 (define-macro-arithmetic (FLatan x)        `(FLop atan ,x))
 
@@ -337,6 +341,20 @@
        (if (FLONUM? ,a)
            (FLsin ,a)
            (PRIMop sin ,a)))))
+
+(define-macro-arithmetic (BBVasin x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (if (FLONUM? ,a)
+           (FLasin ,a)
+           (PRIMop asin ,a)))))
+
+(define-macro-arithmetic (BBVacos x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (if (FLONUM? ,a)
+           (FLacos ,a)
+           (PRIMop acos ,a)))))
 
 (define-macro-arithmetic (BBVatan2 x y)
   (let ((a (gensym))
@@ -1068,6 +1086,17 @@
                         (DEAD-END "record type error"))))))
                 fields
                 (iota (length fields) 1)))))))
+
+(define-macro (define-keys signature . body)
+  (define (replace lst)
+    (cond
+      ((null? lst) '())
+      ((eq? (car lst) '!key) (cons '#!key (cdr lst)))
+      (else (cons (car lst) (replace (cdr lst))))))
+  `(define ,(replace signature) ,@body))
+
+(define-macro (set-bbv-version-limit! . rest) `(begin))
+(define-macro (set-custom-version-limits! . rest) `(begin))
 
 (register-exit-function! (lambda (status) (bbv-saw-statistics) status))
 

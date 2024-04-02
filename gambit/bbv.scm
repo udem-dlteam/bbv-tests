@@ -72,6 +72,8 @@
 (define-macro (SFLsqrt x)        `(MAPop SFL sqrt ,x))
 (define-macro (SFLsin x)         `(MAPop SFL sin ,x))
 (define-macro (SFLcos x)         `(MAPop SFL cos ,x))
+(define-macro (SFLasin x)        `(MAPop SFL asin ,x))
+(define-macro (SFLacos x)        `(MAPop SFL acos ,x))
 (define-macro (SFLatan x)        `(MAPop SFL atan ,x))
 (define-macro (SFLatan2 x y)     `(MAPop SFL atan2 ,x ,y))
 
@@ -111,6 +113,8 @@
 (define-macro (FLsqrt x)        `(FLop sqrt ,x))
 (define-macro (FLsin x)         `(FLop sin ,x))
 (define-macro (FLcos x)         `(FLop cos ,x))
+(define-macro (FLasin x)        `(FLop asin ,x))
+(define-macro (FLacos x)        `(FLop acos ,x))
 (define-macro (FLatan x)        `(FLop atan ,x))
 (define-macro (FLatan2 x y)     `(FLop atan ,x ,y))
 
@@ -340,6 +344,20 @@
        (if (FLONUM? ,a)
            (FLsin ,a)
            (PRIMop sin ,a)))))
+
+(define-macro (BBVasin x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (if (FLONUM? ,a)
+           (FLasin ,a)
+           (PRIMop asin ,a)))))
+
+(define-macro (BBVacos x)
+  (let ((a (gensym)))
+    `(let ((,a ,x))
+       (if (FLONUM? ,a)
+           (FLacos ,a)
+           (PRIMop acos ,a)))))
 
 (define-macro (BBVatan x)
   (let ((a (gensym)))
@@ -1042,3 +1060,37 @@
                         (DEAD-END "record type error"))))))
                 fields
                 (iota (length fields) 1)))))))
+
+(define-macro (define-keys signature . body)
+  (define (replace lst)
+    (cond
+      ((null? lst) '())
+      ((eq? (car lst) '!key) (cons '#!key (cdr lst)))
+      (else (cons (car lst) (replace (cdr lst))))))
+  `(define ,(replace signature) ,@body))
+
+(define-macro (set-bbv-version-limit! limit #!optional print?)
+  (let ((result
+          (cond
+            (limit `(declare (version-limit ,limit)))
+            (use-custom-version-limits?
+              (let ((limit (car custom-version-limits)))
+                (set! custom-version-limits (cdr custom-version-limits))
+                `(declare (version-limit ,limit))))
+            (else `(begin)))))
+    (if print? (pp result))
+    result))
+
+(define-macro (init-use-custom-version-limits!)
+  ;; do not use custom version limits by default
+  (eval `(define use-custom-version-limits? #f))
+  (eval `(define custom-version-limits #f))
+  #f)
+
+(define-macro (use-custom-version-limits!)
+  (eval `(set! use-custom-version-limits? #t)))
+
+(define-macro (set-custom-version-limits! . limits)
+  (eval `(set! custom-version-limits (quote (,@limits)))))
+
+(init-use-custom-version-limits!)

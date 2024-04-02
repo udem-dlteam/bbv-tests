@@ -1,4 +1,4 @@
-(define (run #!key (x (unknown 18)) (y (unknown 12)) (z (unknown 6)))
+(define-keys (run !key (x (unknown 18)) (y (unknown 12)) (z (unknown 6)))
    
   (define (tak x y z)
     (if (not (SFX< y x))

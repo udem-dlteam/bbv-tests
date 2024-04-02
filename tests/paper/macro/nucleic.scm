@@ -16,8 +16,16 @@
 ;
 ;   "???" published in the "Journal of Functional Programming".
 
+(set-custom-version-limits! 2 1 5 4 4 3 2 9 2 10 7 1 1 2 4 4 9 10 1 9 4 9 7 4 8
+  10 5 1 3 7 6 5 3 4 6 2 2 7 2 6 6 10 5 1 8 9 2 7 2 9 5 10 6 10 4 2 1 4 5 2 4 2 7
+  5 8 6 3 6 6 4 5 2 10 3 9 4 3 8 7 5 9 4 6 1 4 1 6 7 5 2 4 10 6 4 8 7 8 3 5 3 4 9
+  9 5 10 7 10 7 6 4 3 9 8 2 1 2 3 3 7 10 2 7 7 10 8 9 5 9 1 2 9 5 6 2 5 7 3 8 1 5
+  9 3 9 2 5 9 10 4 3 6 3 9 9 1 10 6 8 1 2 6 5 4 1 4 10 2 2 8 2 9 3 3 8 9 3 5 9 10
+  7 4 9 4 5 7 6 8 9 8 2 4 4 2 6 1 10 9 4 10 4 1 2 1 4 2 1 6 2)
+
+
 (define k 0)
-(define (++)
+(define (++) (set-bbv-version-limit! #f) 
    (set! k (+fx k 1))
    k)
 
@@ -32,7 +40,7 @@
 (define constant-pi/2        1.57079632679489661923)
 (define constant-minus-pi/2 -1.57079632679489661923)
 
-(define (math-atan2 y x)
+(define (math-atan2 y x) (set-bbv-version-limit! #f) 
   (cond ((SFL> x 0.0)
          (SFLatan2 y x))
         ((SFL< y 0.0)
@@ -46,29 +54,29 @@
 
 ; -- POINTS -------------------------------------------------------------------
 
-(define (make-pt x y z)
+(define (make-pt x y z) (set-bbv-version-limit! #f) 
   (vector x y z))
 
-(define (pt-x pt) (Svector-ref pt 0))
-(define (pt-x-set! pt val) (Svector-set! pt 0 val))
-(define (pt-y pt) (Svector-ref pt 1))
-(define (pt-y-set! pt val) (Svector-set! pt 1 val))
-(define (pt-z pt) (Svector-ref pt 2))
-(define (pt-z-set! pt val) (Svector-set! pt 2 val))
+(define (pt-x pt) (set-bbv-version-limit! #f)  (Svector-ref pt 0))
+(define (pt-x-set! pt val) (set-bbv-version-limit! #f)  (Svector-set! pt 0 val))
+(define (pt-y pt) (set-bbv-version-limit! #f)  (Svector-ref pt 1))
+(define (pt-y-set! pt val) (set-bbv-version-limit! #f)  (Svector-set! pt 1 val))
+(define (pt-z pt) (set-bbv-version-limit! #f)  (Svector-ref pt 2))
+(define (pt-z-set! pt val) (set-bbv-version-limit! #f)  (Svector-set! pt 2 val))
 
-(define (pt-sub p1 p2)
+(define (pt-sub p1 p2) (set-bbv-version-limit! #f) 
    (trace "pt-sub p1=" p1 " p2=" p2)
   (make-pt (SFL- (pt-x p1) (pt-x p2))
            (SFL- (pt-y p1) (pt-y p2))
            (SFL- (pt-z p1) (pt-z p2))))
 
-(define (pt-dist p1 p2)
+(define (pt-dist p1 p2) (set-bbv-version-limit! #f) 
   (let ((dx (SFL- (pt-x p1) (pt-x p2)))
         (dy (SFL- (pt-y p1) (pt-y p2)))
         (dz (SFL- (pt-z p1) (pt-z p2))))
     (SFLsqrt (SFL+ (SFL* dx dx) (SFL+ (SFL* dy dy) (SFL* dz dz))))))
 
-(define (pt-phi p)
+(define (pt-phi p) (set-bbv-version-limit! #f) 
    (trace "pt-phi p=" p)
   (let* ((x (pt-x p))
          (y (pt-y p))
@@ -77,7 +85,7 @@
    (trace "pt-phi.2 " (SFL+ (SFL* (SFLcos b) z) (SFL* (SFLsin b) x)))
     (math-atan2 (SFL+ (SFL* (SFLcos b) z) (SFL* (SFLsin b) x)) y)))
 
-(define (pt-theta p)
+(define (pt-theta p) (set-bbv-version-limit! #f) 
   (math-atan2 (pt-x p) (pt-z p)))
 
 ; -- COORDINATE TRANSFORMATIONS -----------------------------------------------
@@ -97,34 +105,34 @@
 ;
 ; The components tx, ty, and tz are the translation vector.
 
-(define (make-tfo a b c d e f g h i tx ty tz)
+(define (make-tfo a b c d e f g h i tx ty tz) (set-bbv-version-limit! #f) 
    (trace "make-tfo " a " " b " " c " " d " " e " " f " " g " " h)
   (vector a b c d e f g h i tx ty tz))
 
-(define (tfo-a tfo) (Svector-ref tfo 0))
-(define (tfo-a-set! tfo val) (Svector-set! tfo 0 val))
-(define (tfo-b tfo) (Svector-ref tfo 1))
-(define (tfo-b-set! tfo val) (Svector-set! tfo 1 val))
-(define (tfo-c tfo) (Svector-ref tfo 2))
-(define (tfo-c-set! tfo val) (Svector-set! tfo 2 val))
-(define (tfo-d tfo) (Svector-ref tfo 3))
-(define (tfo-d-set! tfo val) (Svector-set! tfo 3 val))
-(define (tfo-e tfo) (Svector-ref tfo 4))
-(define (tfo-e-set! tfo val) (Svector-set! tfo 4 val))
-(define (tfo-f tfo) (Svector-ref tfo 5))
-(define (tfo-f-set! tfo val) (Svector-set! tfo 5 val))
-(define (tfo-g tfo) (Svector-ref tfo 6))
-(define (tfo-g-set! tfo val) (Svector-set! tfo 6 val))
-(define (tfo-h tfo) (Svector-ref tfo 7))
-(define (tfo-h-set! tfo val) (Svector-set! tfo 7 val))
-(define (tfo-i tfo) (Svector-ref tfo 8))
-(define (tfo-i-set! tfo val) (Svector-set! tfo 8 val))
-(define (tfo-tx tfo) (Svector-ref tfo 9))
-(define (tfo-tx-set! tfo val) (Svector-set! tfo 9 val))
-(define (tfo-ty tfo) (Svector-ref tfo 10))
-(define (tfo-ty-set! tfo val) (Svector-set! tfo 10 val))
-(define (tfo-tz tfo) (Svector-ref tfo 11))
-(define (tfo-tz-set! tfo val) (Svector-set! tfo 11 val))
+(define (tfo-a tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 0))
+(define (tfo-a-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 0 val))
+(define (tfo-b tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 1))
+(define (tfo-b-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 1 val))
+(define (tfo-c tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 2))
+(define (tfo-c-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 2 val))
+(define (tfo-d tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 3))
+(define (tfo-d-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 3 val))
+(define (tfo-e tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 4))
+(define (tfo-e-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 4 val))
+(define (tfo-f tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 5))
+(define (tfo-f-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 5 val))
+(define (tfo-g tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 6))
+(define (tfo-g-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 6 val))
+(define (tfo-h tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 7))
+(define (tfo-h-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 7 val))
+(define (tfo-i tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 8))
+(define (tfo-i-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 8 val))
+(define (tfo-tx tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 9))
+(define (tfo-tx-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 9 val))
+(define (tfo-ty tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 10))
+(define (tfo-ty-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 10 val))
+(define (tfo-tz tfo) (set-bbv-version-limit! #f)  (Svector-ref tfo 11))
+(define (tfo-tz-set! tfo val) (set-bbv-version-limit! #f)  (Svector-set! tfo 11 val))
 
 (define tfo-id  ; the identity transformation matrix
   '#(1.0 0.0 0.0
@@ -135,7 +143,7 @@
 ; The function "tfo-apply" multiplies a transformation matrix, tfo, by a
 ; point vector, p.  The result is a new point.
 
-(define (tfo-apply tfo p)
+(define (tfo-apply tfo p) (set-bbv-version-limit! #f) 
   (let ((x (pt-x p))
         (y (pt-y p))
         (z (pt-z p)))
@@ -163,7 +171,7 @@
 ; The result is a new matrix which cumulates the transformations described
 ; by A and B.
 
-(define (tfo-combine A B)
+(define (tfo-combine A B) (set-bbv-version-limit! #f) 
    (trace "tfo-combine a=" A " b=" B)
   (make-tfo
    (SFL+ (SFL* (tfo-a A) (tfo-a B))
@@ -209,7 +217,7 @@
 ; The function "tfo-inv-ortho" computes the inverse of a homogeneous
 ; transformation matrix.
 
-(define (tfo-inv-ortho tfo)
+(define (tfo-inv-ortho tfo) (set-bbv-version-limit! #f) 
    (trace "tfo-inv-orth tfo=" tfo)
   (let* ((tx (tfo-tx tfo))
          (ty (tfo-ty tfo))
@@ -232,7 +240,7 @@
 ; a transformation matrix such that point p1 gets mapped to (0,0,0), p2 gets
 ; mapped to the Y axis and p3 gets mapped to the YZ plane.
 
-(define (tfo-align p1 p2 p3)
+(define (tfo-align p1 p2 p3) (set-bbv-version-limit! #f) 
    (trace "tfo-align tfo=" p1 " " p2 " " p3)
   (let* ((x1 (pt-x p1))       (y1 (pt-y p1))       (z1 (pt-z p1))
          (x3 (pt-x p3))       (y3 (pt-y p3))       (z3 (pt-z p3))
@@ -302,64 +310,64 @@
 
 ; Define part common to all 4 nucleotide types.
 
-(define (nuc-dgf-base-tfo nuc) (Svector-ref nuc 0))
-(define (nuc-dgf-base-tfo-set! nuc val) (Svector-set! nuc 0 val))
-(define (nuc-P-O3*-275-tfo nuc) (Svector-ref nuc 1))
-(define (nuc-P-O3*-275-tfo-set! nuc val) (Svector-set! nuc 1 val))
-(define (nuc-P-O3*-180-tfo nuc) (Svector-ref nuc 2))
-(define (nuc-P-O3*-180-tfo-set! nuc val) (Svector-set! nuc 2 val))
-(define (nuc-P-O3*-60-tfo nuc) (Svector-ref nuc 3))
-(define (nuc-P-O3*-60-tfo-set! nuc val) (Svector-set! nuc 3 val))
-(define (nuc-P nuc) (Svector-ref nuc 4))
-(define (nuc-P-set! nuc val) (Svector-set! nuc 4 val))
-(define (nuc-O1P nuc) (Svector-ref nuc 5))
-(define (nuc-O1P-set! nuc val) (Svector-set! nuc 5 val))
-(define (nuc-O2P nuc) (Svector-ref nuc 6))
-(define (nuc-O2P-set! nuc val) (Svector-set! nuc 6 val))
-(define (nuc-O5* nuc) (Svector-ref nuc 7))
-(define (nuc-O5*-set! nuc val) (Svector-set! nuc 7 val))
-(define (nuc-C5* nuc) (Svector-ref nuc 8))
-(define (nuc-C5*-set! nuc val) (Svector-set! nuc 8 val))
-(define (nuc-H5* nuc) (Svector-ref nuc 9))
-(define (nuc-H5*-set! nuc val) (Svector-set! nuc 9 val))
-(define (nuc-H5** nuc) (Svector-ref nuc 10))
-(define (nuc-H5**-set! nuc val) (Svector-set! nuc 10 val))
-(define (nuc-C4* nuc) (Svector-ref nuc 11))
-(define (nuc-C4*-set! nuc val) (Svector-set! nuc 11 val))
-(define (nuc-H4* nuc) (Svector-ref nuc 12))
-(define (nuc-H4*-set! nuc val) (Svector-set! nuc 12 val))
-(define (nuc-O4* nuc) (Svector-ref nuc 13))
-(define (nuc-O4*-set! nuc val) (Svector-set! nuc 13 val))
-(define (nuc-C1* nuc) (Svector-ref nuc 14))
-(define (nuc-C1*-set! nuc val) (Svector-set! nuc 14 val))
-(define (nuc-H1* nuc) (Svector-ref nuc 15))
-(define (nuc-H1*-set! nuc val) (Svector-set! nuc 15 val))
-(define (nuc-C2* nuc) (Svector-ref nuc 16))
-(define (nuc-C2*-set! nuc val) (Svector-set! nuc 16 val))
-(define (nuc-H2** nuc) (Svector-ref nuc 17))
-(define (nuc-H2**-set! nuc val) (Svector-set! nuc 17 val))
-(define (nuc-O2* nuc) (Svector-ref nuc 18))
-(define (nuc-O2*-set! nuc val) (Svector-set! nuc 18 val))
-(define (nuc-H2* nuc) (Svector-ref nuc 19))
-(define (nuc-H2*-set! nuc val) (Svector-set! nuc 19 val))
-(define (nuc-C3* nuc) (Svector-ref nuc 20))
-(define (nuc-C3*-set! nuc val) (Svector-set! nuc 20 val))
-(define (nuc-H3* nuc) (Svector-ref nuc 21))
-(define (nuc-H3*-set! nuc val) (Svector-set! nuc 21 val))
-(define (nuc-O3* nuc) (Svector-ref nuc 22))
-(define (nuc-O3*-set! nuc val) (Svector-set! nuc 22 val))
-(define (nuc-N1 nuc) (Svector-ref nuc 23))
-(define (nuc-N1-set! nuc val) (Svector-set! nuc 23 val))
-(define (nuc-N3 nuc) (Svector-ref nuc 24))
-(define (nuc-N3-set! nuc val) (Svector-set! nuc 24 val))
-(define (nuc-C2 nuc) (Svector-ref nuc 25))
-(define (nuc-C2-set! nuc val) (Svector-set! nuc 25 val))
-(define (nuc-C4 nuc) (Svector-ref nuc 26))
-(define (nuc-C4-set! nuc val) (Svector-set! nuc 26 val))
-(define (nuc-C5 nuc) (Svector-ref nuc 27))
-(define (nuc-C5-set! nuc val) (Svector-set! nuc 27 val))
-(define (nuc-C6 nuc) (Svector-ref nuc 28))
-(define (nuc-C6-set! nuc val) (Svector-set! nuc 28 val))
+(define (nuc-dgf-base-tfo nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 0))
+(define (nuc-dgf-base-tfo-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 0 val))
+(define (nuc-P-O3*-275-tfo nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 1))
+(define (nuc-P-O3*-275-tfo-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 1 val))
+(define (nuc-P-O3*-180-tfo nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 2))
+(define (nuc-P-O3*-180-tfo-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 2 val))
+(define (nuc-P-O3*-60-tfo nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 3))
+(define (nuc-P-O3*-60-tfo-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 3 val))
+(define (nuc-P nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 4))
+(define (nuc-P-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 4 val))
+(define (nuc-O1P nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 5))
+(define (nuc-O1P-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 5 val))
+(define (nuc-O2P nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 6))
+(define (nuc-O2P-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 6 val))
+(define (nuc-O5* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 7))
+(define (nuc-O5*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 7 val))
+(define (nuc-C5* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 8))
+(define (nuc-C5*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 8 val))
+(define (nuc-H5* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 9))
+(define (nuc-H5*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 9 val))
+(define (nuc-H5** nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 10))
+(define (nuc-H5**-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 10 val))
+(define (nuc-C4* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 11))
+(define (nuc-C4*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 11 val))
+(define (nuc-H4* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 12))
+(define (nuc-H4*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 12 val))
+(define (nuc-O4* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 13))
+(define (nuc-O4*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 13 val))
+(define (nuc-C1* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 14))
+(define (nuc-C1*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 14 val))
+(define (nuc-H1* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 15))
+(define (nuc-H1*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 15 val))
+(define (nuc-C2* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 16))
+(define (nuc-C2*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 16 val))
+(define (nuc-H2** nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 17))
+(define (nuc-H2**-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 17 val))
+(define (nuc-O2* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 18))
+(define (nuc-O2*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 18 val))
+(define (nuc-H2* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 19))
+(define (nuc-H2*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 19 val))
+(define (nuc-C3* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 20))
+(define (nuc-C3*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 20 val))
+(define (nuc-H3* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 21))
+(define (nuc-H3*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 21 val))
+(define (nuc-O3* nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 22))
+(define (nuc-O3*-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 22 val))
+(define (nuc-N1 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 23))
+(define (nuc-N1-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 23 val))
+(define (nuc-N3 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 24))
+(define (nuc-N3-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 24 val))
+(define (nuc-C2 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 25))
+(define (nuc-C2-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 25 val))
+(define (nuc-C4 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 26))
+(define (nuc-C4-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 26 val))
+(define (nuc-C5 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 27))
+(define (nuc-C5-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 27 val))
+(define (nuc-C6 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 28))
+(define (nuc-C6-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 28 val))
 
 ; Define remaining atoms for each nucleotide type.
 
@@ -372,24 +380,24 @@
           H2** O2* H2* C3* H3* O3* N1 N3 C2 C4 C5 C6
           'rA N6 N7 N9 C8 H2 H61 H62 H8))
 
-(define (rA? nuc) (eq? (Svector-ref nuc 29) 'rA))
+(define (rA? nuc) (set-bbv-version-limit! #f)  (eq? (Svector-ref nuc 29) 'rA))
 
-(define (rA-N6 nuc) (Svector-ref nuc 30))
-(define (rA-N6-set! nuc val) (Svector-set! nuc 30 val))
-(define (rA-N7 nuc) (Svector-ref nuc 31))
-(define (rA-N7-set! nuc val) (Svector-set! nuc 31 val))
-(define (rA-N9 nuc) (Svector-ref nuc 32))
-(define (rA-N9-set! nuc val) (Svector-set! nuc 32 val))
-(define (rA-C8 nuc) (Svector-ref nuc 33))
-(define (rA-C8-set! nuc val) (Svector-set! nuc 33 val))
-(define (rA-H2 nuc) (Svector-ref nuc 34))
-(define (rA-H2-set! nuc val) (Svector-set! nuc 34 val))
-(define (rA-H61 nuc) (Svector-ref nuc 35))
-(define (rA-H61-set! nuc val) (Svector-set! nuc 35 val))
-(define (rA-H62 nuc) (Svector-ref nuc 36))
-(define (rA-H62-set! nuc val) (Svector-set! nuc 36 val))
-(define (rA-H8 nuc) (Svector-ref nuc 37))
-(define (rA-H8-set! nuc val) (Svector-set! nuc 37 val))
+(define (rA-N6 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 30))
+(define (rA-N6-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 30 val))
+(define (rA-N7 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 31))
+(define (rA-N7-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 31 val))
+(define (rA-N9 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 32))
+(define (rA-N9-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 32 val))
+(define (rA-C8 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 33))
+(define (rA-C8-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 33 val))
+(define (rA-H2 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 34))
+(define (rA-H2-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 34 val))
+(define (rA-H61 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 35))
+(define (rA-H61-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 35 val))
+(define (rA-H62 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 36))
+(define (rA-H62-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 36 val))
+(define (rA-H8 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 37))
+(define (rA-H8-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 37 val))
 
 (define (make-rC dgf-base-tfo P-O3*-275-tfo P-O3*-180-tfo P-O3*-60-tfo
                  P O1P O2P O5* C5* H5* H5** C4* H4* O4* C1* H1* C2*
@@ -400,20 +408,20 @@
           H2** O2* H2* C3* H3* O3* N1 N3 C2 C4 C5 C6
           'rC N4 O2 H41 H42 H5 H6))
 
-(define (rC? nuc) (eq? (Svector-ref nuc 29) 'rC))
+(define (rC? nuc) (set-bbv-version-limit! #f)  (eq? (Svector-ref nuc 29) 'rC))
 
-(define (rC-N4 nuc) (Svector-ref nuc 30))
-(define (rC-N4-set! nuc val) (Svector-set! nuc 30 val))
-(define (rC-O2 nuc) (Svector-ref nuc 31))
-(define (rC-O2-set! nuc val) (Svector-set! nuc 31 val))
-(define (rC-H41 nuc) (Svector-ref nuc 32))
-(define (rC-H41-set! nuc val) (Svector-set! nuc 32 val))
-(define (rC-H42 nuc) (Svector-ref nuc 33))
-(define (rC-H42-set! nuc val) (Svector-set! nuc 33 val))
-(define (rC-H5 nuc) (Svector-ref nuc 34))
-(define (rC-H5-set! nuc val) (Svector-set! nuc 34 val))
-(define (rC-H6 nuc) (Svector-ref nuc 35))
-(define (rC-H6-set! nuc val) (Svector-set! nuc 35 val))
+(define (rC-N4 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 30))
+(define (rC-N4-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 30 val))
+(define (rC-O2 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 31))
+(define (rC-O2-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 31 val))
+(define (rC-H41 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 32))
+(define (rC-H41-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 32 val))
+(define (rC-H42 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 33))
+(define (rC-H42-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 33 val))
+(define (rC-H5 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 34))
+(define (rC-H5-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 34 val))
+(define (rC-H6 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 35))
+(define (rC-H6-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 35 val))
 
 (define (make-rG dgf-base-tfo P-O3*-275-tfo P-O3*-180-tfo P-O3*-60-tfo
                  P O1P O2P O5* C5* H5* H5** C4* H4* O4* C1* H1* C2*
@@ -424,26 +432,26 @@
           H2** O2* H2* C3* H3* O3* N1 N3 C2 C4 C5 C6
           'rG N2 N7 N9 C8 O6 H1 H21 H22 H8))
 
-(define (rG? nuc) (eq? (Svector-ref nuc 29) 'rG))
+(define (rG? nuc) (set-bbv-version-limit! #f)  (eq? (Svector-ref nuc 29) 'rG))
 
-(define (rG-N2 nuc) (Svector-ref nuc 30))
-(define (rG-N2-set! nuc val) (Svector-set! nuc 30 val))
-(define (rG-N7 nuc) (Svector-ref nuc 31))
-(define (rG-N7-set! nuc val) (Svector-set! nuc 31 val))
-(define (rG-N9 nuc) (Svector-ref nuc 32))
-(define (rG-N9-set! nuc val) (Svector-set! nuc 32 val))
-(define (rG-C8 nuc) (Svector-ref nuc 33))
-(define (rG-C8-set! nuc val) (Svector-set! nuc 33 val))
-(define (rG-O6 nuc) (Svector-ref nuc 34))
-(define (rG-O6-set! nuc val) (Svector-set! nuc 34 val))
-(define (rG-H1 nuc) (Svector-ref nuc 35))
-(define (rG-H1-set! nuc val) (Svector-set! nuc 35 val))
-(define (rG-H21 nuc) (Svector-ref nuc 36))
-(define (rG-H21-set! nuc val) (Svector-set! nuc 36 val))
-(define (rG-H22 nuc) (Svector-ref nuc 37))
-(define (rG-H22-set! nuc val) (Svector-set! nuc 37 val))
-(define (rG-H8 nuc) (Svector-ref nuc 38))
-(define (rG-H8-set! nuc val) (Svector-set! nuc 38 val))
+(define (rG-N2 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 30))
+(define (rG-N2-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 30 val))
+(define (rG-N7 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 31))
+(define (rG-N7-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 31 val))
+(define (rG-N9 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 32))
+(define (rG-N9-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 32 val))
+(define (rG-C8 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 33))
+(define (rG-C8-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 33 val))
+(define (rG-O6 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 34))
+(define (rG-O6-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 34 val))
+(define (rG-H1 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 35))
+(define (rG-H1-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 35 val))
+(define (rG-H21 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 36))
+(define (rG-H21-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 36 val))
+(define (rG-H22 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 37))
+(define (rG-H22-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 37 val))
+(define (rG-H8 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 38))
+(define (rG-H8-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 38 val))
 
 (define (make-rU dgf-base-tfo P-O3*-275-tfo P-O3*-180-tfo P-O3*-60-tfo
                  P O1P O2P O5* C5* H5* H5** C4* H4* O4* C1* H1* C2*
@@ -454,18 +462,18 @@
           H2** O2* H2* C3* H3* O3* N1 N3 C2 C4 C5 C6
           'rU O2 O4 H3 H5 H6))
 
-(define (rU? nuc) (eq? (Svector-ref nuc 29) 'rU))
+(define (rU? nuc) (set-bbv-version-limit! #f)  (eq? (Svector-ref nuc 29) 'rU))
 
-(define (rU-O2 nuc) (Svector-ref nuc 30))
-(define (rU-O2-set! nuc val) (Svector-set! nuc 30 val))
-(define (rU-O4 nuc) (Svector-ref nuc 31))
-(define (rU-O4-set! nuc val) (Svector-set! nuc 31 val))
-(define (rU-H3 nuc) (Svector-ref nuc 32))
-(define (rU-H3-set! nuc val) (Svector-set! nuc 32 val))
-(define (rU-H5 nuc) (Svector-ref nuc 33))
-(define (rU-H5-set! nuc val) (Svector-set! nuc 33 val))
-(define (rU-H6 nuc) (Svector-ref nuc 34))
-(define (rU-H6-set! nuc val) (Svector-set! nuc 34 val))
+(define (rU-O2 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 30))
+(define (rU-O2-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 30 val))
+(define (rU-O4 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 31))
+(define (rU-O4-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 31 val))
+(define (rU-H3 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 32))
+(define (rU-H3-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 32 val))
+(define (rU-H5 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 33))
+(define (rU-H5-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 33 val))
+(define (rU-H6 nuc) (set-bbv-version-limit! #f)  (Svector-ref nuc 34))
+(define (rU-H6-set! nuc val) (set-bbv-version-limit! #f)  (Svector-set! nuc 34 val))
 
 ; Database of nucleotide conformations:
 
@@ -2923,26 +2931,26 @@
 
 ; -- PARTIAL INSTANTIATIONS ---------------------------------------------------
 
-(define (make-var id tfo nuc)
+(define (make-var id tfo nuc) (set-bbv-version-limit! #f) 
   (vector id tfo nuc))
 
-(define (var-id var) (Svector-ref var 0))
-(define (var-id-set! var val) (Svector-set! var 0 val))
-(define (var-tfo var) (Svector-ref var 1))
-(define (var-tfo-set! var val) (Svector-set! var 1 val))
-(define (var-nuc var) (Svector-ref var 2))
-(define (var-nuc-set! var val) (Svector-set! var 2 val))
+(define (var-id var) (set-bbv-version-limit! #f)  (Svector-ref var 0))
+(define (var-id-set! var val) (set-bbv-version-limit! #f)  (Svector-set! var 0 val))
+(define (var-tfo var) (set-bbv-version-limit! #f)  (Svector-ref var 1))
+(define (var-tfo-set! var val) (set-bbv-version-limit! #f)  (Svector-set! var 1 val))
+(define (var-nuc var) (set-bbv-version-limit! #f)  (Svector-ref var 2))
+(define (var-nuc-set! var val) (set-bbv-version-limit! #f)  (Svector-set! var 2 val))
 
-(define (atom-pos atom var)
+(define (atom-pos atom var) (set-bbv-version-limit! #f) 
   (tfo-apply (var-tfo var) (atom (var-nuc var))))
 
-(define (get-var id lst)
+(define (get-var id lst) (set-bbv-version-limit! #f) 
   (let ((v (car lst)))
     (if (GEN= id (var-id v))
       v
       (get-var id (cdr lst)))))
 
-(define (make-relative-nuc tfo n)
+(define (make-relative-nuc tfo n) (set-bbv-version-limit! #f) 
    (trace "make-relative-nuc tfo=" tfo " " n)
   (cond ((rA? n)
          (make-rA
@@ -3101,12 +3109,12 @@
 
 ; Sequential backtracking algorithm
 
-(define (search partial-inst domains constraint?)
+(define (search partial-inst domains constraint?) (set-bbv-version-limit! #f) 
   (if (null? domains)
     (list partial-inst)
     (let ((remaining-domains (Scdr domains)))
 
-      (define (try-assignments lst)
+      (define (try-assignments lst) (set-bbv-version-limit! #f) 
         (if (null? lst)
           '()
           (let ((var (Scar lst)))
@@ -3164,7 +3172,7 @@
 ; the function "dgf-base" computes the transformation matrix that
 ; places the nucleotide "nuc" in the given relationship to "ref".
 
-(define (dgf-base tfo ref nuc)
+(define (dgf-base tfo ref nuc) (set-bbv-version-limit! #f) 
   (let* ((ref-nuc (var-nuc ref))
          (align
           (tfo-inv-ortho
@@ -3189,8 +3197,8 @@
 
 ; Placement of first nucleotide.
 
-(define (reference nuc i)
-  (lambda (partial-inst)
+(define (reference nuc i) (set-bbv-version-limit! #f) 
+  (lambda (partial-inst) (set-bbv-version-limit! #f) 
     (list (make-var i tfo-id nuc))))
 
 ; The transformation matrix for wc is from:
@@ -3205,8 +3213,8 @@
      -0.0019 -0.9379 -0.3468
      -0.0080  6.0730  8.7208))
 
-(define (wc nuc i j)
-  (lambda (partial-inst)
+(define (wc nuc i j) (set-bbv-version-limit! #f) 
+  (lambda (partial-inst) (set-bbv-version-limit! #f) 
     (let* ((ref (get-var j partial-inst))
            (tfo (dgf-base wc-tfo ref nuc)))
       (list (make-var i tfo nuc)))))
@@ -3218,8 +3226,8 @@
       0.1422 -0.9529 -0.2679
       0.4837  6.2649  8.0285))
          
-(define (wc-Dumas nuc i j)
-  (lambda (partial-inst)
+(define (wc-Dumas nuc i j) (set-bbv-version-limit! #f) 
+  (lambda (partial-inst) (set-bbv-version-limit! #f) 
     (let* ((ref (get-var j partial-inst))
            (tfo (dgf-base wc-Dumas-tfo ref nuc)))
       (list (make-var i tfo nuc)))))
@@ -3230,8 +3238,8 @@
      -0.0482  0.5258  0.8492
      -3.8737  0.5480  3.8024))
 
-(define (helix5* nuc i j)
-  (lambda (partial-inst)
+(define (helix5* nuc i j) (set-bbv-version-limit! #f) 
+  (lambda (partial-inst) (set-bbv-version-limit! #f) 
     (let* ((ref (get-var j partial-inst))
            (tfo (dgf-base helix5*-tfo ref nuc)))
       (list (make-var i tfo nuc)))))
@@ -3242,8 +3250,8 @@
       0.1156 -0.5152  0.8492
       3.4426  2.0474 -3.7042))
 
-(define (helix3* nuc i j)
-  (lambda (partial-inst)
+(define (helix3* nuc i j) (set-bbv-version-limit! #f) 
+  (lambda (partial-inst) (set-bbv-version-limit! #f) 
     (let* ((ref (get-var j partial-inst))
            (tfo (dgf-base helix3*-tfo ref nuc)))
       (list (make-var i tfo nuc)))))
@@ -3255,14 +3263,14 @@
       0.0189  0.6478  0.7615
      -3.3018  0.9975  2.5585))
 
-(define (G37-A38 nuc i j)
-  (lambda (partial-inst)
+(define (G37-A38 nuc i j) (set-bbv-version-limit! #f) 
+  (lambda (partial-inst) (set-bbv-version-limit! #f) 
     (let* ((ref (get-var j partial-inst))
            (tfo (dgf-base G37-A38-tfo ref nuc)))
       (make-var i tfo nuc))))
 
-(define (stacked5* nuc i j)
-  (lambda (partial-inst)
+(define (stacked5* nuc i j) (set-bbv-version-limit! #f) 
+  (lambda (partial-inst) (set-bbv-version-limit! #f) 
     (cons ((G37-A38 nuc i j) partial-inst)
           ((helix5* nuc i j) partial-inst))))
 
@@ -3273,19 +3281,19 @@
      -0.0387 -0.6470  0.7615
       3.3819  0.7718 -2.5321))
 
-(define (A38-G37 nuc i j)
-  (lambda (partial-inst)
+(define (A38-G37 nuc i j) (set-bbv-version-limit! #f) 
+  (lambda (partial-inst) (set-bbv-version-limit! #f) 
     (let* ((ref (get-var j partial-inst))
            (tfo (dgf-base A38-G37-tfo ref nuc)))
       (make-var i tfo nuc))))
    
-(define (stacked3* nuc i j)
-  (lambda (partial-inst)
+(define (stacked3* nuc i j) (set-bbv-version-limit! #f) 
+  (lambda (partial-inst) (set-bbv-version-limit! #f) 
     (cons ((A38-G37 nuc i j) partial-inst)
           ((helix3* nuc i j) partial-inst))))
 
-(define (P-O3* nucs i j)
-  (lambda (partial-inst)
+(define (P-O3* nucs i j) (set-bbv-version-limit! #f) 
+  (lambda (partial-inst) (set-bbv-version-limit! #f) 
     (let* ((ref (get-var j partial-inst))
            (align
              (tfo-inv-ortho
@@ -3331,14 +3339,14 @@
 
 ; Anticodon constraint
 
-(define (anticodon-constraint? v partial-inst)
+(define (anticodon-constraint? v partial-inst) (set-bbv-version-limit! #f) 
   (if (GEN= (var-id v) 33)
     (let ((p   (atom-pos nuc-P (get-var 34 partial-inst))) ; P in nucleotide 34
           (o3* (atom-pos nuc-O3* v)))                      ; O3' in nucl. 33
       (SFL<= (pt-dist p o3*) 3.0))                       ; check distance
     #t))
 
-(define (anticodon)
+(define (anticodon) (set-bbv-version-limit! #f) 
   (search '() anticodon-domains anticodon-constraint?))
 
 ; Define pseudoknot problem -- Science 253:1255 Figure 4a and 4b
@@ -3378,7 +3386,7 @@
   
 ; Pseudoknot constraint
 
-(define (pseudoknot-constraint? v partial-inst)
+(define (pseudoknot-constraint? v partial-inst) (set-bbv-version-limit! #f) 
   (case (var-id v)
     ((18)
      (let ((p   (atom-pos nuc-P (get-var 19 partial-inst)))
@@ -3391,16 +3399,16 @@
     (else
      #t)))
 
-(define (pseudoknot)
+(define (pseudoknot) (set-bbv-version-limit! #f) 
   (search '() pseudoknot-domains pseudoknot-constraint?))
 
 ; -- TESTING -----------------------------------------------------------------
 
-(define (list-of-atoms n)
+(define (list-of-atoms n) (set-bbv-version-limit! #f) 
   (Sappend (list-of-common-atoms n)
            (list-of-specific-atoms n)))
 
-(define (list-of-common-atoms n)
+(define (list-of-common-atoms n) (set-bbv-version-limit! #f) 
   (list
     (nuc-P    n)
     (nuc-O1P  n)
@@ -3428,7 +3436,7 @@
     (nuc-C5   n)
     (nuc-C6   n)))
 
-(define (list-of-specific-atoms n)
+(define (list-of-specific-atoms n) (set-bbv-version-limit! #f) 
   (cond ((rA? n)
          (list
            (rA-N6   n)
@@ -3466,38 +3474,38 @@
            (rU-H5   n)
            (rU-H6   n)))))
 
-(define (var-most-distant-atom v)
+(define (var-most-distant-atom v) (set-bbv-version-limit! #f) 
 
-  (define (distance pos)
+  (define (distance pos) (set-bbv-version-limit! #f) 
     (let ((abs-pos (tfo-apply (var-tfo v) pos)))
       (let ((x (pt-x abs-pos)) (y (pt-y abs-pos)) (z (pt-z abs-pos)))
         (SFLsqrt (SFL+ (SFL* x x) (SFL* y y) (SFL* z z))))))
 
   (maximum (Smap2 distance (list-of-atoms (var-nuc v)))))
 
-(define (sol-most-distant-atom s)
+(define (sol-most-distant-atom s) (set-bbv-version-limit! #f) 
   (maximum (Smap2 var-most-distant-atom s)))
 
-(define (most-distant-atom sols)
+(define (most-distant-atom sols) (set-bbv-version-limit! #f) 
   (maximum (Smap2 sol-most-distant-atom sols)))
 
-(define (maximum lst)
+(define (maximum lst) (set-bbv-version-limit! #f) 
   (let loop ((m (Scar lst)) (l (Scdr lst)))
     (if (null? l)
       m
       (let ((x (Scar l)))
         (loop (if (SFL> x m) x m) (Scdr l))))))
 
-(define (run1)
+(define (run1) (set-bbv-version-limit! #f) 
   (most-distant-atom (pseudoknot)))
    
-(define (run #!key (n (unknown 50 1)))
+(define-keys (run !key (n (unknown 50 1)))
    (let loop ((n n) (result #f))
       (if (SFX> n 0)
 	  (loop (SFX- n 1) (run1))
 	  result)))
 
-(define (check result)
+(define (check result) (set-bbv-version-limit! #f) 
   (and (number? result)
        (let ((x (SFL/ result 33.797594890762724)))
           (and (SFL> x 0.999999) (SFL< x 1.000001)))))

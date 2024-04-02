@@ -23,7 +23,6 @@
 ;; env->list: Env -> Binding*
 ;; env-show: Env -> Symbol*
 
-
 ;; bindings
 
 (define gen-binding cons)
@@ -35,15 +34,15 @@
 (define binding-value cdr)
 ;; returns the tvariable of a type binding
 
-(define (key-show key)
+(define (key-show key) (set-bbv-version-limit! #f) 
   ;; default show procedure for keys
   key)
 
-(define (value-show value)
+(define (value-show value) (set-bbv-version-limit! #f) 
   ;; default show procedure for values
   value)
 
-(define (binding-show binding)
+(define (binding-show binding) (set-bbv-version-limit! #f) 
   ;; returns a printable representation of a type binding
   (cons (key-show (binding-key binding))
         (cons ': (value-show (binding-value binding)))))
@@ -54,28 +53,28 @@
 (define dynamic-empty-env '())
 ;; returns the empty environment
 
-(define (extend-env-with-binding env binding)
+(define (extend-env-with-binding env binding) (set-bbv-version-limit! #f) 
   ;; extends env with a binding, which hides any other binding in env
   ;; for the same key (see dynamic-lookup)
   ;; returns the extended environment
   (cons binding env))
 
-(define (extend-env-with-env env ext-env)
+(define (extend-env-with-env env ext-env) (set-bbv-version-limit! #f) 
   ;; extends environment env with environment ext-env
   ;; a binding for a key in ext-env hides any binding in env for
   ;; the same key (see dynamic-lookup)
   ;; returns the extended environment
   (Sappend ext-env env))
 
-(define dynamic-lookup (lambda (x l) (Sassv x l)))
+(define dynamic-lookup (lambda (x l) (set-bbv-version-limit! #f)  (Sassv x l)))
 ;; returns the first pair in env that matches the key; returns #f
 ;; if no such pair exists
 
-(define (env->list e)
+(define (env->list e) (set-bbv-version-limit! #f) 
   ;; converts an environment to a list of bindings
   e)
 
-(define (env-show env)
+(define (env-show env) (set-bbv-version-limit! #f) 
   ;; returns a printable list representation of a type environment
   (Smap2 binding-show env))
 ;;----------------------------------------------------------------------------
@@ -102,7 +101,7 @@
 
 ;; dynamic-parse-datum: parses nonterminal <datum>
 
-(define (dynamic-parse-datum e)
+(define (dynamic-parse-datum e) (set-bbv-version-limit! #f) 
 ;;; Source: IEEE Scheme, sect. 7.2, <datum>
 ;;; Note: "'" is parsed as 'quote, "`" as 'quasiquote, "," as
 ;;; 'unquote, ",@" as 'unquote-splicing (see sect. 4.2.5, p. 18)
@@ -133,7 +132,7 @@
 
 ;; dynamic-parse-formal: parses nonterminal <variable> in defining occurrence position
 
-(define (dynamic-parse-formal f-env e)
+(define (dynamic-parse-formal f-env e) (set-bbv-version-limit! #f) 
   ;; e is an arbitrary object, f-env is a forbidden environment;
   ;; returns: a variable definition (a binding for the symbol), plus
   ;; the value of the binding as a result
@@ -150,12 +149,12 @@
 
 ;; dynamic-parse-formal*
 
-(define (dynamic-parse-formal* formals)
+(define (dynamic-parse-formal* formals) (set-bbv-version-limit! #f) 
 ;;; parses a list of formals and returns a pair consisting of generated
 ;;; environment and list of parsing action results
   (letrec
       ((pf*
-        (lambda (f-env results formals)
+        (lambda (f-env results formals) (set-bbv-version-limit! #f) 
 ;;; f-env: "forbidden" environment (to avoid duplicate defs)
 ;;; results: the results of the parsing actions
 ;;; formals: the unprocessed formals
@@ -179,10 +178,10 @@
 
 ;; dynamic-parse-formals: parses <formals>
 
-(define (dynamic-parse-formals formals)
+(define (dynamic-parse-formals formals) (set-bbv-version-limit! #f) 
 ;;; parses <formals>; see IEEE Scheme, sect. 7.3
 ;;; returns a pair: env and result
-  (letrec ((pfs (lambda (f-env formals)
+  (letrec ((pfs (lambda (f-env formals) (set-bbv-version-limit! #f) 
                   (cond
                    ((null? formals)
                     (cons dynamic-empty-env (dynamic-parse-action-null-formal)))
@@ -213,7 +212,7 @@
 
 ;; dynamic-parse-expression: parses nonterminal <expression>
 
-(define (dynamic-parse-expression env e)
+(define (dynamic-parse-expression env e) (set-bbv-version-limit! #f) 
   (cond
    ((symbol? e)
     (dynamic-parse-variable env e))
@@ -239,10 +238,10 @@
 
 ;; dynamic-parse-expression*
 
-(define (dynamic-parse-expression* env exprs)
+(define (dynamic-parse-expression* env exprs) (set-bbv-version-limit! #f) 
 ;;; Parses lists of expressions (returns them in the right order!)
   (letrec ((pe*
-            (lambda (results es)
+            (lambda (results es) (set-bbv-version-limit! #f) 
               (cond
                ((null? es) results)
                ((pair? es) (pe* (cons (dynamic-parse-expression env (Scar es)) results) (Scdr es)))
@@ -252,7 +251,7 @@
 
 ;; dynamic-parse-expressions
 
-(define (dynamic-parse-expressions env exprs)
+(define (dynamic-parse-expressions env exprs) (set-bbv-version-limit! #f) 
 ;;; parses lists of arguments of a procedure call
   (cond
    ((null? exprs) (dynamic-parse-action-null-arg))
@@ -267,7 +266,7 @@
 
 ;; dynamic-parse-variable: parses variables (applied occurrences)
 
-(define (dynamic-parse-variable env e)
+(define (dynamic-parse-variable env e) (set-bbv-version-limit! #f) 
   (if (symbol? e)
       (if (Smemq e syntactic-keywords)
           (fatal-error 'dynamic-parse-variable "Illegal identifier (keyword): ~s" e)
@@ -280,7 +279,7 @@
 
 ;; dynamic-parse-procedure-call
 
-(define (dynamic-parse-procedure-call env op args)
+(define (dynamic-parse-procedure-call env op args) (set-bbv-version-limit! #f) 
   (dynamic-parse-action-procedure-call
    (dynamic-parse-expression env op)
    (dynamic-parse-expressions env args)))
@@ -288,7 +287,7 @@
 
 ;; dynamic-parse-quote
 
-(define (dynamic-parse-quote env args)
+(define (dynamic-parse-quote env args) (set-bbv-version-limit! #f) 
   (if (list-of-1? args)
       (dynamic-parse-datum (Scar args))
       (fatal-error 'dynamic-parse-quote "Not a datum (multiple arguments): ~s" args)))
@@ -296,7 +295,7 @@
 
 ;; dynamic-parse-lambda
 
-(define (dynamic-parse-lambda env args)
+(define (dynamic-parse-lambda env args) (set-bbv-version-limit! #f) 
   (if (pair? args)
       (let* ((formals (Scar args))
              (body (Scdr args))
@@ -311,9 +310,9 @@
 
 ;; dynamic-parse-body
 
-(define (dynamic-parse-body env body)
+(define (dynamic-parse-body env body) (set-bbv-version-limit! #f) 
   ;; <body> = <definition>* <expression>+
-  (define (def-var* f-env body)
+  (define (def-var* f-env body) (set-bbv-version-limit! #f) 
     ;; finds the defined variables in a body and returns an
     ;; environment containing them
     (if (pair? body)
@@ -322,7 +321,7 @@
               (def-var* n-env (Scdr body))
               f-env))
         f-env))
-  (define (def-var f-env clause)
+  (define (def-var f-env clause) (set-bbv-version-limit! #f) 
     ;; finds the defined variables in a single clause and extends
     ;; f-env accordingly; returns false if it's not a definition
     (if (pair? clause)
@@ -352,7 +351,7 @@
 
 ;; dynamic-parse-if
 
-(define (dynamic-parse-if env args)
+(define (dynamic-parse-if env args) (set-bbv-version-limit! #f) 
   (cond
    ((list-of-3? args)
     (dynamic-parse-action-conditional
@@ -369,7 +368,7 @@
 
 ;; dynamic-parse-set
 
-(define (dynamic-parse-set env args)
+(define (dynamic-parse-set env args) (set-bbv-version-limit! #f) 
   (if (list-of-2? args)
       (dynamic-parse-action-assignment
        (dynamic-parse-variable env (Scar args))
@@ -379,24 +378,24 @@
 
 ;; dynamic-parse-begin
 
-(define (dynamic-parse-begin env args)
+(define (dynamic-parse-begin env args) (set-bbv-version-limit! #f) 
   (dynamic-parse-action-begin-expression
    (dynamic-parse-body env args)))
 
 
 ;; dynamic-parse-cond
 
-(define (dynamic-parse-cond env args)
+(define (dynamic-parse-cond env args) (set-bbv-version-limit! #f) 
   (if (and (pair? args) (list? args))
       (dynamic-parse-action-cond-expression
-       (Smap2 (lambda (e)
+       (Smap2 (lambda (e) (set-bbv-version-limit! #f) 
               (dynamic-parse-cond-clause env e))
             args))
       (fatal-error 'dynamic-parse-cond "Not a list of cond-clauses: ~s" args)))
 
 ;; dynamic-parse-cond-clause
 
-(define (dynamic-parse-cond-clause env e)
+(define (dynamic-parse-cond-clause env e) (set-bbv-version-limit! #f) 
 ;;; ***Note***: Only (<test> <sequence>) is permitted!
   (if (pair? e)
       (cons
@@ -409,7 +408,7 @@
 
 ;; dynamic-parse-and
 
-(define (dynamic-parse-and env args)
+(define (dynamic-parse-and env args) (set-bbv-version-limit! #f) 
   (if (list? args)
       (dynamic-parse-action-and-expression
        (dynamic-parse-expression* env args))
@@ -418,7 +417,7 @@
 
 ;; dynamic-parse-or
 
-(define (dynamic-parse-or env args)
+(define (dynamic-parse-or env args) (set-bbv-version-limit! #f) 
   (if (list? args)
       (dynamic-parse-action-or-expression
        (dynamic-parse-expression* env args))
@@ -427,18 +426,18 @@
 
 ;; dynamic-parse-case
 
-(define (dynamic-parse-case env args)
+(define (dynamic-parse-case env args) (set-bbv-version-limit! #f) 
   (if (and (list? args) (> (Slength args) 1))
       (dynamic-parse-action-case-expression
        (dynamic-parse-expression env (Scar args))
-       (Smap2 (lambda (e)
+       (Smap2 (lambda (e) (set-bbv-version-limit! #f) 
               (dynamic-parse-case-clause env e))
             (Scdr args)))
       (fatal-error 'dynamic-parse-case "Not a list of clauses: ~s" args)))
 
 ;; dynamic-parse-case-clause
 
-(define (dynamic-parse-case-clause env e)
+(define (dynamic-parse-case-clause env e) (set-bbv-version-limit! #f) 
   (if (pair? e)
       (cons
        (cond
@@ -453,7 +452,7 @@
 
 ;; dynamic-parse-let
 
-(define (dynamic-parse-let env args)
+(define (dynamic-parse-let env args) (set-bbv-version-limit! #f) 
   (if (pair? args)
       (if (symbol? (car args))
           (dynamic-parse-named-let env args)
@@ -463,7 +462,7 @@
 
 ;; dynamic-parse-normal-let
 
-(define (dynamic-parse-normal-let env args)
+(define (dynamic-parse-normal-let env args) (set-bbv-version-limit! #f) 
 ;;; parses "normal" let-expressions
   (let* ((bindings (Scar args))
          (body (Scdr args))
@@ -476,7 +475,7 @@
 
 ;; dynamic-parse-named-let
 
-(define (dynamic-parse-named-let env args)
+(define (dynamic-parse-named-let env args) (set-bbv-version-limit! #f) 
 ;;; parses a named let-expression
   (if (pair? (Scdr args))
       (let* ((variable (Scar args))
@@ -498,17 +497,17 @@
 
 ;; dynamic-parse-parallel-bindings
 
-(define (dynamic-parse-parallel-bindings env bindings)
+(define (dynamic-parse-parallel-bindings env bindings) (set-bbv-version-limit! #f) 
   ;; returns a pair consisting of an environment
   ;; and a list of pairs (variable . asg)
   ;; ***Note***: the list of pairs is returned in reverse unzipped form!
   (if (list-of-list-of-2s? bindings)
       (let* ((env-formals-asg
-              (dynamic-parse-formal* (Smap2 (lambda (p) (Scar p)) bindings)))
+              (dynamic-parse-formal* (Smap2 (lambda (p) (set-bbv-version-limit! #f)  (Scar p)) bindings)))
              (nenv (Scar env-formals-asg))
              (bresults (Scdr env-formals-asg))
              (exprs-asg
-              (dynamic-parse-expression* env (Smap2 (lambda (l) (Scadr l)) bindings))))
+              (dynamic-parse-expression* env (Smap2 (lambda (l) (set-bbv-version-limit! #f)  (Scadr l)) bindings))))
         (cons nenv (cons bresults exprs-asg)))
       (fatal-error 'dynamic-parse-parallel-bindings
              "Not a list of bindings: ~s" bindings)))
@@ -516,7 +515,7 @@
 
 ;; dynamic-parse-let*
 
-(define (dynamic-parse-let* env args)
+(define (dynamic-parse-let* env args) (set-bbv-version-limit! #f) 
   (if (pair? args)
       (let* ((bindings (Scar args))
              (body (Scdr args))
@@ -530,13 +529,13 @@
 
 ;; dynamic-parse-sequential-bindings
 
-(define (dynamic-parse-sequential-bindings env bindings)
+(define (dynamic-parse-sequential-bindings env bindings) (set-bbv-version-limit! #f) 
   ;; returns a pair consisting of an environment
   ;; and a list of pairs (variable . asg)
 ;;; ***Note***: the list of pairs is returned in reverse unzipped form!
   (letrec
       ((psb
-        (lambda (f-env c-env var-defs expr-asgs binds)
+        (lambda (f-env c-env var-defs expr-asgs binds) (set-bbv-version-limit! #f) 
 ;;; f-env: forbidden environment
 ;;; c-env: constructed environment
 ;;; var-defs: results of formals
@@ -572,7 +571,7 @@
 
 ;; dynamic-parse-letrec
 
-(define (dynamic-parse-letrec env args)
+(define (dynamic-parse-letrec env args) (set-bbv-version-limit! #f) 
   (if (pair? args)
       (let* ((bindings (Scar args))
              (body (Scdr args))
@@ -586,11 +585,11 @@
 
 ;; dynamic-parse-recursive-bindings
 
-(define (dynamic-parse-recursive-bindings env bindings)
+(define (dynamic-parse-recursive-bindings env bindings) (set-bbv-version-limit! #f) 
 ;;; ***Note***: the list of pairs is returned in reverse unzipped form!
   (if (list-of-list-of-2s? bindings)
       (let* ((env-formals-asg
-              (dynamic-parse-formal* (Smap2 (lambda (p) (Scar p)) bindings)))
+              (dynamic-parse-formal* (Smap2 (lambda (p) (set-bbv-version-limit! #f)  (Scar p)) bindings)))
              (formals-env
               (Scar env-formals-asg))
              (formals-res
@@ -598,7 +597,7 @@
              (exprs-asg
               (dynamic-parse-expression*
                (extend-env-with-env env formals-env)
-               (Smap2 (lambda (p) (Scadr p)) bindings))))
+               (Smap2 (lambda (p) (set-bbv-version-limit! #f)  (Scadr p)) bindings))))
         (cons
          formals-env
          (cons formals-res exprs-asg)))
@@ -607,14 +606,14 @@
 
 ;; dynamic-parse-do
 
-(define (dynamic-parse-do env args)
+(define (dynamic-parse-do env args) (set-bbv-version-limit! #f) 
 ;;; parses do-expressions
 ;;; ***Note***: Not implemented!
   (fatal-error 'dynamic-parse-do "Nothing yet..."))
 
 ;; dynamic-parse-quasiquote
 
-(define (dynamic-parse-quasiquote env args)
+(define (dynamic-parse-quasiquote env args) (set-bbv-version-limit! #f) 
 ;;; ***Note***: Not implemented!
   (fatal-error 'dynamic-parse-quasiquote "Nothing yet..."))
 
@@ -623,7 +622,7 @@
 
 ;; dynamic-parse-command
 
-(define (dynamic-parse-command env c)
+(define (dynamic-parse-command env c) (set-bbv-version-limit! #f) 
   (if (pair? c)
       (let ((op (Scar c))
             (args (Scdr c)))
@@ -637,18 +636,18 @@
 
 ;; dynamic-parse-command*
 
-(define (dynamic-parse-command* env commands)
+(define (dynamic-parse-command* env commands) (set-bbv-version-limit! #f) 
 ;;; parses a sequence of commands
   (if (list? commands)
-      (Smap2 (lambda (command) (dynamic-parse-command env command)) commands)
+      (Smap2 (lambda (command) (set-bbv-version-limit! #f)  (dynamic-parse-command env command)) commands)
       (fatal-error 'dynamic-parse-command* "Invalid sequence of commands: ~s" commands)))
 
 
 ;; dynamic-parse-define
 
-(define (dynamic-parse-define env args)
+(define (dynamic-parse-define env args) (set-bbv-version-limit! #f) 
 ;;; three cases -- see IEEE Scheme, sect. 5.2
-;;; ***Note***: the parser admits forms (define (x . y) ...)
+;;; ***Note***: the parser admits forms (define (x . y) (set-bbv-version-limit! #f)  ...)
 ;;; ***Note***: Variables are treated as applied occurrences!
   (if (pair? args)
       (let ((pattern (Scar args))
@@ -677,29 +676,29 @@
 
 ;; forall?
 
-(define (forall? pred list)
+(define (forall? pred list) (set-bbv-version-limit! #f) 
   (if (null? list)
       #t
       (and (pred (Scar list)) (forall? pred (Scdr list)))))
 
 ;; list-of-1?
 
-(define (list-of-1? l)
+(define (list-of-1? l) (set-bbv-version-limit! #f) 
   (and (pair? l) (null? (Scdr l))))
 
 ;; list-of-2?
 
-(define (list-of-2? l)
+(define (list-of-2? l) (set-bbv-version-limit! #f) 
   (and (pair? l) (pair? (Scdr l)) (null? (Scddr l))))
 
 ;; list-of-3?
 
-(define (list-of-3? l)
+(define (list-of-3? l) (set-bbv-version-limit! #f) 
   (and (pair? l) (pair? (Scdr l)) (pair? (Scddr l)) (null? (Scdddr l))))
 
 ;; list-of-list-of-2s?
 
-(define (list-of-list-of-2s? e)
+(define (list-of-list-of-2s? e) (set-bbv-version-limit! #f) 
   (cond
    ((null? e)
     #t)
@@ -712,7 +711,7 @@
 
 ;; dynamic-parse-from-port
 
-(define (dynamic-parse-from-port)
+(define (dynamic-parse-from-port) (set-bbv-version-limit! #f) 
   (let ((next-input (my-read)))
     (if (eof-object? next-input)
         '()
@@ -722,7 +721,7 @@
 
 ;; dynamic-parse-file
 
-(define (dynamic-parse-file)
+(define (dynamic-parse-file) (set-bbv-version-limit! #f) 
   (dynamic-parse-from-port))
 ;;----------------------------------------------------------------------------
 ;; Implementation of Union/find data structure in Scheme
@@ -746,19 +745,19 @@
 ;; set-info!: Elem! x Info -> Void
 
 
-(define (gen-element info)
+(define (gen-element info) (set-bbv-version-limit! #f) 
   ;; generates a new element: the parent field is initialized to '(),
   ;; the rank field to 0
   (cons '() (cons 0 info)))
 
-(define info (lambda (l) (Scddr l)))
+(define info (lambda (l) (set-bbv-version-limit! #f)  (Scddr l)))
 ;; returns the information stored in an element
 
-(define (set-info! elem info)
+(define (set-info! elem info) (set-bbv-version-limit! #f) 
   ;; sets the info-field of elem to info
   (Sset-cdr! (Scdr elem) info))
 
-;; (define (find! x)
+;; (define (find! x) (set-bbv-version-limit! #f) 
 ;;;; finds the class representative of x and sets the parent field
 ;;;; directly to the class representative (a class representative has
 ;;;; '() as its parent) (uses path halving)
@@ -775,7 +774,7 @@
 ;;               (set-car! x ppx)
 ;;               (find! ppx)))))))
 
-(define (find! elem)
+(define (find! elem) (set-bbv-version-limit! #f) 
   ;; finds the class representative of elem and sets the parent field
   ;; directly to the class representative (a class representative has
   ;; '() as its parent)
@@ -789,7 +788,7 @@
           (Sset-car! elem rep-elem)
           rep-elem))))
 
-(define (link! elem-1 elem-2)
+(define (link! elem-1 elem-2) (set-bbv-version-limit! #f) 
   ;; links class elements by rank
   ;; they must be distinct class representatives
   ;; returns the class representative of the merged equivalence classes
@@ -810,9 +809,9 @@
       (Sset-car! elem-1 elem-2)
       elem-2))))
 
-(define asymm-link! (lambda (l x) (Sset-car! l x)))
+(define asymm-link! (lambda (l x) (set-bbv-version-limit! #f)  (Sset-car! l x)))
 
-;;(define (asymm-link! elem-1 elem-2)
+;;(define (asymm-link! elem-1 elem-2) (set-bbv-version-limit! #f) 
 ;; links elem-1 onto elem-2 no matter what rank;
 ;; does not update the rank of elem-2 and does not return a value
 ;; the two arguments must be distinct
@@ -870,12 +869,12 @@
 (define counter 0)
 ;; counter for generating tvar id's
 
-(define (gen-id)
+(define (gen-id) (set-bbv-version-limit! #f) 
   ;; generates a new id (for printing purposes)
   (set! counter (+ counter 1))
   counter)
 
-(define (gen-tvar)
+(define (gen-tvar) (set-bbv-version-limit! #f) 
   ;; generates a new type variable from a new symbol
   ;; uses union/find elements with two info fields
   ;; a type variable has exactly four fields:
@@ -885,7 +884,7 @@
   ;; cdddr:   Type (the leq field; initially null)
   (gen-element (cons (gen-id) '())))
 
-(define (gen-type tcon targs)
+(define (gen-type tcon targs) (set-bbv-version-limit! #f) 
   ;; generates a new type variable with an associated type definition
   (gen-element (cons (gen-id) (cons tcon targs))))
 
@@ -893,36 +892,36 @@
 ;; the special type variable dynamic
 ;; Generic operations
 
-(define (tvar-id tvar)
+(define (tvar-id tvar) (set-bbv-version-limit! #f) 
   ;; returns the (printable) symbol representing the type variable
   (Scar (info tvar)))
 
-(define (tvar-def tvar)
+(define (tvar-def tvar) (set-bbv-version-limit! #f) 
   ;; returns the type definition (if any) of the type variable
   (Scdr (info tvar)))
 
-(define (set-def! tvar tcon targs)
+(define (set-def! tvar tcon targs) (set-bbv-version-limit! #f) 
   ;; sets the type definition part of tvar to type
   (Sset-cdr! (info tvar) (cons tcon targs))
   '())
 
-(define (reset-def! tvar)
+(define (reset-def! tvar) (set-bbv-version-limit! #f) 
   ;; resets the type definition part of tvar to nil
   (Sset-cdr! (info tvar) '()))
 
-(define type-con (lambda (l) (Scar l)))
+(define type-con (lambda (l) (set-bbv-version-limit! #f)  (Scar l)))
 ;; returns the type constructor of a type definition
 
-(define type-args (lambda (l) (Scdr l)))
+(define type-args (lambda (l) (set-bbv-version-limit! #f)  (Scdr l)))
 ;; returns the type variables of a type definition
 
-(define (tvar->string tvar)
+(define (tvar->string tvar) (set-bbv-version-limit! #f) 
   ;; converts a tvar's id to a string
   (if (Sequal? (tvar-id tvar) 0)
       "Dynamic"
       (Sstring-append "t#" (SFXnumber->string (tvar-id tvar)))))
 
-(define (tvar-show tv)
+(define (tvar-show tv) (set-bbv-version-limit! #f) 
   ;; returns a printable list representation of type variable tv
   (let* ((tv-rep (find! tv))
          (tv-def (tvar-def tv-rep)))
@@ -931,7 +930,7 @@
               '()
               (cons 'is (type-show tv-def))))))
 
-(define (type-show type)
+(define (type-show type) (set-bbv-version-limit! #f) 
   ;; returns a printable list representation of type definition type
   (cond
    ((Sequal? (type-con type) ptype-con)
@@ -941,7 +940,7 @@
                   (tvar-show ((type-args type) new-tvar))))))
    (else
     (cons (type-con type)
-          (Smap2 (lambda (tv)
+          (Smap2 (lambda (tv) (set-bbv-version-limit! #f) 
                  (tvar->string (find! tv)))
                (type-args type))))))
 
@@ -963,31 +962,31 @@
 
 ;; type constants and type constructors
 
-(define (null)
+(define (null) (set-bbv-version-limit! #f) 
   ;; ***Note***: Temporarily changed to be a pair!
   ;; (gen-type null-con '())
   (pair (gen-tvar) (gen-tvar)))
-(define (boolean)
+(define (boolean) (set-bbv-version-limit! #f) 
   (gen-type boolean-con '()))
-(define (character)
+(define (character) (set-bbv-version-limit! #f) 
   (gen-type char-con '()))
-(define (number)
+(define (number) (set-bbv-version-limit! #f) 
   (gen-type number-con '()))
-(define (charseq)
+(define (charseq) (set-bbv-version-limit! #f) 
   (gen-type string-con '()))
-(define (symbol)
+(define (symbol) (set-bbv-version-limit! #f) 
   (gen-type symbol-con '()))
-(define (pair tvar-1 tvar-2)
+(define (pair tvar-1 tvar-2) (set-bbv-version-limit! #f) 
   (gen-type pair-con (list tvar-1 tvar-2)))
-(define (array tvar)
+(define (array tvar) (set-bbv-version-limit! #f) 
   (gen-type vector-con (list tvar)))
-(define (procedure arg-tvar res-tvar)
+(define (procedure arg-tvar res-tvar) (set-bbv-version-limit! #f) 
   (gen-type procedure-con (list arg-tvar res-tvar)))
 
 
 ;; equivalencing of type variables
 
-(define (equiv! tv1 tv2)
+(define (equiv! tv1 tv2) (set-bbv-version-limit! #f) 
   (let* ((tv1-rep (find! tv1))
          (tv2-rep (find! tv2))
          (tv1-def (tvar-def tv1-rep))
@@ -1020,7 +1019,7 @@
       (equiv-with-dynamic! tv2-rep))))
   '())
 
-(define (equiv-with-dynamic! tv)
+(define (equiv-with-dynamic! tv) (set-bbv-version-limit! #f) 
   (let ((tv-rep (find! tv)))
     (if (not (Sequal? tv-rep dynamic))
         (let ((tv-def (tvar-def tv-rep)))
@@ -1044,33 +1043,33 @@
 
 (define ptype-con 'forall)
 
-(define (forall tv-func)
+(define (forall tv-func) (set-bbv-version-limit! #f) 
   (gen-type ptype-con tv-func))
 
-(define (forall2 tv-func2)
-  (forall (lambda (tv1)
-            (forall (lambda (tv2)
+(define (forall2 tv-func2) (set-bbv-version-limit! #f) 
+  (forall (lambda (tv1) (set-bbv-version-limit! #f) 
+            (forall (lambda (tv2) (set-bbv-version-limit! #f) 
                       (tv-func2 tv1 tv2))))))
 
-(define (forall3 tv-func3)
-  (forall (lambda (tv1)
-            (forall2 (lambda (tv2 tv3)
+(define (forall3 tv-func3) (set-bbv-version-limit! #f) 
+  (forall (lambda (tv1) (set-bbv-version-limit! #f) 
+            (forall2 (lambda (tv2 tv3) (set-bbv-version-limit! #f) 
                        (tv-func3 tv1 tv2 tv3))))))
 
-(define (forall4 tv-func4)
-  (forall (lambda (tv1)
-            (forall3 (lambda (tv2 tv3 tv4)
+(define (forall4 tv-func4) (set-bbv-version-limit! #f) 
+  (forall (lambda (tv1) (set-bbv-version-limit! #f) 
+            (forall3 (lambda (tv2 tv3 tv4) (set-bbv-version-limit! #f) 
                        (tv-func4 tv1 tv2 tv3 tv4))))))
 
-(define (forall5 tv-func5)
-  (forall (lambda (tv1)
-            (forall4 (lambda (tv2 tv3 tv4 tv5)
+(define (forall5 tv-func5) (set-bbv-version-limit! #f) 
+  (forall (lambda (tv1) (set-bbv-version-limit! #f) 
+            (forall4 (lambda (tv2 tv3 tv4 tv5) (set-bbv-version-limit! #f) 
                        (tv-func5 tv1 tv2 tv3 tv4 tv5))))))
 
 
 ;; (polymorphic) instantiation
 
-(define (instantiate-type tv)
+(define (instantiate-type tv) (set-bbv-version-limit! #f) 
   ;; instantiates type tv and returns a generic instance
   (let* ((tv-rep (find! tv))
          (tv-def (tvar-def tv-rep)))
@@ -1082,7 +1081,7 @@
      (else
       tv-rep))))
 
-(define (fix tv-func)
+(define (fix tv-func) (set-bbv-version-limit! #f) 
   ;; forms a recursive type: the fixed point of type mapping tv-func
   (let* ((new-tvar (gen-tvar))
          (inst-tvar (tv-func new-tvar))
@@ -1104,16 +1103,16 @@
 
 ;; constraints
 
-(define gen-constr (lambda (a b) (cons a b)))
+(define gen-constr (lambda (a b) (set-bbv-version-limit! #f)  (cons a b)))
 ;; generates an equality between tvar1 and tvar2
 
-(define constr-lhs (lambda (c) (Scar c)))
+(define constr-lhs (lambda (c) (set-bbv-version-limit! #f)  (Scar c)))
 ;; returns the left-hand side of a constraint
 
-(define constr-rhs (lambda (c) (Scdr c)))
+(define constr-rhs (lambda (c) (set-bbv-version-limit! #f)  (Scdr c)))
 ;; returns the right-hand side of a constraint
 
-(define (constr-show c)
+(define (constr-show c) (set-bbv-version-limit! #f) 
   (cons (tvar-show (Scar c))
         (cons '=
               (cons (tvar-show (Scdr c)) '()))))
@@ -1123,15 +1122,15 @@
 
 (define global-constraints '())
 
-(define (init-global-constraints!)
+(define (init-global-constraints!) (set-bbv-version-limit! #f) 
   (set! global-constraints '()))
 
-(define (add-constr! lhs rhs)
+(define (add-constr! lhs rhs) (set-bbv-version-limit! #f) 
   (set! global-constraints
         (cons (gen-constr lhs rhs) global-constraints))
   '())
 
-(define (glob-constr-show)
+(define (glob-constr-show) (set-bbv-version-limit! #f) 
   ;; returns printable version of global constraints
   (Smap2 constr-show global-constraints))
 
@@ -1142,12 +1141,12 @@
 
 ;;(load "typ-mgmt.so")
 
-(define (normalize-global-constraints!)
+(define (normalize-global-constraints!) (set-bbv-version-limit! #f) 
   (normalize! global-constraints)
   (init-global-constraints!))
 
-(define (normalize! constraints)
-  (Smap2 (lambda (c)
+(define (normalize! constraints) (set-bbv-version-limit! #f) 
+  (Smap2 (lambda (c) (set-bbv-version-limit! #f) 
          (equiv! (constr-lhs c) (constr-rhs c))) constraints))
 ;; ----------------------------------------------------------------------------
 ;; Abstract syntax definition and parse actions
@@ -1268,148 +1267,148 @@
 
 ;; Parse actions for abstract syntax construction
 
-(define (dynamic-parse-action-null-const)
+(define (dynamic-parse-action-null-const) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for '()
   (ast-gen null-const '()))
 
-(define (dynamic-parse-action-boolean-const e)
+(define (dynamic-parse-action-boolean-const e) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for #f and #t
   (ast-gen boolean-const e))
 
-(define (dynamic-parse-action-char-const e)
+(define (dynamic-parse-action-char-const e) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for character constants
   (ast-gen char-const e))
 
-(define (dynamic-parse-action-number-const e)
+(define (dynamic-parse-action-number-const e) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for number constants
   (ast-gen number-const e))
 
-(define (dynamic-parse-action-string-const e)
+(define (dynamic-parse-action-string-const e) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for string literals
   (ast-gen string-const e))
 
-(define (dynamic-parse-action-symbol-const e)
+(define (dynamic-parse-action-symbol-const e) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for symbol constants
   (ast-gen symbol-const e))
 
-(define (dynamic-parse-action-vector-const e)
+(define (dynamic-parse-action-vector-const e) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for vector literals
   (ast-gen vector-const e))
 
-(define (dynamic-parse-action-pair-const e1 e2)
+(define (dynamic-parse-action-pair-const e1 e2) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for pairs
   (ast-gen pair-const (cons e1 e2)))
 
-(define (dynamic-parse-action-var-def e)
+(define (dynamic-parse-action-var-def e) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for defining occurrences of variables;
 ;;; e is a symbol
   (ast-gen var-def e))
 
-(define (dynamic-parse-action-null-formal)
+(define (dynamic-parse-action-null-formal) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for null-list of formals
   (ast-gen null-def '()))
 
-(define (dynamic-parse-action-pair-formal d1 d2)
+(define (dynamic-parse-action-pair-formal d1 d2) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for non-null list of formals;
 ;;; d1 is the result of parsing the first formal,
 ;;; d2 the result of parsing the remaining formals
   (ast-gen pair-def (cons d1 d2)))
 
-(define (dynamic-parse-action-variable e)
+(define (dynamic-parse-action-variable e) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for applied occurrences of variables
 ;;; ***Note***: e is the result of a dynamic-parse-action on the
 ;;; corresponding variable definition!
   (ast-gen variable e))
 
-(define (dynamic-parse-action-identifier e)
+(define (dynamic-parse-action-identifier e) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for undeclared identifiers (free variable
 ;;; occurrences)
 ;;; ***Note***: e is a symbol (legal identifier)
   (ast-gen identifier e))
 
-(define (dynamic-parse-action-null-arg)
+(define (dynamic-parse-action-null-arg) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for a null list of arguments in a procedure call
   (ast-gen null-arg '()))
 
-(define (dynamic-parse-action-pair-arg a1 a2)
+(define (dynamic-parse-action-pair-arg a1 a2) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for a non-null list of arguments in a procedure call
 ;;; a1 is the result of parsing the first argument,
 ;;; a2 the result of parsing the remaining arguments
   (ast-gen pair-arg (cons a1 a2)))
 
-(define (dynamic-parse-action-procedure-call op args)
+(define (dynamic-parse-action-procedure-call op args) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for procedure calls: op function, args list of arguments
   (ast-gen procedure-call (cons op args)))
 
-(define (dynamic-parse-action-lambda-expression formals body)
+(define (dynamic-parse-action-lambda-expression formals body) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for lambda-abstractions
   (ast-gen lambda-expression (cons formals body)))
 
-(define (dynamic-parse-action-conditional test then-branch else-branch)
+(define (dynamic-parse-action-conditional test then-branch else-branch) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for conditionals (if-then-else expressions)
   (ast-gen conditional (cons test (cons then-branch else-branch))))
 
-(define (dynamic-parse-action-empty)
+(define (dynamic-parse-action-empty) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for missing or empty field
   (ast-gen empty '()))
 
-(define (dynamic-parse-action-assignment lhs rhs)
+(define (dynamic-parse-action-assignment lhs rhs) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for assignment
   (ast-gen assignment (cons lhs rhs)))
 
-(define (dynamic-parse-action-begin-expression body)
+(define (dynamic-parse-action-begin-expression body) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for begin-expression
   (ast-gen begin-expression body))
 
-(define (dynamic-parse-action-cond-expression clauses)
+(define (dynamic-parse-action-cond-expression clauses) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for cond-expressions
   (ast-gen cond-expression clauses))
 
-(define (dynamic-parse-action-and-expression args)
+(define (dynamic-parse-action-and-expression args) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for and-expressions
   (ast-gen and-expression args))
 
-(define (dynamic-parse-action-or-expression args)
+(define (dynamic-parse-action-or-expression args) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for or-expressions
   (ast-gen or-expression args))
 
-(define (dynamic-parse-action-case-expression key clauses)
+(define (dynamic-parse-action-case-expression key clauses) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for case-expressions
   (ast-gen case-expression (cons key clauses)))
 
-(define (dynamic-parse-action-let-expression bindings body)
+(define (dynamic-parse-action-let-expression bindings body) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for let-expressions
   (ast-gen let-expression (cons bindings body)))
 
-(define (dynamic-parse-action-named-let-expression variable bindings body)
+(define (dynamic-parse-action-named-let-expression variable bindings body) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for named-let expressions
   (ast-gen named-let-expression (cons variable (cons bindings body))))
 
-(define (dynamic-parse-action-let*-expression bindings body)
+(define (dynamic-parse-action-let*-expression bindings body) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for let-expressions
   (ast-gen let*-expression (cons bindings body)))
 
-(define (dynamic-parse-action-letrec-expression bindings body)
+(define (dynamic-parse-action-letrec-expression bindings body) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for let-expressions
   (ast-gen letrec-expression (cons bindings body)))
 
-(define (dynamic-parse-action-definition variable expr)
+(define (dynamic-parse-action-definition variable expr) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for simple definitions
   (ast-gen definition (cons variable expr)))
 
-(define (dynamic-parse-action-function-definition variable formals body)
+(define (dynamic-parse-action-function-definition variable formals body) (set-bbv-version-limit! #f) 
 ;;; dynamic-parse-action for function definitions
   (ast-gen function-definition (cons variable (cons formals body))))
 
 
-(define dynamic-parse-action-commands (lambda (a b) (cons a b)))
+(define dynamic-parse-action-commands (lambda (a b) (set-bbv-version-limit! #f)  (cons a b)))
 ;; dynamic-parse-action for processing a command result followed by a the
 ;; result of processing the remaining commands
 
 
 ;; Pretty-printing abstract syntax trees
 
-(define (ast-show ast)
+(define (ast-show ast) (set-bbv-version-limit! #f) 
 ;;; converts abstract syntax tree to list representation (Scheme program)
 ;;; ***Note***: check translation of constructors to numbers at the top of the file
   (let ((syntax-op (ast-con ast))
@@ -1433,7 +1432,7 @@
                                         (list (ast-show alt))))))))
       ((14) (list 'set! (ast-show (Scar syntax-arg)) (ast-show (Scdr syntax-arg))))
       ((15) (cons 'cond
-                  (Smap2 (lambda (cc)
+                  (Smap2 (lambda (cc) (set-bbv-version-limit! #f) 
                          (let ((guard (Scar cc))
                                (body (Scdr cc)))
                            (cons
@@ -1444,7 +1443,7 @@
                        syntax-arg)))
       ((16) (cons 'case
                   (cons (ast-show (Scar syntax-arg))
-                        (Smap2 (lambda (cc)
+                        (Smap2 (lambda (cc) (set-bbv-version-limit! #f) 
                                (let ((data (Scar cc)))
                                  (if (and (pair? data)
                                           (Sequal? (ast-con (Scar data)) empty))
@@ -1457,7 +1456,7 @@
       ((18) (cons 'or (Smap2 ast-show syntax-arg)))
       ((19) (cons 'let
                   (cons (Smap3
-                         (lambda (vd e)
+                         (lambda (vd e) (set-bbv-version-limit! #f) 
                            (list (ast-show vd) (ast-show e)))
                          (Scaar syntax-arg)
                          (Scdar syntax-arg))
@@ -1465,21 +1464,21 @@
       ((20) (cons 'let
                   (cons (ast-show (Scar syntax-arg))
                         (cons (Smap3
-                               (lambda (vd e)
+                               (lambda (vd e) (set-bbv-version-limit! #f) 
                                  (list (ast-show vd) (ast-show e)))
                                (Scaadr syntax-arg)
                                (Scdadr syntax-arg))
                               (Smap2 ast-show (Scddr syntax-arg))))))
       ((21) (cons 'let*
                   (cons (Smap3
-                         (lambda (vd e)
+                         (lambda (vd e) (set-bbv-version-limit! #f) 
                            (list (ast-show vd) (ast-show e)))
                          (Scaar syntax-arg)
                          (Scdar syntax-arg))
                         (Smap2 ast-show (Scdr syntax-arg)))))
       ((22) (cons 'letrec
                   (cons (Smap3
-                         (lambda (vd e)
+                         (lambda (vd e) (set-bbv-version-limit! #f) 
                            (list (ast-show vd) (ast-show e)))
                          (Scaar syntax-arg)
                          (Scdar syntax-arg))
@@ -1504,14 +1503,14 @@
 
 ;; ast*-show
 
-(define (ast*-show p)
+(define (ast*-show p) (set-bbv-version-limit! #f) 
 ;;; shows a list of abstract syntax trees
   (Smap2 ast-show p))
 
 
 ;; datum-show
 
-(define (datum-show ast)
+(define (datum-show ast) (set-bbv-version-limit! #f) 
 ;;; prints an abstract syntax tree as a datum
   (case (ast-con ast)
     ((0 1 2 3 4 5) (ast-arg ast))
@@ -1521,10 +1520,10 @@
 
 ;; write-to-port
 
-(define (write-to-port prog port)
+(define (write-to-port prog port) (set-bbv-version-limit! #f) 
   ;; writes a program to a port
   (for-each
-   (lambda (command)
+   (lambda (command) (set-bbv-version-limit! #f) 
      (write command port)
      (newline port))
    prog)
@@ -1532,7 +1531,7 @@
 
 ;; write-file
 
-(define (write-to-file prog filename)
+(define (write-to-file prog filename) (set-bbv-version-limit! #f) 
   ;; write a program to a file
   (let ((port (open-output-file filename)))
     (write-to-port prog port)
@@ -1546,7 +1545,7 @@
 
 ;; Abstract syntax operations, incl. constraint generation
 
-(define (ast-gen syntax-op arg)
+(define (ast-gen syntax-op arg) (set-bbv-version-limit! #f) 
   ;; generates all attributes and performs semantic side effects
   (let ((ntvar
          (case syntax-op
@@ -1557,7 +1556,7 @@
            ((4) (charseq))
            ((5) (symbol))
            ((6) (let ((aux-tvar (gen-tvar)))
-                  (Sfor-each2 (lambda (t)
+                  (Sfor-each2 (lambda (t) (set-bbv-version-limit! #f) 
                               (add-constr! t aux-tvar))
                             (Smap2 ast-tvar arg))
                   (array aux-tvar)))
@@ -1591,26 +1590,26 @@
                    (add-constr! var-tvar exp-tvar)
                    var-tvar))
            ((15) (let ((new-tvar (gen-tvar)))
-                   (Sfor-each2 (lambda (body)
+                   (Sfor-each2 (lambda (body) (set-bbv-version-limit! #f) 
                                (add-constr! (ast-tvar (tail body)) new-tvar))
-                             (Smap2 (lambda (p) (Scdr p)) arg))
-                   (Sfor-each2 (lambda (e)
+                             (Smap2 (lambda (p) (set-bbv-version-limit! #f)  (Scdr p)) arg))
+                   (Sfor-each2 (lambda (e) (set-bbv-version-limit! #f) 
                                (add-constr! (boolean) (ast-tvar e)))
-                             (Smap2 (lambda (p) (Scar p)) arg))
+                             (Smap2 (lambda (p) (set-bbv-version-limit! #f)  (Scar p)) arg))
                    new-tvar))
            ((16) (let* ((new-tvar (gen-tvar))
                         (t-key (ast-tvar (Scar arg)))
                         (case-clauses (Scdr arg)))
-                   (Sfor-each2 (lambda (exprs)
-                               (Sfor-each2 (lambda (e)
+                   (Sfor-each2 (lambda (exprs) (set-bbv-version-limit! #f) 
+                               (Sfor-each2 (lambda (e) (set-bbv-version-limit! #f) 
                                            (add-constr! (ast-tvar e) t-key))
                                          exprs))
-                             (Smap2 (lambda (p) (Scar p)) case-clauses))
-                   (Sfor-each2 (lambda (body)
+                             (Smap2 (lambda (p) (set-bbv-version-limit! #f)  (Scar p)) case-clauses))
+                   (Sfor-each2 (lambda (body) (set-bbv-version-limit! #f) 
                                (add-constr! (ast-tvar (tail body)) new-tvar))
-                             (Smap2 (lambda (p) (Scdr p)) case-clauses))
+                             (Smap2 (lambda (p) (set-bbv-version-limit! #f)  (Scdr p)) case-clauses))
                    new-tvar))
-           ((17 18) (Sfor-each2 (lambda (e)
+           ((17 18) (Sfor-each2 (lambda (e) (set-bbv-version-limit! #f) 
                                 (add-constr! (boolean) (ast-tvar e)))
                               arg)
             (boolean))
@@ -1656,7 +1655,7 @@
 
 ;; tail
 
-(define (tail l)
+(define (tail l) (set-bbv-version-limit! #f) 
 ;;; returns the tail of a nonempty list
   (if (null? (Scdr l))
       (Scar l)
@@ -1664,7 +1663,7 @@
 
 ;; convert-tvars
 
-(define (convert-tvars tvar-list)
+(define (convert-tvars tvar-list) (set-bbv-version-limit! #f) 
 ;;; converts a list of tvars to a single tvar
   (cond
    ((null? tvar-list) (null))
@@ -1675,7 +1674,7 @@
 
 ;; Pretty-printing abstract syntax trees
 
-(define (tast-show ast)
+(define (tast-show ast) (set-bbv-version-limit! #f) 
 ;;; converts abstract syntax tree to list representation (Scheme program)
   (let ((syntax-op (ast-con ast))
         (syntax-tvar (tvar-show (ast-tvar ast)))
@@ -1703,7 +1702,7 @@
        ((14) (list 'set! (tast-show (Scar syntax-arg))
                    (tast-show (Scdr syntax-arg))))
        ((15) (cons 'cond
-                   (Smap2 (lambda (cc)
+                   (Smap2 (lambda (cc) (set-bbv-version-limit! #f) 
                           (let ((guard (Scar cc))
                                 (body (Scdr cc)))
                             (cons
@@ -1714,7 +1713,7 @@
                         syntax-arg)))
        ((16) (cons 'case
                    (cons (tast-show (Scar syntax-arg))
-                         (Smap2 (lambda (cc)
+                         (Smap2 (lambda (cc) (set-bbv-version-limit! #f) 
                                 (let ((data (Scar cc)))
                                   (if (and (pair? data)
                                            (Sequal? (ast-con (Scar data)) empty))
@@ -1727,7 +1726,7 @@
        ((18) (cons 'or (Smap2 tast-show syntax-arg)))
        ((19) (cons 'let
                    (cons (Smap3
-                          (lambda (vd e)
+                          (lambda (vd e) (set-bbv-version-limit! #f) 
                             (list (tast-show vd) (tast-show e)))
                           (Scaar syntax-arg)
                           (Scdar syntax-arg))
@@ -1735,21 +1734,21 @@
        ((20) (cons 'let
                    (cons (tast-show (Scar syntax-arg))
                          (cons (Smap3
-                                (lambda (vd e)
+                                (lambda (vd e) (set-bbv-version-limit! #f) 
                                   (list (tast-show vd) (tast-show e)))
                                 (Scaadr syntax-arg)
                                 (Scdadr syntax-arg))
                                (Smap2 tast-show (Scddr syntax-arg))))))
        ((21) (cons 'let*
                    (cons (Smap3
-                          (lambda (vd e)
+                          (lambda (vd e) (set-bbv-version-limit! #f) 
                             (list (tast-show vd) (tast-show e)))
                           (Scaar syntax-arg)
                           (Scdar syntax-arg))
                          (Smap2 tast-show (Scdr syntax-arg)))))
        ((22) (cons 'letrec
                    (cons (Smap3
-                          (lambda (vd e)
+                          (lambda (vd e) (set-bbv-version-limit! #f) 
                             (list (tast-show vd) (tast-show e)))
                           (Scaar syntax-arg)
                           (Scdar syntax-arg))
@@ -1774,7 +1773,7 @@
 
 ;; tast*-show
 
-(define (tast*-show p)
+(define (tast*-show p) (set-bbv-version-limit! #f) 
 ;;; shows a list of abstract syntax trees
   (Smap2 tast-show p))
 
@@ -1788,7 +1787,7 @@
 (define may-untag-counter 0)
 (define no-may-untag-counter 0)
 
-(define (reset-counters!)
+(define (reset-counters!) (set-bbv-version-limit! #f) 
   (set! untag-counter 0)
   (set! no-untag-counter 0)
   (set! tag-counter 0)
@@ -1796,7 +1795,7 @@
   (set! may-untag-counter 0)
   (set! no-may-untag-counter 0))
 
-(define (counters-show)
+(define (counters-show) (set-bbv-version-limit! #f) 
   (list
    (cons tag-counter no-tag-counter)
    (cons untag-counter no-untag-counter)
@@ -1805,7 +1804,7 @@
 
 ;; tag-show
 
-(define (tag-show tvar-rep prog)
+(define (tag-show tvar-rep prog) (set-bbv-version-limit! #f) 
   ;; display prog with tagging operation
   (if (Sequal? tvar-rep dynamic)
       (begin
@@ -1818,7 +1817,7 @@
 
 ;; untag-show
 
-(define (untag-show tvar-rep prog)
+(define (untag-show tvar-rep prog) (set-bbv-version-limit! #f) 
   ;; display prog with untagging operation
   (if (Sequal? tvar-rep dynamic)
       (begin
@@ -1828,7 +1827,7 @@
         (set! no-untag-counter (SFX+ no-untag-counter 1))
         (list 'no-untag prog))))
 
-(define (may-untag-show tvar-rep prog)
+(define (may-untag-show tvar-rep prog) (set-bbv-version-limit! #f) 
   ;; display possible untagging in actual arguments
   (if (Sequal? tvar-rep dynamic)
       (begin
@@ -1841,7 +1840,7 @@
 
 ;; tag-ast-show
 
-(define (tag-ast-show ast)
+(define (tag-ast-show ast) (set-bbv-version-limit! #f) 
 ;;; converts typed and normalized abstract syntax tree to
 ;;; a Scheme program with explicit tagging and untagging operations
   (let ((syntax-op (ast-con ast))
@@ -1880,7 +1879,7 @@
       ((14) (list 'set! (tag-ast-show (Scar syntax-arg))
                   (tag-ast-show (cdr syntax-arg))))
       ((15) (cons 'cond
-                  (Smap2 (lambda (cc)
+                  (Smap2 (lambda (cc) (set-bbv-version-limit! #f) 
                          (let ((guard (Scar cc))
                                (body (cdr cc)))
                            (cons
@@ -1892,7 +1891,7 @@
                        syntax-arg)))
       ((16) (cons 'case
                   (cons (tag-ast-show (car syntax-arg))
-                        (Smap2 (lambda (cc)
+                        (Smap2 (lambda (cc) (set-bbv-version-limit! #f) 
                                (let ((data (car cc)))
                                  (if (and (pair? data)
                                           (Sequal? (ast-con (car data)) empty))
@@ -1902,18 +1901,18 @@
                                            (Smap2 tag-ast-show (cdr cc))))))
                              (cdr syntax-arg)))))
       ((17) (cons 'and (Smap2
-                        (lambda (ast)
+                        (lambda (ast) (set-bbv-version-limit! #f) 
                           (let ((bool-tvar (find! (ast-tvar ast))))
                             (untag-show bool-tvar (tag-ast-show ast))))
                         syntax-arg)))
       ((18) (cons 'or (Smap2
-                       (lambda (ast)
+                       (lambda (ast) (set-bbv-version-limit! #f) 
                          (let ((bool-tvar (find! (ast-tvar ast))))
                            (untag-show bool-tvar (tag-ast-show ast))))
                        syntax-arg)))
       ((19) (cons 'let
                   (cons (Smap3
-                         (lambda (vd e)
+                         (lambda (vd e) (set-bbv-version-limit! #f) 
                            (list (tag-ast-show vd) (tag-ast-show e)))
                          (Scaar syntax-arg)
                          (Scdar syntax-arg))
@@ -1921,21 +1920,21 @@
       ((20) (cons 'let
                   (cons (tag-ast-show (Scar syntax-arg))
                         (cons (Smap3
-                               (lambda (vd e)
+                               (lambda (vd e) (set-bbv-version-limit! #f) 
                                  (list (tag-ast-show vd) (tag-ast-show e)))
                                (Scaadr syntax-arg)
                                (Scdadr syntax-arg))
                               (Smap2 tag-ast-show (Scddr syntax-arg))))))
       ((21) (cons 'let*
                   (cons (Smap3
-                         (lambda (vd e)
+                         (lambda (vd e) (set-bbv-version-limit! #f) 
                            (list (tag-ast-show vd) (tag-ast-show e)))
                          (Scaar syntax-arg)
                          (Scdar syntax-arg))
                         (Smap2 tag-ast-show (Scdr syntax-arg)))))
       ((22) (cons 'letrec
                   (cons (Smap3
-                         (lambda (vd e)
+                         (lambda (vd e) (set-bbv-version-limit! #f) 
                            (list (tag-ast-show vd) (tag-ast-show e)))
                          (Scaar syntax-arg)
                          (Scdar syntax-arg))
@@ -1962,7 +1961,7 @@
 
 ;; tag-ast*-show
 
-(define (tag-ast*-show p)
+(define (tag-ast*-show p) (set-bbv-version-limit! #f) 
   ;; display list of commands/expressions with tagging/untagging
   ;; operations
   (Smap2 tag-ast-show p))
@@ -1981,12 +1980,12 @@
 
 (define misc-env
   (list
-   (cons 'quote (forall (lambda (tv) tv)))
-   (cons 'Sequal? (forall (lambda (tv) (procedure (convert-tvars (list tv tv))
+   (cons 'quote (forall (lambda (tv) (set-bbv-version-limit! #f)  tv)))
+   (cons 'Sequal? (forall (lambda (tv) (set-bbv-version-limit! #f)  (procedure (convert-tvars (list tv tv))
                                                (boolean)))))
-   (cons 'eq? (forall (lambda (tv) (procedure (convert-tvars (list tv tv))
+   (cons 'eq? (forall (lambda (tv) (set-bbv-version-limit! #f)  (procedure (convert-tvars (list tv tv))
                                               (boolean)))))
-   (cons 'equal? (forall (lambda (tv) (procedure (convert-tvars (list tv tv))
+   (cons 'equal? (forall (lambda (tv) (set-bbv-version-limit! #f)  (procedure (convert-tvars (list tv tv))
                                                  (boolean)))))
    ))
 
@@ -1996,14 +1995,14 @@
   (list
    (cons 'open-input-file (procedure (convert-tvars (list (charseq))) dynamic))
    (cons 'eof-object? (procedure (convert-tvars (list dynamic)) (boolean)))
-   (cons 'read (forall (lambda (tv)
+   (cons 'read (forall (lambda (tv) (set-bbv-version-limit! #f) 
                          (procedure (convert-tvars (list tv)) dynamic))))
-   (cons 'write (forall (lambda (tv)
+   (cons 'write (forall (lambda (tv) (set-bbv-version-limit! #f) 
                           (procedure (convert-tvars (list tv)) dynamic))))
-   (cons 'display (forall (lambda (tv)
+   (cons 'display (forall (lambda (tv) (set-bbv-version-limit! #f) 
                             (procedure (convert-tvars (list tv)) dynamic))))
    (cons 'newline (procedure (null) dynamic))
-   (cons 'pretty-print (forall (lambda (tv)
+   (cons 'pretty-print (forall (lambda (tv) (set-bbv-version-limit! #f) 
                                  (procedure (convert-tvars (list tv)) dynamic))))))
 
 
@@ -2011,7 +2010,7 @@
 
 (define boolean-env
   (list
-   (cons 'boolean? (forall (lambda (tv)
+   (cons 'boolean? (forall (lambda (tv) (set-bbv-version-limit! #f) 
                              (procedure (convert-tvars (list tv)) (boolean)))))
    ;;(cons #f (boolean))
    ;; #f doesn't exist in Chez Scheme, but gets mapped to null!
@@ -2022,96 +2021,96 @@
 
 ;; type environment for pairs and lists
 
-(define (list-type tv)
-  (fix (lambda (tv2) (pair tv tv2))))
+(define (list-type tv) (set-bbv-version-limit! #f) 
+  (fix (lambda (tv2) (set-bbv-version-limit! #f)  (pair tv tv2))))
 
 (define list-env
   (list
-   (cons 'pair? (forall2 (lambda (tv1 tv2)
+   (cons 'pair? (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                            (procedure (convert-tvars (list (pair tv1 tv2)))
                                       (boolean)))))
-   (cons 'null? (forall2 (lambda (tv1 tv2)
+   (cons 'null? (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                            (procedure (convert-tvars (list (pair tv1 tv2)))
                                       (boolean)))))
-   (cons 'list? (forall2 (lambda (tv1 tv2)
+   (cons 'list? (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                            (procedure (convert-tvars (list (pair tv1 tv2)))
                                       (boolean)))))
-   (cons 'cons (forall2 (lambda (tv1 tv2)
+   (cons 'cons (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                           (procedure (convert-tvars (list tv1 tv2))
                                      (pair tv1 tv2)))))
-   (cons 'car (forall2 (lambda (tv1 tv2)
+   (cons 'car (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                          (procedure (convert-tvars (list (pair tv1 tv2)))
                                     tv1))))
-   (cons 'cdr (forall2 (lambda (tv1 tv2)
+   (cons 'cdr (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                          (procedure (convert-tvars (list (pair tv1 tv2)))
                                     tv2))))
-   (cons 'set-car! (forall2 (lambda (tv1 tv2)
+   (cons 'set-car! (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                               (procedure (convert-tvars (list (pair tv1 tv2)
                                                               tv1))
                                          dynamic))))
-   (cons 'set-cdr! (forall2 (lambda (tv1 tv2)
+   (cons 'set-cdr! (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                               (procedure (convert-tvars (list (pair tv1 tv2)
                                                               tv2))
                                          dynamic))))
-   (cons 'caar (forall3 (lambda (tv1 tv2 tv3)
+   (cons 'caar (forall3 (lambda (tv1 tv2 tv3) (set-bbv-version-limit! #f) 
                           (procedure (convert-tvars
                                       (list (pair (pair tv1 tv2) tv3)))
                                      tv1))))
-   (cons 'cdar (forall3 (lambda (tv1 tv2 tv3)
+   (cons 'cdar (forall3 (lambda (tv1 tv2 tv3) (set-bbv-version-limit! #f) 
                           (procedure (convert-tvars
                                       (list (pair (pair tv1 tv2) tv3)))
                                      tv2))))
 
-   (cons 'cadr (forall3 (lambda (tv1 tv2 tv3)
+   (cons 'cadr (forall3 (lambda (tv1 tv2 tv3) (set-bbv-version-limit! #f) 
                           (procedure (convert-tvars
                                       (list (pair tv1 (pair tv2 tv3))))
                                      tv2))))
-   (cons 'cddr (forall3 (lambda (tv1 tv2 tv3)
+   (cons 'cddr (forall3 (lambda (tv1 tv2 tv3) (set-bbv-version-limit! #f) 
                           (procedure (convert-tvars
                                       (list (pair tv1 (pair tv2 tv3))))
                                      tv3))))
    (cons 'caaar (forall4
-                 (lambda (tv1 tv2 tv3 tv4)
+                 (lambda (tv1 tv2 tv3 tv4) (set-bbv-version-limit! #f) 
                    (procedure (convert-tvars
                                (list (pair (pair (pair tv1 tv2) tv3) tv4)))
                               tv1))))
    (cons 'cdaar (forall4
-                 (lambda (tv1 tv2 tv3 tv4)
+                 (lambda (tv1 tv2 tv3 tv4) (set-bbv-version-limit! #f) 
                    (procedure (convert-tvars
                                (list (pair (pair (pair tv1 tv2) tv3) tv4)))
                               tv2))))
    (cons 'cadar (forall4
-                 (lambda (tv1 tv2 tv3 tv4)
+                 (lambda (tv1 tv2 tv3 tv4) (set-bbv-version-limit! #f) 
                    (procedure (convert-tvars
                                (list (pair (pair tv1 (pair tv2 tv3)) tv4)))
                               tv2))))
    (cons 'cddar (forall4
-                 (lambda (tv1 tv2 tv3 tv4)
+                 (lambda (tv1 tv2 tv3 tv4) (set-bbv-version-limit! #f) 
                    (procedure (convert-tvars
                                (list (pair (pair tv1 (pair tv2 tv3)) tv4)))
                               tv3))))
    (cons 'caadr (forall4
-                 (lambda (tv1 tv2 tv3 tv4)
+                 (lambda (tv1 tv2 tv3 tv4) (set-bbv-version-limit! #f) 
                    (procedure (convert-tvars
                                (list (pair tv1 (pair (pair tv2 tv3) tv4))))
                               tv2))))
    (cons 'cdadr (forall4
-                 (lambda (tv1 tv2 tv3 tv4)
+                 (lambda (tv1 tv2 tv3 tv4) (set-bbv-version-limit! #f) 
                    (procedure (convert-tvars
                                (list (pair tv1 (pair (pair tv2 tv3) tv4))))
                               tv3))))
    (cons 'caddr (forall4
-                 (lambda (tv1 tv2 tv3 tv4)
+                 (lambda (tv1 tv2 tv3 tv4) (set-bbv-version-limit! #f) 
                    (procedure (convert-tvars
                                (list (pair tv1 (pair tv2 (pair tv3 tv4)))))
                               tv3))))
    (cons 'cdddr (forall4
-                 (lambda (tv1 tv2 tv3 tv4)
+                 (lambda (tv1 tv2 tv3 tv4) (set-bbv-version-limit! #f) 
                    (procedure (convert-tvars
                                (list (pair tv1 (pair tv2 (pair tv3 tv4)))))
                               tv4))))
    (cons 'cadddr
-         (forall5 (lambda (tv1 tv2 tv3 tv4 tv5)
+         (forall5 (lambda (tv1 tv2 tv3 tv4 tv5) (set-bbv-version-limit! #f) 
                     (procedure (convert-tvars
                                 (list (pair tv1
                                             (pair tv2
@@ -2119,52 +2118,52 @@
                                                         (pair tv4 tv5))))))
                                tv4))))
    (cons 'cddddr
-         (forall5 (lambda (tv1 tv2 tv3 tv4 tv5)
+         (forall5 (lambda (tv1 tv2 tv3 tv4 tv5) (set-bbv-version-limit! #f) 
                     (procedure (convert-tvars
                                 (list (pair tv1
                                             (pair tv2
                                                   (pair tv3
                                                         (pair tv4 tv5))))))
                                tv5))))
-   (cons 'list (forall (lambda (tv)
+   (cons 'list (forall (lambda (tv) (set-bbv-version-limit! #f) 
                          (procedure tv tv))))
-   (cons 'length (forall (lambda (tv)
+   (cons 'length (forall (lambda (tv) (set-bbv-version-limit! #f) 
                            (procedure (convert-tvars (list (list-type tv)))
                                       (number)))))
-   (cons 'append (forall (lambda (tv)
+   (cons 'append (forall (lambda (tv) (set-bbv-version-limit! #f) 
                            (procedure (convert-tvars (list (list-type tv)
                                                            (list-type tv)))
                                       (list-type tv)))))
-   (cons 'reverse (forall (lambda (tv)
+   (cons 'reverse (forall (lambda (tv) (set-bbv-version-limit! #f) 
                             (procedure (convert-tvars (list (list-type tv)))
                                        (list-type tv)))))
-   (cons 'list-ref (forall (lambda (tv)
+   (cons 'list-ref (forall (lambda (tv) (set-bbv-version-limit! #f) 
                              (procedure (convert-tvars (list (list-type tv)
                                                              (number)))
                                         tv))))
-   (cons 'memq (forall (lambda (tv)
+   (cons 'memq (forall (lambda (tv) (set-bbv-version-limit! #f) 
                          (procedure (convert-tvars (list tv
                                                          (list-type tv)))
                                     (boolean)))))
-   (cons 'memv (forall (lambda (tv)
+   (cons 'memv (forall (lambda (tv) (set-bbv-version-limit! #f) 
                          (procedure (convert-tvars (list tv
                                                          (list-type tv)))
                                     (boolean)))))
-   (cons 'member (forall (lambda (tv)
+   (cons 'member (forall (lambda (tv) (set-bbv-version-limit! #f) 
                            (procedure (convert-tvars (list tv
                                                            (list-type tv)))
                                       (boolean)))))
-   (cons 'assq (forall2 (lambda (tv1 tv2)
+   (cons 'assq (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                           (procedure (convert-tvars
                                       (list tv1
                                             (list-type (pair tv1 tv2))))
                                      (pair tv1 tv2)))))
-   (cons 'assv (forall2 (lambda (tv1 tv2)
+   (cons 'assv (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                           (procedure (convert-tvars
                                       (list tv1
                                             (list-type (pair tv1 tv2))))
                                      (pair tv1 tv2)))))
-   (cons 'assoc (forall2 (lambda (tv1 tv2)
+   (cons 'assoc (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                            (procedure (convert-tvars
                                        (list tv1
                                              (list-type (pair tv1 tv2))))
@@ -2174,7 +2173,7 @@
 
 (define symbol-env
   (list
-   (cons 'symbol? (forall (lambda (tv)
+   (cons 'symbol? (forall (lambda (tv) (set-bbv-version-limit! #f) 
                             (procedure (convert-tvars (list tv)) (boolean)))))
    (cons 'symbol->string (procedure (convert-tvars (list (symbol))) (charseq)))
    (cons 'string->symbol (procedure (convert-tvars (list (charseq))) (symbol)))
@@ -2182,7 +2181,7 @@
 
 (define number-env
   (list
-   (cons 'number? (forall (lambda (tv)
+   (cons 'number? (forall (lambda (tv) (set-bbv-version-limit! #f) 
                             (procedure (convert-tvars (list tv)) (boolean)))))
    (cons '+ (procedure (convert-tvars (list (number) (number))) (number)))
    (cons '- (procedure (convert-tvars (list (number) (number))) (number)))
@@ -2194,7 +2193,7 @@
 
 (define char-env
   (list
-   (cons 'char? (forall (lambda (tv)
+   (cons 'char? (forall (lambda (tv) (set-bbv-version-limit! #f) 
                           (procedure (convert-tvars (list tv)) (boolean)))))
    (cons 'char->integer (procedure (convert-tvars (list (character)))
                                    (number)))
@@ -2204,25 +2203,25 @@
 
 (define string-env
   (list
-   (cons 'string? (forall (lambda (tv)
+   (cons 'string? (forall (lambda (tv) (set-bbv-version-limit! #f) 
                             (procedure (convert-tvars (list tv)) (boolean)))))
    ))
 
 (define vector-env
   (list
-   (cons 'vector? (forall (lambda (tv)
+   (cons 'vector? (forall (lambda (tv) (set-bbv-version-limit! #f) 
                             (procedure (convert-tvars (list tv)) (boolean)))))
-   (cons 'make-vector (forall (lambda (tv)
+   (cons 'make-vector (forall (lambda (tv) (set-bbv-version-limit! #f) 
                                 (procedure (convert-tvars (list (number)))
                                            (array tv)))))
-   (cons 'vector-length (forall (lambda (tv)
+   (cons 'vector-length (forall (lambda (tv) (set-bbv-version-limit! #f) 
                                   (procedure (convert-tvars (list (array tv)))
                                              (number)))))
-   (cons 'vector-ref (forall (lambda (tv)
+   (cons 'vector-ref (forall (lambda (tv) (set-bbv-version-limit! #f) 
                                (procedure (convert-tvars (list (array tv)
                                                                (number)))
                                           tv))))
-   (cons 'vector-set! (forall (lambda (tv)
+   (cons 'vector-set! (forall (lambda (tv) (set-bbv-version-limit! #f) 
                                 (procedure (convert-tvars (list (array tv)
                                                                 (number)
                                                                 tv))
@@ -2231,22 +2230,22 @@
 
 (define procedure-env
   (list
-   (cons 'procedure? (forall (lambda (tv)
+   (cons 'procedure? (forall (lambda (tv) (set-bbv-version-limit! #f) 
                                (procedure (convert-tvars (list tv)) (boolean)))))
-   (cons 'map (forall2 (lambda (tv1 tv2)
+   (cons 'map (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                          (procedure (convert-tvars
                                      (list (procedure (convert-tvars
                                                        (list tv1)) tv2)
                                            (list-type tv1)))
                                     (list-type tv2)))))
-   (cons 'foreach (forall2 (lambda (tv1 tv2)
+   (cons 'foreach (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                              (procedure (convert-tvars
                                          (list (procedure (convert-tvars
                                                            (list tv1)) tv2)
                                                (list-type tv1)))
                                         (list-type tv2)))))
    (cons 'call-with-current-continuation
-         (forall2 (lambda (tv1 tv2)
+         (forall2 (lambda (tv1 tv2) (set-bbv-version-limit! #f) 
                     (procedure (convert-tvars
                                 (list (procedure
                                        (convert-tvars
@@ -2259,7 +2258,7 @@
 
 ;; global top level environment
 
-(define (global-env)
+(define (global-env) (set-bbv-version-limit! #f) 
   (LIBconcatenate
           (list
           misc-env
@@ -2275,13 +2274,13 @@
 
 (define dynamic-top-level-env (global-env))
 
-(define (init-dynamic-top-level-env!)
+(define (init-dynamic-top-level-env!) (set-bbv-version-limit! #f) 
   (set! dynamic-top-level-env (global-env))
   '())
 
-(define (dynamic-top-level-env-show)
+(define (dynamic-top-level-env-show) (set-bbv-version-limit! #f) 
   ;; displays the top level environment
-  (Smap2 (lambda (binding)
+  (Smap2 (lambda (binding) (set-bbv-version-limit! #f) 
          (cons (key-show (binding-key binding))
                (cons ': (tvar-show (binding-value binding)))))
        (env->list dynamic-top-level-env)))
@@ -2291,15 +2290,15 @@
 
 ;; Needed packages:
 
-(define (ic!) (init-global-constraints!))
-(define (pc) (glob-constr-show))
-(define (lc) (Slength global-constraints))
-(define (n!) (normalize-global-constraints!))
-(define (pt) (dynamic-top-level-env-show))
-(define (it!) (init-dynamic-top-level-env!))
-(define (io!) (set! tag-ops 0) (set! no-ops 0))
-(define (ib!) (set! read-buffer read-content))
-(define (i!) (ic!) (it!) (io!) (ib!) '())
+(define (ic!) (set-bbv-version-limit! #f)  (init-global-constraints!))
+(define (pc) (set-bbv-version-limit! #f)  (glob-constr-show))
+(define (lc) (set-bbv-version-limit! #f)  (Slength global-constraints))
+(define (n!) (set-bbv-version-limit! #f)  (normalize-global-constraints!))
+(define (pt) (set-bbv-version-limit! #f)  (dynamic-top-level-env-show))
+(define (it!) (set-bbv-version-limit! #f)  (init-dynamic-top-level-env!))
+(define (io!) (set-bbv-version-limit! #f)  (set! tag-ops 0) (set! no-ops 0))
+(define (ib!) (set-bbv-version-limit! #f)  (set! read-buffer read-content))
+(define (i!) (set-bbv-version-limit! #f)  (ic!) (it!) (io!) (ib!) '())
 
 (define tag-ops 0)
 (define no-ops 0)
@@ -2324,7 +2323,7 @@
 
 (define read-content (unknown (init-content)))
 (define read-buffer read-content)
-(define (my-read)
+(define (my-read) (set-bbv-version-limit! #f) 
   (if (null? read-buffer)
       (eof-object)
       (let ((next (car read-buffer)))
@@ -2340,11 +2339,11 @@
       (tag-ast*-show foo)
       (counters-show))))
 
-(define (run #!key (n (unknown 200 1)))
+(define-keys (run !key (n (unknown 200 1)))
   (let loop ((n n) (result #f))
     (if (SFX> n 0)
         (loop (SFX- n 1) (run1))
 	      result)))
 
-(define (check result)
+(define (check result) (set-bbv-version-limit! #f) 
   (Sequal? result '((181 . 480) (6 . 1892) (2219 . 427))))

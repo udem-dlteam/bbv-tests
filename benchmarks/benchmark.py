@@ -6,6 +6,7 @@ import collections
 import csv
 import datetime
 import itertools
+import json
 import locale
 import logging
 import math
@@ -13,12 +14,15 @@ import operator
 import os
 import pathlib
 import platform
+import random
 import re
 import shlex
+import stat
 import statistics
 import string
 import subprocess
 import sys
+import textwrap
 import time
 
 try:
@@ -42,6 +46,8 @@ import psutil
 
 import seaborn as sns
 
+import deap
+
 ##############################################################################
 ## Database
 ##############################################################################
@@ -62,6 +68,7 @@ if not hasattr(db.Entity, "get_or_create"):
 
 class Compiler(db.Entity):
     name = Required(str)
+    path = Optional(str)
     commit_sha = Required(str)
     commit_description = Required(str)
     commit_author = Required(str)
@@ -69,20 +76,24 @@ class Compiler(db.Entity):
     runs = Set('Run')
 
     @classmethod
-    def get_or_create_compiler(cls, compilerdir):
+    def get_or_create_compiler(cls, compiler):
+        compilerdir = compiler.path
         # Define the format for the commit details we want
         # %H: commit hash, %an: author name, %s: subject, %ct: committer date (Unix timestamp)
         format_str = "%H%n%an%n%s%n%ct"
+        name = compiler.name
 
-        output = subprocess.check_output(['git', 'show', '-s', f'--format={format_str}'],
-                                         cwd=compilerdir, universal_newlines=True).strip()
-
-        name = compilerdir.name
-        sha, author, description, timestamp = output.splitlines()
+        try:
+            output = subprocess.check_output(['git', 'show', '-s', f'--format={format_str}'],
+                                            cwd=compilerdir, universal_newlines=True).strip()
+            sha, author, description, timestamp = output.splitlines()
+        except (ValueError, TypeError):
+            sha, author, description, timestamp = "????"
 
         logger.debug(f"current compiler is: {name}, {sha}, {author}, {description}, {timestamp}")
 
         return Compiler.get_or_create(name=name,
+                                      path=compiler.path,
                                       commit_sha=sha,
                                       commit_description=description,
                                       commit_author=author,
@@ -203,10 +214,16 @@ class StaticMeasure(db.Entity):
     run = Required('Run')
 
 class Repetition(db.Entity):
-    run = Required('Run')
+    run = Optional('Run')
     perf_events = Set('PerfEvent', reverse='rep')
     compiler_statistics = Set('CompilerStatistics', reverse='rep')
     timestamp = Required(int, default=lambda: int(time.time()))
+
+def db_encode_int_array(int_array):
+    return ','.join((map(str, int_array)))
+
+def db_decode_int_array(encoded_int_array):
+    return [int(x) for x in encoded_int_array.split(',')]
 
 class Run(db.Entity):
     benchmark = Required('Benchmark', reverse='runs')
@@ -214,6 +231,7 @@ class Run(db.Entity):
     compiler = Required('Compiler', reverse='runs')
     compiler_optimizations = Required(bool)
     version_limit = Required(int)
+    version_limits = Optional(str) # int array
     safe_arithmetic = Required(bool)
     reps = Set('Repetition', reverse='run')
     primitives = Set('PrimitiveCount', reverse='run')
@@ -237,10 +255,15 @@ db.generate_mapping(create_tables=True)
 # Utils
 ##############################################################################
 
-def run_command(command, timeout, env=None):
+def run_command(command, timeout, env=None, extend_env=None):
     logger.info(command)
 
-    env = env = os.environ.copy() if env is None else env
+    env = env = os.environ.copy() if env is None else env.copy()
+
+    if extend_env:
+        env.update(extend_env)
+
+    env = {str(k): str(v) for k, v in env.items()}
 
     if timeout is not None:
         logger.info(f"(with timeout: {timeout}s)")
@@ -286,9 +309,11 @@ class PrimitivesCountParser:
 
         if cls.DEFAULT_PRIMITIVE_COUNTER_MARKER not in compiler_output:
             logger.debug(compiler_output)
-            raise ValueError(f"{cls.DEFAULT_PRIMITIVE_COUNTER_MARKER} not found in compiler output")
+            logger.error(f"{cls.DEFAULT_PRIMITIVE_COUNTER_MARKER} not found in compiler output")
+            counter_section = ""
+        else:
+            counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
 
-        counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
         counts = re.findall("\(([^ ]+) (\d+)\)", counter_section)
         self.primitives = {k: int(v) for k, v in counts}
 
@@ -443,7 +468,13 @@ SCHEME_COMPILE_TIME = "scheme-compile-time"
 C_COMPILE_TIME = "c-compile-time"
 TOTAL_COMPILE_TIME = "compile-time"
 
-def extract_compile_times_from_compiler_output(content):
+def extract_compile_times_from_compiler_output(content, dummy=False):
+    if dummy:
+        return {
+        SCHEME_COMPILE_TIME: 0,
+        C_COMPILE_TIME: 0
+        }
+
     scheme_time = re.search(r"\*\*\*scheme-compile-time: (.+)", content).group(1)
     c_time = re.search(r"\*\*\*c-compile-time: (.+)", content).group(1)
     return {
@@ -452,23 +483,23 @@ def extract_compile_times_from_compiler_output(content):
         }
 
 
-def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
+def compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
     env = os.environ.copy()
 
+    base_command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
 
-    optimization_flag = "-O3" if compiler_optimizations else ""
-    arithmetic_flag = "-U" if not safe_arithmetic else ""
-
-    base_command = f"{COMPILE_SCRIPT} -S gambit -D {gambitdir} -V {vlimit} {arithmetic_flag} {optimization_flag} -f {file}"
-    command_with_primitives = f"{base_command} -P"
-
-    output_with_primitives = run_command(command_with_primitives, timeout, env)
-    primitive_count = PrimitivesCountParser(output_with_primitives)
-
-    if not primitive_count:
-        logger.warning("Failed to parse primitive count")
+    if only_executable:
+        primitive_count = None
     else:
-        logger.debug(f"Primitive count: {dict(primitive_count)}")
+        command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
+
+        output_with_primitives = run_command(command_with_primitives, timeout, env)
+        primitive_count = PrimitivesCountParser(output_with_primitives)
+
+        if not primitive_count:
+            logger.warning("Failed to parse primitive count")
+        else:
+            logger.debug(f"Primitive count: {dict(primitive_count)}")
 
     timed_command = f"perf stat {base_command}"
     output = run_command(timed_command, timeout, env)
@@ -479,27 +510,30 @@ def compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizati
 
     return executable, primitive_count, compile_times
 
+def get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, primitive_count):
+    optimization_flag = "-O3" if compiler_optimizations else ""
+    primitive_count_flag = '-P' if primitive_count else ''
+    arithmetic_flag = '-U' if not safe_arithmetic else ''
+    path_flag = f'-D {compiler.path}' if compiler.path else ''
+    return f"{COMPILE_SCRIPT} -S {compiler.name} {path_flag} -V {vlimit} {arithmetic_flag} {optimization_flag} {primitive_count_flag} -f {file}"
 
-def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
-    def get_command(primitive_count):
-        optimization_flag = "-O3" if compiler_optimizations else ""
-        primitive_count_flag = '-P' if primitive_count else ''
-        arithmetic_flag = '-U' if not safe_arithmetic else ''
-        return f"{COMPILE_SCRIPT} -S bigloo -V {vlimit} {arithmetic_flag} {optimization_flag} {primitive_count_flag} -f {file}"
-
+def compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
     # First execution with primitive count
-    command_with_primitives = get_command(True)
+    if only_executable:
+        primitive_count = None
+    else:
+        command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
 
-    output = run_command(command_with_primitives, timeout)
+        output = run_command(command_with_primitives, timeout)
 
-    executable = extract_executable_from_compiler_output(output)
+        executable = extract_executable_from_compiler_output(output)
 
-    executable_output = run_command(executable, timeout)
+        executable_output = run_command(executable, timeout)
 
-    primitive_count = PrimitivesCountParser(executable_output)
+        primitive_count = PrimitivesCountParser(executable_output)
 
     # Second execution without primitive count
-    base_command = get_command(False)
+    base_command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
     timed_command = f"perf stat {base_command}"
     output = run_command(timed_command, timeout)
     compile_times = extract_compile_times_from_compiler_output(output)
@@ -514,38 +548,41 @@ def compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeou
 
     return executable, primitive_count, compile_times
 
+def compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
+    command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
+    output = run_command(command, timeout)
+    executable = extract_executable_from_compiler_output(output)
+    return executable, PrimitivesCountParser(""), extract_compile_times_from_compiler_output("", dummy=True)
 
-def compile(compiler_execution_data, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None):
-    gambitdir = compiler_execution_data.get('gambitdir')
-    use_bigloo = compiler_execution_data.get('use_bigloo')
-
-    if use_bigloo:
-        return compile_bigloo(file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
-    elif gambitdir:
-        return compile_gambit(gambitdir, file, vlimit, safe_arithmetic, compiler_optimizations, timeout)
+def compile(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
+    if compiler.name == "bigloo":
+        return compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
+    elif compiler.name == "gambit":
+        return compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
     else:
-        raise NotImplementedError
+        return compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
 
-
-def run_benchmark(executable, arguments, timeout=None):
+def run_benchmark(executable, arguments, timeout=None, env=None, only_time=False):
     # Run program to measure time only
     time_command = f"perf stat {executable} {arguments}"
-    time_output = run_command(time_command, timeout)
-
-    # Run program with all perf stat events on
-    all_events = ' '.join(f"-e {e}" for e in PerfResultParser.event_names)
-    all_command = f"perf stat {all_events} {executable} {arguments}"
-    all_output = run_command(all_command, timeout)
-
-    # parse and join outputs
+    time_output = run_command(time_command, timeout, extend_env=env)
     time_parser = PerfResultParser(time_output)
-    all_perf_parser = PerfResultParser(all_output)
 
-    all_perf_parser.update(time_parser)
+    if not only_time:
+        # Run program with all perf stat events on
+        all_events = ' '.join(f"-e {e}" for e in PerfResultParser.event_names)
+        all_command = f"perf stat {all_events} {executable} {arguments}"
+        all_output = run_command(all_command, timeout, extend_env=env)
+
+        # parse and join outputs
+        all_perf_parser = PerfResultParser(all_output)
+        all_perf_parser.update(time_parser)
+    else:
+        all_perf_parser = time_parser
 
     for event in PerfResultParser.event_names:
         if event not in all_perf_parser:
-            logger.info(f"Could not find perf stat event {repr(event)} when running {executable}")
+            logger.debug(f"Could not find perf stat event {repr(event)} when running {executable}")
 
     scheme_parser = SchemeStatsParser(time_output)
 
@@ -555,7 +592,7 @@ default_arguments = "repeat: 10"
 
 benchmark_args = {
     "ack": "repeat: 50 m: 3 n: 9",
-    "bague": "repeat: 1",
+    "bague": "repeat: 1 nombre-de-pierres: 28",
     "fib": "repeat: 3 n: 39",
     "fibfp": "repeat: 2 n: 39.0",
     "tak": "repeat: 10000 x: 18 y: 12 z: 6",
@@ -571,26 +608,27 @@ benchmark_args = {
     "sum": "repeat: 10000 n: 10000",
     "sumfp": "repeat: 200 n: 1e6",
     "triangl": "repeat: 20 i: 22 depth: 1",
-    "almabench": "repeat: 1 K: 36525",
+    "almabench": "repeat: 2 K: 36525",
     "fft": "repeat: 1 n: 1048576",
     "primes": "repeat: 1000000",
     "rev": "repeat: 100000000",
     "vlen": "repeat: 100000000",
-    "boyer": "repeat: 1",
-    "earley": "repeat: 1",
-    "compiler": "repeat: 1",
-    "dynamic": "repeat: 1",
-    "scheme": "repeat: 1",
-    "nucleic": "repeat: 1",
-    "conform": "repeat: 1",
-    "conform-record": "repeat: 1",
-    "conform-vector": "repeat: 1",
-    "maze": "repeat: 1",
-    "maze-record": "repeat: 1",
-    "maze-vector": "repeat: 1",
-    "peval": "repeat: 1",
-    "slatex": "repeat: 1",
+    "boyer": "repeat: 1 n: 500",
+    "earley": "repeat: 1 n: 10000",
+    "compiler": "repeat: 1 n: 2000",
+    "dynamic": "repeat: 1 n: 200",
+    "scheme": "repeat: 1 n: 100000",
+    "nucleic": "repeat: 1 n: 50",
+    "conform": "repeat: 1 n: 1000",
+    "maze": "repeat: 1 n: 50000",
+    "peval": "repeat: 1 n: 3000",
+    "leval": "repeat: 1 n: 60",
+    "slatex": "repeat: 1 n: 10000",
 }
+
+def convert_to_node_arguments(arguments):
+    arg_map = dict([a.split(':') for a in arguments.replace(": ", ":").split()])
+    return repr(json.dumps({k.replace("-", "_"): v for k, v in arg_map.items()}))
 
 def get_gambit_program_size(executable, benchmark):
     objdump_command = f"objdump --disassemble {executable} | sed -e '/ <.*>:/!d'"
@@ -649,29 +687,47 @@ def get_program_size(executable, benchmark, compiler):
     elif 'bigloo' in compiler.name:
         return get_bigloo_program_size(executable)
     else:
-        raise ValueError("unknown compiler, cannot retrieve size")
+        logger.error("unknown compiler, cannot retrieve size")
+        return 0
 
-def get_or_create_bigloo_or_gambit(gambitdir, use_bigloo):
-    if gambitdir:
-        compiler, _ = Compiler.get_or_create_compiler(gambitdir)
+def get_or_create_run_compiler(compiler):
+    if compiler.path:
+        compiler, _ = Compiler.get_or_create_compiler(compiler)
         return compiler
-    
-    if use_bigloo:
-        compiler, _ = Compiler.get_or_create(name='bigloo',
+    else:
+        compiler, _ = Compiler.get_or_create(name=compiler.name,
                                              commit_sha='?',
                                              commit_description='?',
                                              commit_author='?',
                                              commit_timestamp=-1)
         return compiler
 
-    raise NotImplementedError
+def get_benchmark_cli_arguments(name):
+    arguments = benchmark_args.get(name)
+    if arguments is None:
+        logger.warning(f"no CLI argument for {repr(name)}")
+        arguments = default_arguments
+    return arguments
+
+def get_heap_size_arguments(compiler_name):
+    if compiler_name == "gambit":
+        return f"-:m100M", None
+    elif compiler_name == "bigloo":
+        return "", {"BIGLOOHEAP": 100}
+    elif compiler_name == 'node':
+        return "", None # Done by compilation script
+    elif compiler_name == 'chez':
+        return "", None # cannot adjust heap
+    elif compiler_name == 'racket':
+        return "", None # cannot adjust heap
+    else:
+        logger.error(f'cannot set heap size for {compiler_name}')
+        return "", None
 
 @db_session
-def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_arithmetic, repetitions, compiler_optimizations, force_execution=False, timeout=None):
+def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repetitions, compiler_optimizations, force_execution=False, timeout=None):
     system, _ = System.get_or_create_current_system()
-    compiler = get_or_create_bigloo_or_gambit(gambitdir, use_bigloo)
-
-    compiler_execution_data = {'gambitdir': gambitdir, 'use_bigloo': use_bigloo, 'compiler': compiler}
+    compiler = get_or_create_run_compiler(compiler)
 
     with open(file) as f:
         name = os.path.splitext(os.path.basename(file))[0]
@@ -683,12 +739,7 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
                     f'- version limit: {v}\n'
                     f'- safe arithmetic: {safe_arithmetic}')
 
-        base_arguments = benchmark_args.get(benchmark.name)
-        if base_arguments is None:
-            logger.warning(f"no CLI argument for {repr(benchmark.name)}")
-            base_arguments = default_arguments
-        if compiler.name == 'gambit':
-            base_arguments = f"-:m100M {base_arguments}"
+        base_arguments = get_benchmark_cli_arguments(benchmark.name)
 
         if not force_execution:
             existing_run = Run.get(benchmark=benchmark,
@@ -712,21 +763,27 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
                   compiler_optimizations=compiler_optimizations,
                   arguments=base_arguments)
 
-        executable, primitive_count, compile_times = compile(compiler_execution_data, file, v, safe_arithmetic, compiler_optimizations, timeout)
+        executable, primitive_count, compile_times = compile(compiler, file, v, safe_arithmetic, compiler_optimizations, timeout)
 
         scheme_compile_time = compile_times[SCHEME_COMPILE_TIME]
         c_compile_time = compile_times[C_COMPILE_TIME]
         total_compile_time = scheme_compile_time + c_compile_time
 
-        logger.debug(f"compilation time: {compile_time}")
+        logger.debug(f"compilation time: {total_compile_time}")
         StaticMeasure(name=TOTAL_COMPILE_TIME, value=total_compile_time, run=run)
         StaticMeasure(name=SCHEME_COMPILE_TIME, value=scheme_compile_time, run=run)
         StaticMeasure(name=C_COMPILE_TIME, value=c_compile_time, run=run)
 
+        # Set heap size of all benchmarks to 100M
+        heap_args, env = get_heap_size_arguments(compiler.name)
+        base_arguments = f'{heap_args} {base_arguments}'
+
         align_stack_step = 3
         for i in range(repetitions):
             arguments = f"{base_arguments} align-stack: {i * align_stack_step}"
-            perf_results, scheme_stats = run_benchmark(executable, arguments, timeout)
+            if compiler.name == "node":
+                arguments = convert_to_node_arguments(arguments)
+            perf_results, scheme_stats = run_benchmark(executable, arguments, timeout=timeout, env=env)
 
             rep = Repetition(run=run)
 
@@ -762,10 +819,6 @@ def run_and_save_benchmark(gambitdir, use_bigloo, file, version_limits, safe_ari
             StaticMeasure(name='program-size', value=size, run=run)
         else:
             logger.warning(f"could not resolve size of {repr(executable)}")
-
-##############################################################################
-# Chart generation
-##############################################################################
 
 class ChartValue:
     def __init__(self, value, stdev=0):
@@ -807,12 +860,10 @@ class ChartValue:
 def sanitize_filename(filename, valid_chars="-_.()" + string.ascii_letters + string.digits):
     return ''.join(c for c in filename if c in valid_chars)
 
-
 def ensure_directory_exists(filepath):
     dir_name = os.path.dirname(filepath)
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
-
 
 def choose_path(base, output, system_name, compiler_name, safe_arithmetic,
                 valid_chars="-_.()" + string.ascii_letters + string.digits):
@@ -840,23 +891,6 @@ def choose_path(base, output, system_name, compiler_name, safe_arithmetic,
     else:
         raise ValueError(f"output must be a folder of .png target, got {output}")
 
-
-def choose_barchart_output_path(output, system_name, compiler_name, safe_arithmetic, benchmark, perf_event_names, primitive_names):
-    primitive_segment = f"_{len(primitive_names)}primitives" if primitive_names else ""
-    base = f"{benchmark}_{'_'.join(sorted(perf_event_names))}{primitive_segment}"
-    return choose_path(base, output, system_name, compiler_name, safe_arithmetic)
-
-
-def select_primitives_names(runs, primitive_names_or_amount):
-    if isinstance(primitive_names_or_amount, int):
-        # Recover the most common primitives
-        primitives = select(prim for prim in PrimitiveCount if prim.run in runs).order_by(desc(PrimitiveCount.value))
-        return list(select(prim.name for prim in primitives if prim.name !=
-                      "##identity").distinct()[:primitive_names_or_amount])
-    else:
-        return primitive_names_or_amount
-
-
 def get_system_from_name_or_default(system_name=None):
     system = System.get_current_system() if system_name is None else System.get(name=system_name)
 
@@ -874,507 +908,207 @@ def get_compiler_from_name(compiler_name):
 
     return compiler
 
-
-@db_session
-def plot_benchmarks(system_name, compiler_name, benchmark, safe_arithmetic, perf_event_names, primitive_names_or_amount, static_measures_names, output):
-    system = get_system_from_name_or_default(system_name)
-    compiler = get_compiler_from_name(compiler_name)
-
-    # Select only the latest runs for a given version limit
-    runs = select(
-        r for r in Run
-        if r.system == system and r.compiler == compiler and r.benchmark.name == benchmark
-           and r.safe_arithmetic == safe_arithmetic
-        and r.compiler_optimizations
-        and r.timestamp == max(select(
-            r2.timestamp for r2 in Run
-            if r2.system == system and r2.compiler == compiler
-            and r2.benchmark.name == benchmark
-            and r2.version_limit == r.version_limit
-            and r2.safe_arithmetic == safe_arithmetic
-            and r2.compiler_optimizations == r.compiler_optimizations)))\
-        .order_by(Run.version_limit)
-
-    logger.debug(f"found {len(runs)} (only latest)")
-
-    primitive_names = select_primitives_names(runs, primitive_names_or_amount)
-
-    if primitive_names:
-        logger.info(f"primitives to plot: {', '.join(primitive_names)}")
-
-    data = extract_data_from_runs(runs, perf_event_names, primitive_names, static_measures_names)
-    output_path = choose_barchart_output_path(output=output,
-                                     system_name=system.name,
-                                     compiler_name=compiler.name,
-                                     safe_arithmetic=safe_arithmetic,
-                                     benchmark=benchmark,
-                                     perf_event_names=perf_event_names,
-                                     primitive_names=primitive_names)
-
-    logger.info(f"output to {output_path}")
-
-    plot_data(data, output_path)
-
-
-_sentinel = object()
-def sanitize_stats(name, values, default=_sentinel, _logged=[False]):
-    if not values:
-        if default is _sentinel:
-            raise ValueError(f'Cannot find {repr(name)}')
-        else:
-            return default
-
-    percentage = 0.1
-
-    if not _logged[0]:
-        logger.debug(f"trimming {int(percentage * 100)}% of outliers")
-        _logged[0]= True
-
-    values.sort()
-    values = values[math.floor(len(values) * percentage):math.ceil(len(values) * (1 - percentage)) + 1]
-
-    mean = statistics.mean(values)
-    stdev = statistics.stdev(values) if len(values) > 1 else 0
-
-    return ChartValue(mean, stdev)
-
-def get_perf_event_statistics(run, name, default=_sentinel):
-    events = select(e for e in PerfEvent if e.event == name and e.run == run)
-    values = [e.value for e in events]
-    return sanitize_stats(name, values, default)
-
-
-def get_static_measures_statistics(run, name, default=_sentinel):
-    events = select(e for e in StaticMeasure if e.name == name and e.run == run)
-    values = [e.value for e in events]
-    return sanitize_stats(name, values, default)
-
-
-def extract_data_from_runs(runs, perf_event_names, primitive_names, static_measures_names):
-    data = []
-
-    for run in runs:
-        perf_events = {}
-
-        for name in perf_event_names:
-            perf_events[name] = get_perf_event_statistics(run, name)
-
-        primitive_counts = {}
-
-        for name in primitive_names:
-            if prim := PrimitiveCount.get(run=run, name=name):
-                primitive_counts[name] = ChartValue(prim.value)
-            else:
-                logger.debug(f"{name} primitive not found, defaulting to 0")
-                primitive_counts[name] = ChartValue(0)
-
-        static_measures = {}
-
-        for name in static_measures_names:
-            if not (measure := StaticMeasure.get(run=run, name=name)):
-                raise ValueError(f'Cannot find {repr(name)}')
-            static_measures[name] = ChartValue(measure.value)
-
-        data.append((run, perf_events, primitive_counts, static_measures))
-
-    return data
-
-
-def plot_data(data, output_path):
-    # Compute colors
-    n_perf_stats = max((len(p) for _, p, _, _ in data), default=0)
-    n_primitive_stats = max((len(p) for _, _, p, _ in data), default=0)
-    n_static_measures = max((len(m) for _, _, _, m in data), default=0)
-    n_measurments = n_perf_stats + n_primitive_stats + n_static_measures
-
-    perf_colors = mpl.colormaps.get_cmap('winter')(np.linspace(0.3, 0.8, n_perf_stats))
-    primitive_colors = mpl.colormaps.get_cmap('autumn')(np.linspace(0.3, 0.8, n_primitive_stats))
-    static_measures_colors = mpl.colormaps.get_cmap('summer')(np.linspace(0.3, 0.8, n_static_measures))
-
-    # Format data for matplotlib
-    data_no_bbv_no_optim = [d for d in data if d[0].version_limit == 0
-                                               and not d[0].compiler_optimizations][:1]
-    data_no_bbv_optim = [d for d in data if d[0].version_limit == 0
-                                            and d[0].compiler_optimizations][:1]
-    data_with_bbv = [d for d in data if d[0].version_limit > 0]
-    data_with_bbv.sort(key=lambda d: d[0].version_limit)
-
-    data = data_no_bbv_no_optim + data_no_bbv_optim + data_with_bbv
-
-    def pick_version_name(run):
-        if run.version_limit == 0:
-            base = "No BBV"
-        else:
-            base = f"{run.version_limit}"
-
-        if run.compiler_optimizations:
-            base += "/optim"
-
-        return base
-
-    versions = [pick_version_name(r) for r, *_ in data]
-    measures = collections.defaultdict(list)
-
-    first = data[0]
-
-    def get_first_point(name):
-        for measures in first[1:]:
-            if measure := measures.get(name):
-                return measure
-        return ChartValue.zero
-
-    for run, *measure_sets in data:
-        for m in measure_sets:
-            for name, measure in sorted(m.items(), key=operator.itemgetter(0)):
-                measures[name].append(measure / get_first_point(name))
-
-    def category_order(name):
-        for i, group in enumerate(first[1:]):
-            for datum_name in group.keys():
-                if name.startswith(datum_name):
-                    logger.debug(f"{name} goes into bar group {i}")
-                    return i
-        raise ValueError(f"could not order {name}")
-
-    # Label location and bar width
-    n_versions = len(versions)
-    x = np.arange(len(versions))
-    num_bars = n_versions * len(measures)
-
-    if (num_bars + n_versions) < 30:
-        width = 0.2
-    elif (num_bars + n_versions) < 60:
-        width = 0.23
-    else:
-        width = 18 / (num_bars + n_versions)
- 
-    multiplier = 0
-
-    # Plot
-    fig, ax = plt.subplots(layout='constrained')
-
-    for (attribute, measurement), color in zip(measures.items(),
-                                               itertools.chain(perf_colors, primitive_colors, static_measures_colors)):
-        offset = width * multiplier
-        rects = ax.bar(x + offset, [m.value for m in measurement],
-                       width=width, label=attribute, color=color,
-                       yerr=[m.stdev or math.nan for m in measurement],
-                       capsize=width * 7)
-        multiplier += 1
-
-    ax.set_xticks(x + width * (n_measurments / 2 - 0.5), versions, rotation=45, rotation_mode="anchor", ha='right')
-
-    plt.legend(loc='lower center', bbox_to_anchor=(0.5, 1.1), ncol=3)
-
-    plt.title(first[0].benchmark.name.title())
-
-    plt.tight_layout()
-
-    ensure_directory_exists(output_path)
-    plt.savefig(output_path)
-
-
 ##############################################################################
-# Correlation analysis
+# Profile guided-optimization of version limit
 ##############################################################################
 
-def choose_analysis_output_path(output, system_name, compiler_name, safe_arithmetic):
-    return choose_path(f'analysis', output, system_name, compiler_name, safe_arithmetic)
-
-
-def choose_specific_metric_output_path(output, metric, system_name, compiler_name, safe_arithmetic):
-    return choose_path(f'{metric}_analysis', output, system_name, compiler_name, safe_arithmetic)
-
-def get_row_name(run):
-    base = ""
-
-    if (limit := run.version_limit) == 0:
-        base += "0"
-    else:
-        base += str(limit)
-
-    if run.compiler_optimizations:
-        base += "+"
-
-    return base
-
-def row_name_key(name):
-    if name.endswith("+"):
-        return int(name[:-1]), True
-    else:
-        return int(name), False
-
-def compute_ratio_dataframe(benchmark_runs, perf_attributes, static_attributes, pseudo_ratio_offset=1):
-    benchmark_runs = list(benchmark_runs)
-    rows = {}
-
-    logger.info(f"Computing ratios for {benchmark_runs[0].benchmark.name}")
-
-    for run in benchmark_runs:
-        row = []
-        rows[get_row_name(run)] = row
-
-        for perf_attr in perf_attributes:
-            row.append(get_perf_event_statistics(run, perf_attr).value)
-
-        for static_attr in static_attributes:
-            row.append(get_static_measures_statistics(run, static_attr).value)
-
-    rows = {k: rows[k] for k in sorted(rows, key=row_name_key)}
-
-    df = pd.DataFrame(np.nan, index=rows.keys(), columns=perf_attributes + static_attributes)
-
-    for i, row_data in rows.items():
-        df.loc[i] = row_data
-
-    if df.isna().any().any():
-        logger.warning(f"NaN found in dataframe, there seems to be missing data")
-
-    # Use pseudo ratio (d[i] + pseudo_ratio_offset) / (d[0] + pseudo_ratio_offset)
-    # for columns which contain a zero
-    cols_with_zero = df.columns[(df == 0).any()]
-    df[cols_with_zero] = df[cols_with_zero] + pseudo_ratio_offset
-
-    logger.info(f"Zero values found, using pseudo-ratio for the following columns: {', '.join(cols_with_zero)}")
-
-    # Compute ratios based on the first column
-    return df.div(df.iloc[0])
-
-
-def analyze_specific_metric(output, system, compiler, safe_arithmetic, runs, perf_attributes, static_attributes):
-    def _get_result(run, attr, kind):
-        if kind is PerfEvent:
-            events = select(p for p in PerfEvent if p.event == attr and p.run == run)[:]
-        elif kind is StaticMeasure:
-            events = select(p for p in StaticMeasure if p.name == attr and p.run == run)[:]
-        else:
-            raise NotImplementedError
-
-        mean = statistics.mean(e.value for e in events)
-        stdev = statistics.stdev(e.value for e in events) if len(events) > 2 else 0
-        return ChartValue(mean, stdev)
+def replace_patterns(main_string, pattern, replacements):
+    replacement_iter = iter(replacements)  # Create an iterator over the replacements list
+    parts = []  # List to hold parts of the string
+    last_end = 0  # Track end of the last match
     
-    for event, get_result in [(p, lambda run, attr: _get_result(run, attr, PerfEvent)) for p in perf_attributes] + \
-                 [(p, lambda run, attr: _get_result(run, attr, StaticMeasure)) for p in static_attributes]:
-        output_path = choose_specific_metric_output_path(output=output,
-                                                         metric=event,
-                                                         system_name=system.name,
-                                                         compiler_name=compiler.name,
-                                                         safe_arithmetic=safe_arithmetic)
-
-        benchmarks = list(set(r.benchmark.name for r in runs))
-
-        def get_bench_index(benchmark_name):
-            return benchmarks.index(benchmark_name)
-
-        def get_mean_index():
-            return -1
-
-        def pseudo_ratio(x, y):
-            return (x + 1) / (y + 1)
-
-        def geometric_mean(values):
-            return math.prod(values) ** (1 / len(values))
-
-        rows = collections.defaultdict(lambda: [None] * (len(benchmarks) + 1))
-
-        for benchmark_name in benchmarks:
-            benchmark_runs = sorted([r for r in runs if r.benchmark.name == benchmark_name],
-                                    key=lambda r: (r.version_limit, r.compiler_optimizations))
-            bench_index = get_bench_index(benchmark_name)
-
-            first_result = get_result(benchmark_runs[0], event)
-
-            for run in benchmark_runs:
-                result = get_result(run, event)
-                row_name = get_row_name(run)
-                rows[row_name][bench_index] = pseudo_ratio(result.value, first_result.value)
-
-        for row in rows.values():
-            row[get_mean_index()] = geometric_mean(row[:-1])
-
-        # Plot
-        fig, ax = plt.subplots(figsize=(15, 5))
-
-        def clamp(x):
-            return min(2, max(0, x))
-
-        vmin = clamp(min(value for value in row for row in rows.values()))
-        vmax = clamp(max(value for value in row for row in rows.values()))
-
-        sorted_row_names = sorted(rows.keys(), key=row_name_key)
-        table = [rows[k] for k in sorted_row_names]
-
-        table = pd.DataFrame(table, columns=[*benchmarks, "Geometric mean"], index=sorted_row_names)
-
-        heatmap_ax = sns.heatmap(table, annot=True, fmt='.2g', cmap="coolwarm",
-                                 linewidths=.5, vmin=vmin, vmax=vmax, center=1)
-
-        for text in heatmap_ax.texts:
-            text.set_size(7)
-
-        plt.title(f"Mean ratio for {repr(event)}", fontsize=16, fontweight='bold')
-
-        ax.xaxis.tick_top()
-        plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
-
-        text_size = 12 if len(benchmarks) < 5 else 12 / (len(benchmarks) / 8)
-        ax.text(0.5, -0.1, f"benchmarks: {', '.join(benchmarks)}",
-                size=text_size, ha="center", transform=ax.transAxes)
-
-        plt.tight_layout()
-
-        ensure_directory_exists(output_path)
-        plt.savefig(output_path)
-
-
-@db_session
-def analyze(benchmark_names, system_name, compiler_name, safe_arithmetic, output):
-    system = get_system_from_name_or_default(system_name)
-    compiler = get_compiler_from_name(compiler_name)
-
-    output_path = choose_analysis_output_path(output=output,
-                                              system_name=system.name,
-                                              compiler_name=compiler.name,
-                                              safe_arithmetic=safe_arithmetic)
-
-    # Select benchmarks for analysis
-    if benchmark_names is None:
-        benchmarks_filter = list(select(b.name for b in Benchmark).distinct())
-    else:
-        benchmarks_filter = benchmark_names
-
-    for benchmark_name in benchmarks_filter[:]:
-        bench = Benchmark.get(name=benchmark_name)
-
-        if not bench:
-            benchmarks_filter.remove(benchmark_name)
-            logger.warning(f"benchmark does not exist: {repr(benchmark_name)}")
-        elif not exists(r for r in Run if r.benchmark == bench
-                        and r.system == system and r.compiler.name == compiler_name):
-            benchmarks_filter.remove(benchmark_name)
-            logger.warning(f"benchmark does not exist for the provided settings: {repr(benchmark_name)}")
-
-    logger.debug(f"benchmarks used: {', '.join(benchmarks_filter)}")
-
-    # Select only the latest runs for a each benchmark
-    runs = list(select(
-        r for r in Run
-        if r.system == system and r.compiler.name == compiler_name
-        and r.benchmark.name in benchmarks_filter
-        and r.safe_arithmetic == safe_arithmetic
-        and r.compiler_optimizations
-        and r.timestamp == max(select(
-            r2.timestamp for r2 in Run
-            if r2.system == system and r2.compiler.name == compiler_name
-            and r2.version_limit == r.version_limit
-            and r2.benchmark == r.benchmark
-            and r2.version_limit == r.version_limit
-            and r2.safe_arithmetic == safe_arithmetic
-            and r2.compiler_optimizations))).order_by(Run.benchmark))
-
-    runs = [r for r in runs if r.benchmark.name not in ("mbrot", "array1", "sumfp", "sum")]
-
-    found_benchmark_names = sorted(set(r.benchmark.name for r in runs))
-
-    logger.info(f"found {len(runs)} (only latest)")
-
-    # Format data in a pandas dataframe
-    perf_attributes = list(select(e.event for e in PerfEvent if e.run in runs).distinct())
-
-    # Remove attributes that perf could not recover on all runs
-    perf_attributes = [p for p in perf_attributes if all(get_perf_event_statistics(run, p, None) for run in runs)]
-
-    logger.info(f"perf attributes in analysis: {', '.join(perf_attributes)}")
-
-    static_attributes = list(select(m.name for m in StaticMeasure if m.run in runs).distinct())
-
-    logger.info(f"static measures in analysis: {', '.join(perf_attributes)}")
-
-    analyze_specific_metric(output, system, compiler, safe_arithmetic, runs, perf_attributes, static_attributes)
-
-    data_points = {}
-
-    benchmarks_groups = itertools.groupby(runs, key=lambda r: r.benchmark.id)  # group runs by version
-
-    ratio_dataframes = [compute_ratio_dataframe(group, perf_attributes, static_attributes)
-                        for _, group in benchmarks_groups]
-
-    # Compute the mean along the third axis, ignoring NaN values
-    df_average_ratio = pd.DataFrame(np.prod([df.values for df in ratio_dataframes], axis=0),
-                                    columns=ratio_dataframes[0].columns) ** (1 / len(ratio_dataframes))
-    df_average_ratio.index = ratio_dataframes[0].index
-
-    # Plot
-    fig, ax = plt.subplots(figsize=(15, 5))
-
-    def clamp(x):
-        return min(2, max(0, x))
-
-    vmin = clamp(np.nanmin(df_average_ratio.values))
-    vmax = clamp(np.nanmax(df_average_ratio.values))
-
-    heatmap_ax = sns.heatmap(df_average_ratio, annot=True, fmt='.2g', cmap="coolwarm", linewidths=.5, vmin=vmin, vmax=vmax, center=1)
-
-    for text in heatmap_ax.texts:
-        text.set_size(7)
-
-    plt.title(f"Mean ratio", fontsize=16, fontweight='bold')
-
-    ax.xaxis.tick_top()
-    plt.xticks(rotation=35, rotation_mode="anchor", ha='left')
+    # Use re.finditer to find all matches of the pattern
+    for match in re.finditer(pattern, main_string):
+        start, end = match.span()
+        parts.append(main_string[last_end:start])  # Append the part before the match
+        
+        try:
+            # Get the next replacement, append it instead of the match
+            replacement = next(replacement_iter)
+            parts.append(replacement)
+        except StopIteration:
+            # If no more replacements, append the original match
+            parts.append(main_string[start:end])
+        
+        last_end = end  # Update the end of the last match
     
-    text_size = 12 if len(found_benchmark_names) < 5 else 12 / (len(found_benchmark_names) / 5)
-    ax.text(0.5, -0.1, f"benchmarks: {', '.join(found_benchmark_names)}",
-            size=text_size, ha="center", transform=ax.transAxes)
-
-    plt.tight_layout()
-
-    ensure_directory_exists(output_path)
-    plt.savefig(output_path)
-
-
-##############################################################################
-# Perf data distribution
-##############################################################################
-
-def choose_distribution_output_path(output, system_name, compiler_name, safe_arithmetic, benchmark, version_limit, perf_event):
-    base = f"distribution_{benchmark}_V{version_limit}_{perf_event}"
-    return choose_path(base, output, system_name, compiler_name, safe_arithmetic)
+    # Append the remaining part of the string after the last match
+    parts.append(main_string[last_end:])
+    
+    return ''.join(parts)
 
 @db_session
-def perf_distribution(system_name,
-                      compiler_name,
-                      benchmark_name,
-                      event,
-                      version_limit,
-                      output):
-    system = get_system_from_name_or_default(system_name)
-    compiler = get_compiler_from_name(compiler_name)
+def profile_optimize_benchmark(compiler, file, default_limit, repetitions, timeout):
+    from deap import base, creator, tools, algorithms
 
-    output_path = choose_distribution_output_path(output, system.name,
-                                                  compiler.name, benchmark_name, version_limit, event)
+    random.seed(42)
 
-    benchmark = Benchmark.get(name=benchmark_name)
+    start_time = time.time()
+    VERSION_LIMIT_PATTERN = r'\(set-bbv-version-limit!\s#f\)'
 
-    run = Run.select(lambda r: r.system == system and
-                     r.compiler == compiler and
-                     r.benchmark == benchmark and
-                     r.version_limit == version_limit).order_by(desc(Run.timestamp)).first()
+    times = {}
+    compiler = get_or_create_run_compiler(compiler)
+    system, _ = System.get_or_create_current_system()
 
-    # sorted = lambda x: x
-    values = sorted([event.value for event in select(e for e in PerfEvent if e.event == event and e.run == run)])
+    def get_runtime(limits):
+        logger.info(f'Getting runtime for limits: {",".join(map(str, limits))}')
 
-    plt.bar(range(len(values)), values)
+        lib_vlimit = limits[-1]
+        replacements = [f"(set-bbv-version-limit! {l})" for l in limits[:-1]]
+        new_content = replace_patterns(content, VERSION_LIMIT_PATTERN, replacements)
 
-    plt.savefig(output_path)
+        suffix=".custom-version-limit"
+        root, extension = os.path.splitext(file)
+        new_file = f"{root}{suffix}{extension}"
+
+        with open(new_file, 'w') as f:
+            f.write(new_content)
+
+        base_arguments = get_benchmark_cli_arguments(benchmark.name)
+
+        run, created = Run.get_or_create(benchmark=benchmark,
+                                         system=system,
+                                         compiler=compiler,
+                                         version_limit=-1,
+                                         version_limits=db_encode_int_array(limits),
+                                         arguments=base_arguments,
+                                         safe_arithmetic=True,
+                                         compiler_optimizations=True)
+
+        heap_args, env = get_heap_size_arguments(compiler.name)
+        base_arguments = f'{heap_args} {base_arguments}'
+
+        
+
+        if not created:
+            logger.info(f'run already existed')
+            # run already existed, get existing result
+            perf_times = select(p.value for p in PerfEvent if p.rep.run == run and p.event == PerfResultParser.time_event)
+            if len(perf_times) >= repetitions:
+                logger.info(f'run already existed with {len(perf_times)} repetitions')
+                return statistics.mean(perf_times)
+
+        logger.info(f'executing to get more time readings')
+
+        executable, _, _ = compile(compiler, new_file, lib_vlimit, True, True, timeout, only_executable=True)
+
+        align_stack_step = 3
+        runtimes = []
+        for i in range(repetitions):
+            arguments = f"{base_arguments} align-stack: {i * align_stack_step}"
+            perf_results, _ = run_benchmark(executable, arguments, timeout=timeout, env=env, only_time=True)
+
+            rep = Repetition(run=run)
+
+            for event, (value, variance) in perf_results.items():
+                PerfEvent(event=event, value=value, rep=rep)
+
+            time, _ = perf_results[PerfResultParser.time_event]
+            runtimes.append(time)
+
+        average = statistics.mean(runtimes)
+        logger.info(f"average runtime for {os.path.basename(file)} with Vs={', '.join(map(str, limits))}: {average}s")
+
+        db.commit()
+        logger.info('commit profiling run to db')
+
+        return average
+
+    def optim():
+        def eval_runtime(individual):
+            return [get_runtime(individual)]
+
+        MIN_VLIMIT = 1
+        MAX_VLIMIT = 10
+
+        dimension = len(re.findall(VERSION_LIMIT_PATTERN, content)) + 1
+
+        creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+        creator.create("Individual", list, fitness=creator.FitnessMin)
+
+        toolbox = base.Toolbox()
+        toolbox.register("attr_int", random.randint, MIN_VLIMIT, MAX_VLIMIT)
+        toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_int, n=dimension)
+        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+
+        toolbox.register("evaluate", eval_runtime)
+        toolbox.register("mate",   tools.cxTwoPoint)  # Crossover
+        toolbox.register("mutate", tools.mutUniformInt, low=MIN_VLIMIT, up=MAX_VLIMIT, indpb=0.2)  # Mutation
+        toolbox.register("select", tools.selTournament, tournsize=7)  # Selection
+
+        # Genetic Algorithm Parameters
+        random_population_size = 10
+        crossover_probability = 0.7
+        mutation_probability = 0.2
+        number_of_generations = 100
+
+        # Creating the initial population
+        population = toolbox.population(n=random_population_size)
+        for v in range(MIN_VLIMIT, MAX_VLIMIT + 1):
+            uniform_version_limit = toolbox.individual()
+            uniform_version_limit[:] = [v] * dimension
+            population.append(uniform_version_limit)
+
+        # Run the Genetic Algorithm
+        result, logbook = algorithms.eaSimple(population, toolbox, cxpb=crossover_probability, mutpb=mutation_probability, ngen=number_of_generations, verbose=True)
+
+        # Extracting the best solution
+        best_individual = tools.selBest(result, k=1)[0]
+        looger.info("Best Individual =", best_individual)
+        looger.info("Best Fitness =", best_individual.fitness.values[0])
+
+    with open(file, 'r') as f:
+        name = os.path.splitext(os.path.basename(file))[0]
+        timestamp = int(os.path.getmtime(file))
+        content = f.read()
+        benchmark, _ = Benchmark.get_or_create(name=name, content=content, timestamp=timestamp)
+    
+    optim()
+
+
+@db_session
+def profile_optimize_report(compiler):
+    def wrap_text(text, width=80):
+        return textwrap.fill(text, width)
+
+    profiling_runs = list(select(r for r in Run if r.version_limit == -1 \
+                                                   and r.compiler.name == compiler \
+                                                   and r.compiler_optimizations \
+                                                   and r.safe_arithmetic))
+    
+    benchmarks = MACRO_BENCHMARKS
+
+    ratios = []
+
+    for benchmark in benchmarks:
+
+        benchmark_runs = [r for r in profiling_runs if r.benchmark.name == benchmark]
+
+        times = [(average_time(r), r) for r in benchmark_runs]
+        print(benchmark)
+        print(f"runs: {len(benchmark_runs)}")
+
+        if benchmark_runs:
+            base_time = average_base_time(benchmark_runs[0])
+            ratio = times[0][0] / base_time
+            ratios.append(ratio)
+            print(f"BEST TIME: {times[0][0]}s")
+            print(f"RATIO: {ratio}")
+            print(f"global version limit: {times[0][1].version_limits.split(',')[-1]}")
+            print(wrap_text(f"(set-custom-version-limits! {' '.join(times[0][1].version_limits.split(',')[:-1])})"))
+            print()
+        else:
+            print("NO RUNS\n")
+
+    print(f"GEOMEAN: {statistics.geometric_mean(ratios)}")
+
 
 ##############################################################################
 # CSV dump
 ##############################################################################
     
 
-def choose_csv_output_path(output, system_name, compiler_name):
+def choose_csv_output_path(output, system_name):
     path = pathlib.Path(output or '.').resolve()
     suffix = path.suffix
 
@@ -1383,7 +1117,7 @@ def choose_csv_output_path(output, system_name, compiler_name):
         logger.debug(f"output into folder {path}")
 
         # build default filename
-        filename = f"results_{compiler_name}_{system_name}.csv"
+        filename = f"results_{system_name}.csv"
 
         # sanitize filename
         filename = sanitize_filename(filename)
@@ -1398,9 +1132,10 @@ def choose_csv_output_path(output, system_name, compiler_name):
         raise ValueError(f"output must be a folder of .csv target, got {output}")
 
 
+MACRO_BENCHMARKS = ('almabench', 'boyer', 'compiler', 'conform', 'dynamic',
+                    'earley', 'leval', 'maze', 'nucleic', 'peval', 'scheme', 'slatex')
 def is_macro(name):
-    return name in ('almabench', 'boyer', 'compiler', 'conform', 'dynamic',
-                    'earley', 'maze', 'nucleic', 'peval', 'scheme', 'slatex')
+    return name in MACRO_BENCHMARKS
 
 def run_is_macro(run):
     return is_macro(run.benchmark.name)
@@ -1414,6 +1149,16 @@ def nan_on(*exceptions):
                 return math.nan
         return inner_wrapper
     return wrapper
+
+def average_base_time(run):
+    base_runs = select(r for r in Run if r.benchmark == run.benchmark \
+                                       and r.compiler == run.compiler \
+                                       and r.system == run.system \
+                                       and r.compiler_optimizations == run.compiler_optimizations
+                                       and r.safe_arithmetic == run.safe_arithmetic \
+                                       and r.version_limit == 0)
+    base_run = max(base_runs, key=lambda r: r.timestamp)
+    return average_time(base_run)
 
 def average_time(run):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
@@ -1453,89 +1198,80 @@ def run_program_size(run):
     m = StaticMeasure.get(name='program-size', run=run)
     return m.value if m else math.nan
 
-
 @db_session
-def to_csv(system_name, compiler_name, benchmark_names, version_limits, output):
-    system = get_system_from_name_or_default(system_name)
-    compiler = get_compiler_from_name(compiler_name)
+def to_csv(system_name, version_limits, output):
+    def one_csv_result(compiler_name):
+        system = get_system_from_name_or_default(system_name)
+        compiler = get_compiler_from_name(compiler_name)
 
-    output_path = choose_csv_output_path(output, system_name, compiler_name)
+        runs = list(select(
+            r for r in Run
+            if r.system == system
+            and r.compiler.name == compiler_name # TODO switch back to using compiler when no commit-split
+            and r.version_limit in version_limits
+            and r.compiler_optimizations
+            and r.safe_arithmetic
+            and r.timestamp == max(select(
+                r2.timestamp for r2 in Run
+                if r2.system == system
+                and r2.compiler.name == compiler_name
+                and r2.version_limit == r.version_limit
+                and r2.benchmark == r.benchmark
+                and r2.version_limit == r.version_limit
+                and r2.safe_arithmetic == r.safe_arithmetic
+                and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
 
-    runs = list(select(
-        r for r in Run
-        if r.system == system
-        and r.compiler.name == compiler_name # TODO switch back to using compiler when no commit-split
-        and r.benchmark.name in benchmark_names
-        and r.version_limit in version_limits
-        and r.compiler_optimizations
-        and r.safe_arithmetic
-        and r.timestamp == max(select(
-            r2.timestamp for r2 in Run
-            if r2.system == system
-            and r2.compiler.name == compiler_name
-            and r2.version_limit == r.version_limit
-            and r2.benchmark == r.benchmark
-            and r2.version_limit == r.version_limit
-            and r2.safe_arithmetic == r.safe_arithmetic
-            and r2.compiler_optimizations == r.compiler_optimizations))).order_by(Run.benchmark))
+        def get_column_name(limit):
+            return f"V={limit}"
+        
+        def get_run_column_name(run):
+            return get_column_name(run.version_limit)
 
-    def get_column_name(limit, optim, safe, postfix=''):
-        name = f"V={limit}"
-        if optim or not safe:
-            name += "("
-            if optim: name += "O"
-            if not safe: name += "U"
-            name += ")"
-        return name + postfix
+        benchmark_names = set(run.benchmark.name for run in runs)
+        benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
 
-    stdev_postfix = ' stdev'
+        column_names = ["Benchmark"]
+        column_names += [get_column_name(l) for l in version_limits]
+
+        logger.debug(f"columns in csv: {','.join(column_names)}")
+
+        data = []
+
+        def get_measure_data(title, get_measure, get_stdev=lambda r: 0):
+
+            measure_data = []
+            measure_data.append([f"{title} - {compiler_name.title()}"])
+            measure_data.append(column_names)
+
+            for name in benchmark_names:
+                measure_data.append([name] + [math.nan] * (len(column_names) - 1))
+
+            for run in runs:
+                row = benchmark_names.index(run.benchmark.name)
+                res_col = column_names.index(get_run_column_name(run))
+                measure_data[row + 2][res_col] = get_measure(run)
+
+            return measure_data  
+
+        # Time
+        logger.debug("Appending 'Execution time'")
+        data += get_measure_data("Execution time", average_time, stdev_time)
+
+        # primitive count
+        if compiler_name in ("gambit", "bigloo"):
+            logger.debug("Appending 'Runtime removable checks'")
+            data += get_measure_data("Runtime removable checks", sum_removable_checks)
+
+        return data
+
+    output_path = choose_csv_output_path(output, system_name)
     
-    def get_run_column_name(run, postfix=''):
-        return get_column_name(run.version_limit,
-                               run.compiler_optimizations,
-                               run.safe_arithmetic,
-                               postfix=postfix)
-
-    benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
-
-    column_names = ["Benchmark"]
-    column_names += [get_column_name(l, o, s, postfix=p) for s in (True,)
-                                                        for o in (True,)
-                                                        for l in version_limits
-                                                        for p in ('',)]
-
-    logger.debug(f"columns in csv: {','.join(column_names)}")
-
     data = []
-
-    def get_measure_data(title, get_measure, get_stdev=lambda r: 0):
-
-        measure_data = []
-        measure_data.append([f"{title} - {compiler_name.title()}"])
-        measure_data.append(column_names)
-
-        for name in benchmark_names:
-            measure_data.append([name] + [math.nan] * (len(column_names) - 1))
-
-        for run in runs:
-            row = benchmark_names.index(run.benchmark.name)
-            res_col = column_names.index(get_run_column_name(run))
-            measure_data[row + 2][res_col] = get_measure(run)
-            # stdev_col = column_names.index(get_run_column_name(run, postfix=stdev_postfix))
-            # measure_data[row + 2][stdev_col] = get_stdev(run)
-
-        return measure_data  
-
-    # Time
-    logger.debug("Appending 'Execution time'")
-    data += get_measure_data("Execution time", average_time, stdev_time)
-
-    # primitive count
-    logger.debug("Appending 'Runtime removable checks'")
-    data += get_measure_data("Runtime removable checks", sum_removable_checks)
-
-    with open(output_path, 'w') as f:
-        csvwriter = csv.writer(f)
+    for compiler_name in ('bigloo', 'gambit', 'chez', 'node', 'racket'):
+        data.extend(one_csv_result(compiler_name))
+    
+    with open(output_path, 'w') as csv_file:
+        csvwriter = csv.writer(csv_file)
         csvwriter.writerows(data)
 
 ##############################################################################
@@ -1619,7 +1355,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         return [[math.nan] * len(column_names) for _ in range(len(row_names))]
 
     def one_heatmap(path_base, measure, best=False,
-                                        only_macro=False,
+                                        include_macro=True,
+                                        include_micro=True,
                                         subtract_unsafe_run=False,
                                         unsafe_runs=None,
                                         base_runs=None,
@@ -1636,18 +1373,25 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             unsafe_base_runs = None
 
         if absolute:
-            def ratio(value, base):
+            def ratio(value, base, base_run=None):
                 return value
         else:
-            def ratio(value, base):
-                return value / base
+            def ratio(value, base, base_run=None):
+                try:
+                    return value / base
+                except ZeroDivisionError:
+                    benchmark_name = "?" if not base_run else (f"{base_run.benchmark.name} "
+                                                               f"V={base_run.version_limit} "
+                                                               f"U={not base_run.safe_arithmetic} ")
+                    logger.error(f"base value is zero for {path_base} on {compiler_name} {benchmark_name}")
+                    return math.nan
 
         if subtract_unsafe_run:
             @nan_on(StopIteration)
             def _measure(run, base_run):
                 base_unsafe_run = next(r for r in unsafe_base_runs if run.benchmark == r.benchmark)
                 base_unsafe_measure = measure(base_unsafe_run)
-                return ratio((measure(run) - base_unsafe_measure), (measure(base_run) - base_unsafe_measure))
+                return ratio((measure(run) - base_unsafe_measure), (measure(base_run) - base_unsafe_measure), base_run=base_run)
 
         else:
             def _measure(run, base_run):
@@ -1675,9 +1419,14 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         df = pd.DataFrame(data, columns=column_names, index=heatmap_row_names)
 
-        if only_macro:
+        if not include_micro:
             cols = df.columns.tolist()
             cols = [n for n in cols if is_macro(n.split()[0])]
+            df = df[cols]
+
+        if not include_macro:
+            cols = df.columns.tolist()
+            cols = [n for n in cols if not is_macro(n.split()[0])]
             df = df[cols]
 
         mean_name = "Mean" if absolute else "Geometric Mean"
@@ -1732,21 +1481,29 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         linthresh = 0.1
         extra_ticks = []
 
-        if path_base == 'time':
-            vmin, vmax = 0.7, 1.1
-            extra_ticks = [0.8, 0.9]
-        elif path_base == 'program_size':
-            vmin, vmax = 0.5, 8
-        elif path_base == 'checks':
-            vmin, vmax = 0.1, 1.1
-            # Remove red from cmap. It must not appear in color bar since it cannot happen
+        def remove_red():
+            nonlocal cmap
             checks_interp = np.interp(
                 np.linspace(0, 1),
                 [0, 0.5, 1],
                 [0, 0.5, 0.5])
             cmap = colors.LinearSegmentedColormap.from_list("checks_cmap", cmap(checks_interp))
+
+        if path_base == 'time':
+            vmin, vmax = 0.7, 1.1
+            extra_ticks = [0.8, 0.9]
+        elif path_base == 'micro_time':
+            vmin, vmax = 0.5, 1.0
+            extra_ticks = [0.75]
+            remove_red()
+        elif path_base == 'program_size':
+            vmin, vmax = 0.5, 8
+        elif path_base == 'checks':
+            vmin, vmax = 0.1, 1.1
+            # Remove red from cmap. It must not appear in color bar since it cannot happen
+            remove_red()
         elif path_base == "compile_time":
-            vmin, vmax = 0.5, 64
+            vmin, vmax = 0.5, 32
             
         locator = LogLocator(base=2)
         ticks = [t for t in locator.tick_values(vmin, vmax) if vmin <= t <= vmax]
@@ -1816,7 +1573,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.savefig(output_path)
 
     # Execution time
-    one_heatmap("time", average_time, only_macro=True)
+    one_heatmap("time", average_time, include_micro=False)
+    one_heatmap("micro_time", average_time, include_macro=False)
 
     # old way to compute checks
     # one_heatmap("checks", sum_checks)
@@ -1842,7 +1600,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             and r2.compiler_optimizations))))
 
     # Use Gambit as base runs for checks
-    checks_compiler_name = 'bbv-gambit'
+    checks_compiler_name = 'gambit'
     checks_base_runs = list(select(
         r for r in Run
         if r.compiler.name == checks_compiler_name
@@ -1860,7 +1618,6 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             and not r2.compiler_optimizations))))
 
     if unsafe_base_runs:
-        #one_heatmap("time_vs_unsafe", average_time, only_macro=True, base_runs=unsafe_base_runs)
         one_heatmap("checks", sum_checks, subtract_unsafe_run=True, base_runs=checks_base_runs,
                     unsafe_runs=unsafe_base_runs)
 
@@ -2019,7 +1776,7 @@ if __name__ == "__main__":
     def file_path(value):
         path = pathlib.Path(value)
         if path.is_file():
-            return path
+            return path.resolve()
         else:
             raise FileNotFoundError(f"{value} is not a valid file")
 
@@ -2055,18 +1812,23 @@ if __name__ == "__main__":
 
     benchmark_parser.add_argument('file', type=file_path)
 
-    compiler_parser_group = benchmark_parser.add_mutually_exclusive_group(required=True)
+    class CompilerArg:
+        def __init__(self, name, path):
+            self.name = name
+            self.path = path
 
-    compiler_parser_group.add_argument('-g', '--gambit-dir',
-                                       dest='gambitdir',
-                                       type=directory_path,
-                                       metavar='PATH',
-                                       help='Gambit root')
+    class StoreFlagAndOptionalArg(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            # Store a tuple with the flag's name (or a simplified version of it) and the optional argument
+            setattr(namespace, self.dest, CompilerArg(option_string.replace('--', ''), values if values else None))
 
-    compiler_parser_group.add_argument('-b', '--bigloo',
-                                       dest='use_bigloo',
-                                       action='store_true',
-                                       help='Use Bigloo')
+    compiler_parser_group = benchmark_parser.add_mutually_exclusive_group()
+
+    compiler_parser_group.add_argument('--gambit', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Gambit compiler. Optional directory path can follow.')
+    compiler_parser_group.add_argument('--bigloo', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Bigloo compiler. Optional directory path can follow.')
+    compiler_parser_group.add_argument('--chez',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Chez compiler. Optional directory path can follow.')
+    compiler_parser_group.add_argument('--node',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use NodeJS compiler. Optional directory path can follow.')
+    compiler_parser_group.add_argument('--racket', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Racket compiler. Optional directory path can follow.')
 
     benchmark_parser.add_argument('-l', '--limit',
                                   dest="version_limits",
@@ -2106,110 +1868,49 @@ if __name__ == "__main__":
                                   action='store_true',
                                   help='rerun benchmark even if results already exist')
 
-    # Parser for plotting benchmarks
-    plot_parser = subparsers.add_parser('plot', help='Plot benchmarks')
+    # Parser for profile-guided version limit selection
+    profile_guided_parser = subparsers.add_parser('profile_guided', help='Look for an optimial combination of version limits')
 
-    plot_parser.add_argument('-b', '--benchmark',
-                             required=True,
-                             dest="benchmark",
-                             help="benchmark name or path")
+    profile_guided_parser.add_argument('file', type=file_path)
+    
+    profile_compiler_parser_group = profile_guided_parser.add_mutually_exclusive_group()
 
-    plot_parser.add_argument('-s', '--systen',
-                             dest="system_name",
-                             help="plot benchmark from this system")
+    profile_compiler_parser_group.add_argument('--gambit', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Gambit compiler. Optional directory path can follow.')
+    profile_compiler_parser_group.add_argument('--bigloo', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Bigloo compiler. Optional directory path can follow.')
+    profile_compiler_parser_group.add_argument('--chez',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Chez compiler. Optional directory path can follow.')
+    profile_compiler_parser_group.add_argument('--node',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use NodeJS compiler. Optional directory path can follow.')
+    profile_compiler_parser_group.add_argument('--racket', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Racket compiler. Optional directory path can follow.')
 
-    plot_parser.add_argument('-c', '--compiler',
-                             dest="compiler_name",
-                             default="gambit",
-                             help="plot benchmark of this compiler")
+    profile_guided_parser.add_argument('-l', '--limit',
+                                  dest="default_limit",
+                                  metavar="LIMIT",
+                                  default=5,
+                                  type=int,
+                                  help="BBV starting version limit")
 
-    plot_parser.add_argument('-u', '--unsafe',
-                             dest="safe_arithmetic",
-                             action='store_false',
-                             default=True,
-                             help="benchmarks with unsafe arithmetic")
+    profile_guided_parser.add_argument('-r', '--repetitions',
+                                  dest="repetitions",
+                                  metavar='N',
+                                  default=5,
+                                  type=int,
+                                  help="Number of repetition when executing")
 
-    plot_parser.add_argument('-e', '--perf-events',
-                             nargs="+",
-                             default=(),
-                             dest="perf_event_names",
-                             help="perf stat events to plot")
+    profile_guided_parser.add_argument('-t', '--timeout',
+                                  dest="timeout",
+                                  metavar='T',
+                                  type=float,
+                                  help="Compilation timeout (in secondes)")
 
-    plot_parser.add_argument('-m', '--static-measures',
-                             nargs="+",
-                             default=(),
-                             dest="static_measures_names",
-                             help="static measures to plot")
 
-    plot_parser.add_argument('-p', '--primitives',
-                             nargs="+",
-                             default=(),
-                             dest="primitive_names_or_amount",
-                             action=PrimitivesInput,
-                             help="primitive calls to plot")
+    # Parser for profile-guided report
+    profile_report_parser = subparsers.add_parser('profile_report', help='Report on PGO version limit selection')
 
-    plot_parser.add_argument('-o', '--output',
-                             dest="output",
-                             help="where to output the chart (file or folder)")
-
-    # Parser for comparing merge strategy with correlation matrices
-    analysis_parser = subparsers.add_parser('analysis', help='Plot correlation matrice for a merge strategy')
-
-    analysis_parser.add_argument('-s', '--systen',
-                             dest="system_name",
-                             help="analyze benchmarks from this system")
-
-    analysis_parser.add_argument('-c', '--compiler',
-                             dest="compiler_name",
-                             default="gambit",
-                             help="analyze benchmarks of this compiler")
-
-    analysis_parser.add_argument('-u', '--unsafe',
-                                 dest="safe_arithmetic",
-                                 action='store_false',
-                                 default=True,
-                                 help="Benchmark with unsafe arithmetic")
-
-    analysis_parser.add_argument('-b', '--benchmarks',
-                                 dest="benchmark_names",
-                                 nargs='+',
-                                 help="benchmarks used for analysis (all if none given)")
-
-    analysis_parser.add_argument('-o', '--output',
-                                dest="output",
-                                help="where to output the chart (file or folder)")
-
-    perf_distribution_parser = subparsers.add_parser('perf_distribution', help='Plot perf distribution histogram')
-
-    perf_distribution_parser.add_argument('-s', '--systen',
-                                          dest="system_name",
-                                          help="analyze benchmarks from this system")
-
-    perf_distribution_parser.add_argument('-c', '--compiler',
-                                          dest="compiler_name",
-                                          default="gambit",
-                                          help="analyze benchmarks of this compiler")
-
-    perf_distribution_parser.add_argument('-b', '--benchmark',
-                                          required=True,
-                                          dest="benchmark_name",
-                                          help="benchmark name or path")
-
-    perf_distribution_parser.add_argument('-e', '--event',
-                                          required=True,
-                                          dest="event",
-                                          help="perf stat event name")
-
-    perf_distribution_parser.add_argument('-l', '--limit',
-                                          dest="version_limit",
-                                          metavar="LIMIT",
-                                          default=0,
-                                          type=int,
-                                          help="BBV versions limit to plot")
-
-    perf_distribution_parser.add_argument('-o', '--output',
-                                          dest="output",
-                                          help="where to output the histogram (file or folder)")
+    
+    profile_report_parser.add_argument('-c', '--compiler',
+                            metavar="COMPILER",
+                            dest="compiler_name",
+                            default="gambit",
+                            help="Compiler")
 
     # Parser for dumping results in CSV
     csv_parser = subparsers.add_parser('csv', help='Dumps benchmark data in csv')
@@ -2218,19 +1919,6 @@ if __name__ == "__main__":
                             metavar="SYSTEM",
                             dest="system_name",
                             help="Benchmarks system")
-
-    csv_parser.add_argument('-c', '--compiler',
-                            metavar="COMPILER",
-                            dest="compiler_name",
-                            default="gambit",
-                            help="Benchmark compiler")
-
-    csv_parser.add_argument('-b', '--benchmarks',
-                            metavar="BENCHMARK",
-                            required=True,
-                            nargs="+",
-                            dest="benchmark_names",
-                            help="benchmarks to dump in csv")
 
     csv_parser.add_argument('-l', '--limit',
                             dest="version_limits",
@@ -2286,8 +1974,9 @@ if __name__ == "__main__":
     logger.debug(args)
 
     if args.command == 'benchmark':
-        run_and_save_benchmark(gambitdir=args.gambitdir,
-                               use_bigloo=args.use_bigloo,
+        if not args.compiler:
+            raise benchmark_parser.error("a compiler is required")
+        run_and_save_benchmark(compiler=args.compiler,
                                file=args.file,
                                version_limits=args.version_limits,
                                safe_arithmetic=args.safe_arithmetic,
@@ -2295,33 +1984,18 @@ if __name__ == "__main__":
                                compiler_optimizations=args.compiler_optimizations,
                                force_execution=args.force_execution,
                                timeout=args.timeout)
-    elif args.command == 'plot':
-        plot_benchmarks(benchmark=args.benchmark,
-                        compiler_name=args.compiler_name,
-                        system_name=args.system_name,
-                        safe_arithmetic=args.safe_arithmetic,
-                        perf_event_names=args.perf_event_names,
-                        primitive_names_or_amount=args.primitive_names_or_amount,
-                        static_measures_names=args.static_measures_names,
-                        output=args.output)
-    elif args.command == 'analysis':
-        analyze(
-            system_name=args.system_name,
-            compiler_name=args.compiler_name,
-            benchmark_names=args.benchmark_names,
-            safe_arithmetic=args.safe_arithmetic,
-            output=args.output)
-    elif args.command == 'perf_distribution':
-        perf_distribution(system_name=args.system_name,
-                          compiler_name=args.compiler_name,
-                          benchmark_name=args.benchmark_name,
-                          event=args.event,
-                          version_limit=args.version_limit,
-                          output=args.output)
+    elif args.command == 'profile_guided':
+        if not args.compiler:
+            raise benchmark_parser.error("a compiler is required")
+        profile_optimize_benchmark(compiler=args.compiler,
+                               file=args.file,
+                               default_limit=args.default_limit,
+                               repetitions=args.repetitions,
+                               timeout=args.timeout)
+    elif args.command == 'profile_report':
+        profile_optimize_report(compiler=args.compiler_name)
     elif args.command == 'csv':
         to_csv(system_name=args.system_name,
-               compiler_name=args.compiler_name,
-               benchmark_names=args.benchmark_names,
                version_limits=args.version_limits,
                output=args.output)
     elif args.command == 'heatmap':

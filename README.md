@@ -105,3 +105,11 @@ For node:
 ```
 node maze.js '{"repeat": 2, "n": 50000}'
 ```
+
+### Execute benchmarks with Chez Scheme
+
+```
+cat ./chez/bbv.scm ./tests/paper/micro/fib.scm ./chez/main.scm > fib.bundle.scm
+chez --quiet --optimize-level 2 --script fib.bundle.scm
+```
+

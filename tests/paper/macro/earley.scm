@@ -40,8 +40,8 @@
 ;      (e (e + e) (v))
 ;      (v (v y) ())
 ;    )
-;   (lambda (str)
-;     (map (lambda (char)
+;   (lambda (str) (set-bbv-version-limit! #f) 
+;     (map (lambda (char) (set-bbv-version-limit! #f) 
 ;            (list char ; user-info = the character itself
 ;                  (case char
 ;                    ((#\x) 'x)
@@ -60,7 +60,7 @@
 ;      (e (e #\+ e) (v))
 ;      (v (v #\y) ())
 ;    )
-;   (lambda (str) (map (lambda (char) (list char char)) (string->list str)))
+;   (lambda (str) (set-bbv-version-limit! #f)  (map (lambda (char) (set-bbv-version-limit! #f)  (list char char)) (string->list str)))
 ; )
 ;
 ; To help with the rest of the discussion, here are a few definitions:
@@ -123,11 +123,14 @@
 ;   Enders of V     = (5 19 20)
 ;   Predictors of V = (15 17)
 
-(define (make-parser grammar lexer)
+(set-custom-version-limits! 2 1 5 4 4 3 2 9 2 10 7 1 1 2 4 4 9 10 1 9 4 9 7 4 8
+  10 5 1 3 7 6 5 3 4 6 2 2 7 2 6 6 10 5 1 8 9)
 
-  (define (non-terminals grammar) ; return vector of non-terminals in grammar
+(define (make-parser grammar lexer) (set-bbv-version-limit! #f) 
 
-    (define (add-nt nt nts)
+  (define (non-terminals grammar) (set-bbv-version-limit! #f)  ; return vector of non-terminals in grammar
+
+    (define (add-nt nt nts) (set-bbv-version-limit! #f) 
       (if (Smember nt nts) nts (cons nt nts))) ; use equal? for equality tests
 
     (let def-loop ((defs grammar) (nts '()))
@@ -146,13 +149,13 @@
               (def-loop (Scdr defs) nts))))
         (Slist->vector (Sreverse nts))))) ; goal non-terminal must be at index 0
 
-  (define (ind nt nts) ; return index of non-terminal `nt' in `nts'
+  (define (ind nt nts) (set-bbv-version-limit! #f)  ; return index of non-terminal `nt' in `nts'
     (let loop ((i (SFX- (Svector-length nts) 1)))
       (if (SFX>= i 0)
         (if (equal? (Svector-ref nts i) nt) i (loop (SFX- i 1)))
         #f)))
 
-  (define (nb-configurations grammar) ; return nb of configurations in grammar
+  (define (nb-configurations grammar) (set-bbv-version-limit! #f)  ; return nb of configurations in grammar
     (let def-loop ((defs grammar) (nb-confs 0))
       (if (pair? defs)
         (let ((def (Scar defs)))
@@ -182,9 +185,9 @@
          (steps (Smake-vector2 nb-confs #f))      ; what to do in a given conf
          (names (Smake-vector2 nb-confs #f)))     ; name of rules
 
-    (define (setup-tables grammar nts starters enders predictors steps names)
+    (define (setup-tables grammar nts starters enders predictors steps names) (set-bbv-version-limit! #f) 
 
-      (define (add-conf conf nt nts class)
+      (define (add-conf conf nt nts class) (set-bbv-version-limit! #f) 
         (let ((i (ind nt nts)))
           (Svector-set! class i (cons conf (Svector-ref class i)))))
 
@@ -233,15 +236,15 @@
                                 predictors
                                 steps
                                 names)))
-      (lambda (input)
+      (lambda (input) (set-bbv-version-limit! #f) 
 
-        (define (ind nt nts) ; return index of non-terminal `nt' in `nts'
+        (define (ind nt nts) (set-bbv-version-limit! #f)  ; return index of non-terminal `nt' in `nts'
           (let loop ((i (SFX- (Svector-length nts) 1)))
             (if (SFX>= i 0)
               (if (equal? (Svector-ref nts i) nt) i (loop (SFX- i 1)))
               #f)))
 
-        (define (comp-tok tok nts) ; transform token to parsing format
+        (define (comp-tok tok nts) (set-bbv-version-limit! #f)  ; transform token to parsing format
           (let loop ((l1 (Scdr tok)) (l2 '()))
             (if (pair? l1)
               (let ((i (ind (Scar l1) nts)))
@@ -250,10 +253,10 @@
                   (loop (Scdr l1) l2)))
               (cons (Scar tok) (Sreverse l2)))))
 
-        (define (input->tokens input lexer nts)
-          (Slist->vector (Smap2 (lambda (tok) (comp-tok tok nts)) (lexer input))))
+        (define (input->tokens input lexer nts) (set-bbv-version-limit! #f) 
+          (Slist->vector (Smap2 (lambda (tok) (set-bbv-version-limit! #f)  (comp-tok tok nts)) (lexer input))))
 
-        (define (make-states nb-toks nb-confs)
+        (define (make-states nb-toks nb-confs) (set-bbv-version-limit! #f) 
           (let ((states (Smake-vector2 (SFX+ nb-toks 1) #f)))
             (let loop ((i nb-toks))
               (if (SFX>= i 0)
@@ -263,10 +266,10 @@
                   (loop (SFX- i 1)))
                 states))))
 
-        (define (conf-set-get state conf)
+        (define (conf-set-get state conf) (set-bbv-version-limit! #f) 
           (Svector-ref state (SFX+ conf 1)))
 
-        (define (conf-set-get* state state-num conf)
+        (define (conf-set-get* state state-num conf) (set-bbv-version-limit! #f) 
           (let ((conf-set (conf-set-get state conf)))
             (if conf-set
               conf-set
@@ -278,7 +281,7 @@
                 (Svector-set! state (SFX+ conf 1) conf-set)
                 conf-set))))
 
-        (define (conf-set-merge-new! conf-set)
+        (define (conf-set-merge-new! conf-set) (set-bbv-version-limit! #f) 
           (Svector-set! conf-set
             (SFX+ (Svector-ref conf-set 1) 5)
             (Svector-ref conf-set 4))
@@ -286,19 +289,19 @@
           (Svector-set! conf-set 3 -1)
           (Svector-set! conf-set 4 -1))
 
-        (define (conf-set-head conf-set)
+        (define (conf-set-head conf-set) (set-bbv-version-limit! #f) 
           (Svector-ref conf-set 2))
 
-        (define (conf-set-next conf-set i)
+        (define (conf-set-next conf-set i) (set-bbv-version-limit! #f) 
           (Svector-ref conf-set (SFX+ i 5)))
 
-        (define (conf-set-member? state conf i)
+        (define (conf-set-member? state conf i) (set-bbv-version-limit! #f) 
           (let ((conf-set (Svector-ref state (SFX+ conf 1))))
             (if conf-set
               (conf-set-next conf-set i)
               #f)))
 
-        (define (conf-set-adjoin state conf-set conf i)
+        (define (conf-set-adjoin state conf-set conf i) (set-bbv-version-limit! #f) 
           (let ((tail (Svector-ref conf-set 3))) ; put new element at tail
             (Svector-set! conf-set (SFX+ i 5) -1)
             (Svector-set! conf-set (SFX+ tail 5) i)
@@ -308,7 +311,7 @@
                 (Svector-set! conf-set 0 (Svector-ref state 0))
                 (Svector-set! state 0 conf)))))
 
-        (define (conf-set-adjoin* states state-num l i)
+        (define (conf-set-adjoin* states state-num l i) (set-bbv-version-limit! #f) 
           (let ((state (Svector-ref states state-num)))
             (let loop ((l1 l))
               (if (pair? l1)
@@ -320,7 +323,7 @@
                       (loop (Scdr l1)))
                     (loop (Scdr l1))))))))
 
-        (define (conf-set-adjoin** states states* state-num conf i)
+        (define (conf-set-adjoin** states states* state-num conf i) (set-bbv-version-limit! #f) 
           (let ((state (Svector-ref states state-num)))
             (if (conf-set-member? state conf i)
               (let* ((state* (Svector-ref states* state-num))
@@ -330,7 +333,7 @@
                 #t)
               #f)))
 
-        (define (conf-set-union state conf-set conf other-set)
+        (define (conf-set-union state conf-set conf other-set) (set-bbv-version-limit! #f) 
           (let loop ((i (conf-set-head other-set)))
             (if (SFX>= i 0)
               (if (not (conf-set-next conf-set i))
@@ -339,9 +342,9 @@
                   (loop (conf-set-next other-set i)))
                 (loop (conf-set-next other-set i))))))
 
-        (define (forw states state-num starters enders predictors steps nts)
+        (define (forw states state-num starters enders predictors steps nts) (set-bbv-version-limit! #f) 
 
-          (define (predict state state-num conf-set conf nt starters enders)
+          (define (predict state state-num conf-set conf nt starters enders) (set-bbv-version-limit! #f) 
 
             ; add configurations which start the non-terminal `nt' to the
             ; right of the dot
@@ -369,7 +372,7 @@
                       (loop2 (Scdr l)))
                     (loop2 (Scdr l)))))))
 
-          (define (reduce states state state-num conf-set head preds)
+          (define (reduce states state state-num conf-set head preds) (set-bbv-version-limit! #f) 
 
             ; a non-terminal is now completed so check for reductions that
             ; are now possible at the configurations `preds'
@@ -403,7 +406,7 @@
                         (reduce states state state-num conf-set head preds)))
                     (loop)))))))
 
-        (define (forward starters enders predictors steps nts toks)
+        (define (forward starters enders predictors steps nts toks) (set-bbv-version-limit! #f) 
           (let* ((nb-toks (Svector-length toks))
                  (nb-confs (Svector-length steps))
                  (states (make-states nb-toks nb-confs))
@@ -418,7 +421,7 @@
                   (loop (SFX+ i 1)))))
             states))
 
-        (define (produce conf i j enders steps toks states states* nb-nts)
+        (define (produce conf i j enders steps toks states states* nb-nts) (set-bbv-version-limit! #f) 
           (let ((prev (SFX- conf 1)))
             (if (and (SFX>= conf nb-nts) (SFX>= (Svector-ref steps prev) 0))
               (let loop1 ((l (Svector-ref enders (Svector-ref steps prev))))
@@ -437,7 +440,7 @@
                           (loop1 (Scdr l))))
                       (loop1 (Scdr l)))))))))
 
-        (define (back states states* state-num enders steps nb-nts toks)
+        (define (back states states* state-num enders steps nb-nts toks) (set-bbv-version-limit! #f) 
           (let ((state* (Svector-ref states* state-num)))
             (let loop1 ()
               (let ((conf (Svector-ref state* 0)))
@@ -454,7 +457,7 @@
                           (loop2 (conf-set-next conf-set i)))
                         (loop1)))))))))
 
-        (define (backward states enders steps nts toks)
+        (define (backward states enders steps nts toks) (set-bbv-version-limit! #f) 
           (let* ((nb-toks (Svector-length toks))
                  (nb-confs (Svector-length steps))
                  (nb-nts (Svector-length nts))
@@ -472,7 +475,7 @@
                   (loop2 (SFX- i 1)))))
             states*))
 
-        (define (parsed? nt i j nts enders states)
+        (define (parsed? nt i j nts enders states) (set-bbv-version-limit! #f) 
           (let ((nt* (ind nt nts)))
             (if nt*
               (let ((nb-nts (Svector-length nts)))
@@ -485,7 +488,7 @@
                     #f)))
               #f)))
 
-        (define (deriv-trees conf i j enders steps names toks states nb-nts)
+        (define (deriv-trees conf i j enders steps names toks states nb-nts) (set-bbv-version-limit! #f) 
           (let ((name (Svector-ref names conf)))
 
             (if name ; `conf' is at the start of a rule (either special or not)
@@ -528,7 +531,7 @@
                         (loop1 (Scdr l1) l2)))
                     l2))))))
 
-        (define (deriv-trees* nt i j nts enders steps names toks states)
+        (define (deriv-trees* nt i j nts enders steps names toks states) (set-bbv-version-limit! #f) 
           (let ((nt* (ind nt nts)))
             (if nt*
               (let ((nb-nts (Svector-length nts)))
@@ -544,7 +547,7 @@
                     trees)))
               #f)))
 
-        (define (nb-deriv-trees conf i j enders steps toks states nb-nts)
+        (define (nb-deriv-trees conf i j enders steps toks states nb-nts) (set-bbv-version-limit! #f) 
           (let ((prev (SFX- conf 1)))
             (if (or (SFX< conf nb-nts) (SFX< (Svector-ref steps prev) 0))
               1
@@ -573,7 +576,7 @@
                       (loop1 (Scdr l) n)))
                   n)))))
 
-        (define (nb-deriv-trees* nt i j nts enders steps toks states)
+        (define (nb-deriv-trees* nt i j nts enders steps toks states) (set-bbv-version-limit! #f) 
           (let ((nt* (ind nt nts)))
             (if nt*
               (let ((nb-nts (Svector-length nts)))
@@ -611,14 +614,14 @@
                   deriv-trees*
                   nb-deriv-trees*))))))
 
-(define (parse->parsed? parse nt i j)
+(define (parse->parsed? parse nt i j) (set-bbv-version-limit! #f) 
   (let* ((nts     (Svector-ref parse 0))
          (enders  (Svector-ref parse 2))
          (states  (Svector-ref parse 7))
          (parsed? (Svector-ref parse 8)))
     (parsed? nt i j nts enders states)))
 
-(define (parse->trees parse nt i j)
+(define (parse->trees parse nt i j) (set-bbv-version-limit! #f) 
   (let* ((nts          (Svector-ref parse 0))
          (enders       (Svector-ref parse 2))
          (steps        (Svector-ref parse 4))
@@ -628,7 +631,7 @@
          (deriv-trees* (Svector-ref parse 9)))
     (deriv-trees* nt i j nts enders steps names toks states)))
 
-(define (parse->nb-trees parse nt i j)
+(define (parse->nb-trees parse nt i j) (set-bbv-version-limit! #f) 
   (let* ((nts             (Svector-ref parse 0))
          (enders          (Svector-ref parse 2))
          (steps           (Svector-ref parse 4))
@@ -637,13 +640,13 @@
          (nb-deriv-trees* (Svector-ref parse 10)))
     (nb-deriv-trees* nt i j nts enders steps toks states)))
 
-(define (test)
+(define (test) (set-bbv-version-limit! #f) 
   (let ((p (make-parser '( (s (a) (s s)) )
-                        (lambda (l) (Smap2 (lambda (x) (list x x)) l)))))
+                        (lambda (l) (set-bbv-version-limit! #f)  (Smap2 (lambda (x) (set-bbv-version-limit! #f)  (list x x)) l)))))
     (let ((x (p '(a a a a a a a a a))))
       (Slength (parse->trees x 's 0 9)))))
 
-(define (run #!key (n (unknown 10000 1)))
+(define-keys (run !key (n (unknown 10000 1)))
   (let loop ((n n) (result #f))
     (if (SFX> n 0)
         (loop (SFX- n 1) (test))
@@ -651,5 +654,5 @@
 
 (define expected-result 1430)
 
-(define (check result)
+(define (check result) (set-bbv-version-limit! #f) 
    (equal? result expected-result))
