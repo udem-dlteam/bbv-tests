@@ -305,7 +305,13 @@ case "$SYSTEM" in
 
     PATH="$COMPILER_DIR/bin:$PATH"
 
-    BIGLOO_OPTIONS="-srfi arithmetic$ARITHMETIC -w -unsafe -saw -cgen -o bbv.c"
+    if [ "$SAFETY_MODE" = "unsafe" ]; then
+      UNSAFE_FLAG="-unsafe"
+    else
+      UNSAFE_FLAG=""
+    fi
+
+    BIGLOO_OPTIONS="-srfi arithmetic$ARITHMETIC -w $UNSAFE_FLAG -saw -cgen -o bbv.c"
     BIGLOO_C_OPTIONS="-Wno-unused-value -Wno-parentheses-equality -Wno-parentheses \
                       -Wno-invalid-source-encoding -Wno-return-type -Wno-trigraphs \
                       -fPIC -DBGL_NAN_TAGGING=0  -c   -I. -I. -I${COMPILER_DIR}/lib/bigloo/4.6a"
