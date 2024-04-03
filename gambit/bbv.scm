@@ -1,7 +1,6 @@
 (declare
   (standard-bindings)
   (extended-bindings)
-  (not safe)  ;; TODO: is is strange to default to unsafe code because it means procedures not handled by the various macros defined below will not have type checking
   (block)
 )
 
@@ -601,6 +600,28 @@
 
 (define-macro (Sequal? x y)
   `(LIBequal? ,x ,y))
+
+(define-macro (Slist? l)
+  `(let ((l ,l))
+    (cond
+     ((null? l) #t)
+     ((not (pair? l)) #f)
+     (else
+      (letrec
+        ((loop1
+          (lambda (fast slow)
+            (cond
+              ((null? fast) #t)
+              ((or (not (pair? fast)) (eq? fast slow)) #f)
+              (else (loop2 (Scdr fast) slow)))))
+         (loop2
+          (lambda (fast slow)
+            (cond
+              ((null? fast) #t)
+              ((or (not (pair? fast)) (eq? fast slow)) #f)
+              (else (loop1 (Scdr fast) (Scdr slow)))))))
+        (loop1 (Scdr l) l))))))
+          
 
 (define-macro (Slist-tail lst i)
   `(let ((lst ,lst) (i ,i))
