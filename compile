@@ -255,9 +255,16 @@ case "$SYSTEM" in
       VERSION_LIMIT_POSTFIX=""
     fi
 
+    if [ "$SAFETY_MODE" = "unsafe" ]; then
+      UNSAFE_DECL="(not safe)"
+    else
+      UNSAFE_DECL=""
+    fi
+
     PRELUDE="(declare
                $OPTIM_DECLARATIONS
                $VERSION_LIMIT_DECL
+               $UNSAFE_DECL
                (inlining-limit $INLINING_LIMIT))
              (define-macro (%%%)
                (eval '(define arithmetic '$ARITHMETIC))
