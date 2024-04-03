@@ -250,8 +250,9 @@ class Run(db.Entity):
         return max(entities, key=lambda e: e.timestamp)
 
 
-db.bind(provider='sqlite', filename='benchmarks.db', create_db=True)
-db.generate_mapping(create_tables=True)
+def bind_db(filename):
+    db.bind(provider='sqlite', filename=filename, create_db=True)
+    db.generate_mapping(create_tables=True)
 
 ##############################################################################
 # Utils
@@ -1887,6 +1888,11 @@ if __name__ == "__main__":
                         dest="loglevel",
                         const=logging.INFO,)
 
+    parser.add_argument('-db', '--database',
+                        help="database file to use",
+                        default='benchmarks.db',
+                        type=pathlib.Path)
+
     # Parser for running benchmarks
     benchmark_parser = subparsers.add_parser('benchmark', help='Run benchmark and store results')
 
@@ -2052,6 +2058,8 @@ if __name__ == "__main__":
     logger.addHandler(logging.StreamHandler())
     
     logger.debug(args)
+
+    bind_db(str(args.database.resolve()))
 
     if args.command == 'benchmark':
         if not args.compiler:
