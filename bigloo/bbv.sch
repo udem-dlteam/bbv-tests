@@ -43,7 +43,6 @@
       ((car cdr set-car! set-cdr!
 	  fixnum? flonum?
 	  sqrt cos sin
-	  vector-map vector->list string->list
 	  vector-length string-ref string-set!
 	  string-length substring)
        `(,(symbol-append '$ op) ,@args))
@@ -63,6 +62,9 @@
       ((bit-or) `($bitor ,@args))
       ((bit-not) `($bitnot ,@args))
       ((remainder) `(remainderfx ,@args))
+      ((string->list) `((@ string->list __r4_strings_6_7) ,@args))
+      ((vector->list) `((@ vector->list __r4_vectors_6_8) ,@args))
+      ((vector-map) `((@ vector-map __r4_vectors_6_8) ,@args))
       (else `(,op ,@args))))
 
 (define (unknown x . rest)
