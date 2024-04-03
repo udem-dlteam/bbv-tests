@@ -1,7 +1,6 @@
 (declare
   (standard-bindings)
   (extended-bindings)
-  (not safe)  ;; TODO: is is strange to default to unsafe code because it means procedures not handled by the various macros defined below will not have type checking
   (block)
 )
 
@@ -13,9 +12,10 @@
  (define (symbol-append . rest)
    (string->symbol (string-concatenate (map symbol->string rest)))))
 
-(define-macro (FLop op . args)   `(,(symbol-append '|##fl| op) ,@args))
-(define-macro (FXop op . args)   `(,(symbol-append '|##fx| op) ,@args))
-(define-macro (PRIMop op . args) `(let () (declare (not inline-primitives)) (,(symbol-append '|##| op) ,@args)))
+(define-macro (FLop op . args)   `(PRIMop ,(symbol-append '|fl| op) ,@args))
+(define-macro (FXop op . args)   `(PRIMop ,(symbol-append '|fx| op) ,@args))
+(define-macro (PRIMop op . args) `(let () (declare (not safe))
+                                    (,(symbol-append '|##| op) ,@args)))
 
 (define-macro (unknown . args) `(PRIMop first-argument ,@args))
 
@@ -169,7 +169,7 @@
                    (,b ,y))
                (cond
                 ((and (FIXNUM? ,a) (FIXNUM? ,b))
-                 (let ((,c (,(symbol-append '|##fx| op '?) ,a ,b)))
+                 (let ((,c (PRIMop ,(symbol-append 'fx op '?) ,a ,b)))
                    (if ,c ,c (PRIMop ,op ,a ,b))))
                 ((and (FLONUM? ,a) (FLONUM? ,b))
                  (FLop ,op ,a ,b))
@@ -180,7 +180,7 @@
         `(let ((,a ,x))
            (cond
             ((FIXNUM? ,a)
-             (let ((,c (,(symbol-append '|##fx| op '?) ,a)))
+             (let ((,c (PRIMop ,(symbol-append 'fx op '?) ,a)))
                (if ,c ,c (PRIMop ,op ,a))))
             ((FLONUM? ,a)
              (FLop ,op ,a))
@@ -601,6 +601,27 @@
 
 (define-macro (Sequal? x y)
   `(LIBequal? ,x ,y))
+
+(define-macro (Slist? l)
+  `(let ((l ,l))
+    (cond
+     ((null? l) #t)
+     ((not (pair? l)) #f)
+     (else
+      (letrec
+        ((loop1
+          (lambda (fast slow)
+            (cond
+              ((null? fast) #t)
+              ((or (not (pair? fast)) (eq? fast slow)) #f)
+              (else (loop2 (Scdr fast) slow)))))
+         (loop2
+          (lambda (fast slow)
+            (cond
+              ((null? fast) #t)
+              ((or (not (pair? fast)) (eq? fast slow)) #f)
+              (else (loop1 (Scdr fast) (Scdr slow)))))))
+        (loop1 (Scdr l) l))))))
 
 (define-macro (Slist-tail lst i)
   `(let ((lst ,lst) (i ,i))

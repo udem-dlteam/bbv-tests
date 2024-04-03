@@ -41,13 +41,12 @@
       ((vector-ref) `(vector-ref-ur ,@args))
       ((atan2) `(atan-2fl ,@args))
       ((car cdr set-car! set-cdr!
-	  fixnum? flonum? remainder
+	  fixnum? flonum?
 	  sqrt cos sin
-	  vector-map vector->list string->list
 	  vector-length string-ref string-set!
 	  string-length substring)
        `(,(symbol-append '$ op) ,@args))
-      ((string->symbol symbol->string string->number fixnum->string
+      ((string->symbol symbol->string
 	  fixnum->flonum truncate
 	  char<? char<=? char>=? char>? char=? char->integer)
        `(,(symbol-append 'c- op) ,@args))
@@ -55,11 +54,17 @@
        `(,(symbol-append op 'fx) ,@args))
       ((make-vector) `($make-vector ,@args ,@(if (pair? (cdr args)) '() '(#f))))
       ((make-string) `($make-string ,@args ,@(if (pair? (cdr args)) '() '(#\space))))
+      ((fixnum->string) `($fixnum->string ,@args ,@(if (pair? (cdr args)) '() '(10))))
+      ((string->number) `(strtol ,(car args) 0 ,(if (pair? (cdr args)) (cadr args) 10)))
       ((bit-lsh) `($bitlsh ,@args))
       ((bit-rsh) `($bitrsh ,@args))
       ((bit-and) `($bitand ,@args))
       ((bit-or) `($bitor ,@args))
       ((bit-not) `($bitnot ,@args))
+      ((remainder) `(remainderfx ,@args))
+      ((string->list) `((@ string->list __r4_strings_6_7) ,@args))
+      ((vector->list) `((@ vector->list __r4_vectors_6_8) ,@args))
+      ((vector-map) `((@ vector-map __r4_vectors_6_8) ,@args))
       (else `(,op ,@args))))
 
 (define (unknown x . rest)
