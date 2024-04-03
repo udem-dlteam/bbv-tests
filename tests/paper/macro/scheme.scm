@@ -903,7 +903,7 @@
 (def-proc 'cdddar                         cdddar)
 (def-proc 'cddddr                         cddddr)
 (def-proc 'null?                          (lambda (x) (set-bbv-version-limit! #f)  (null? x)))
-(def-proc 'list?                          list?)
+(def-proc 'list?                          (lambda (l) (Slist? l)))
 (def-proc 'list                           list)
 (def-proc 'length                         length)
 (def-proc 'append                         append)

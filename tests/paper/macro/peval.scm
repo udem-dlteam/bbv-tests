@@ -22,7 +22,7 @@
   (let loop ((l l))
     (let ((x (Scdr l))) (if (pair? x) (loop x) l))))
 
-(define (proper-list? l) (set-bbv-version-limit! #f)  (list? l))
+(define (proper-list? l) (set-bbv-version-limit! #f)  (Slist? l))
 
 ;------------------------------------------------------------------------------
 ;

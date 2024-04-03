@@ -386,7 +386,7 @@
 ;; dynamic-parse-cond
 
 (define (dynamic-parse-cond env args) (set-bbv-version-limit! #f) 
-  (if (and (pair? args) (list? args))
+  (if (and (pair? args) (Slist? args))
       (dynamic-parse-action-cond-expression
        (Smap2 (lambda (e) (set-bbv-version-limit! #f) 
               (dynamic-parse-cond-clause env e))
@@ -409,7 +409,7 @@
 ;; dynamic-parse-and
 
 (define (dynamic-parse-and env args) (set-bbv-version-limit! #f) 
-  (if (list? args)
+  (if (Slist? args)
       (dynamic-parse-action-and-expression
        (dynamic-parse-expression* env args))
       (fatal-error 'dynamic-parse-and "Not a list of arguments: ~s" args)))
@@ -418,7 +418,7 @@
 ;; dynamic-parse-or
 
 (define (dynamic-parse-or env args) (set-bbv-version-limit! #f) 
-  (if (list? args)
+  (if (Slist? args)
       (dynamic-parse-action-or-expression
        (dynamic-parse-expression* env args))
       (fatal-error 'dynamic-parse-or "Not a list of arguments: ~s" args)))
@@ -427,7 +427,7 @@
 ;; dynamic-parse-case
 
 (define (dynamic-parse-case env args) (set-bbv-version-limit! #f) 
-  (if (and (list? args) (> (Slength args) 1))
+  (if (and (Slist? args) (> (Slength args) 1))
       (dynamic-parse-action-case-expression
        (dynamic-parse-expression env (Scar args))
        (Smap2 (lambda (e) (set-bbv-version-limit! #f) 
@@ -443,7 +443,7 @@
        (cond
         ((Sequal? (Scar e) 'else)
          (list (dynamic-parse-action-empty)))
-        ((list? (Scar e))
+        ((Slist? (Scar e))
          (Smap2 dynamic-parse-datum (Scar e)))
         (else (fatal-error 'dynamic-parse-case-clause "Not a datum list: ~s" (Scar e))))
        (dynamic-parse-body env (Scdr e)))
@@ -638,7 +638,7 @@
 
 (define (dynamic-parse-command* env commands) (set-bbv-version-limit! #f) 
 ;;; parses a sequence of commands
-  (if (list? commands)
+  (if (Slist? commands)
       (Smap2 (lambda (command) (set-bbv-version-limit! #f)  (dynamic-parse-command env command)) commands)
       (fatal-error 'dynamic-parse-command* "Invalid sequence of commands: ~s" commands)))
 
