@@ -273,10 +273,9 @@ case "$SYSTEM" in
              (##include \"$SCRIPT_DIR/gambit/bbv.scm\")
              $VERSION_LIMIT_POSTFIX"
 
-    FLAGS="-keep-temp -gvm"
-
+    FLAGS=""
     if [ "$GENERATE_CFG" = "1" ]; then
-      FLAGS="$FLAGS -cfg"
+      FLAGS="$FLAGS -keep-temp -gvm -cfg"
     fi
 
     EXPANSION_FLAG=""
