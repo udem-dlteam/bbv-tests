@@ -280,11 +280,22 @@ def run_command(command, timeout, env=None, extend_env=None):
                                    stderr=subprocess.STDOUT)
         output, _ = process.communicate(timeout=timeout)
         logger.debug(output)
+
+        return_code = process.poll()
+
+        logger.info(f"Return code: {return_code}")
+
+        if return_code != 0:
+            logger.error(f"Process did not run as expected, return code: {return_code}")
+            raise ValueError(f"Process return code {return_code}")
+
         return output.decode()
     finally:
         if process and process.poll() is None:
             logger.info("killing process")
-            process.kill()
+            # Attempt to prevent bigloo process surviving, not sure if it works
+            # and not sure why it's needed
+            for _ in range(100): process.kill()
 
 ##############################################################################
 # Data parsers
