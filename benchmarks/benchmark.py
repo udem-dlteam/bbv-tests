@@ -491,31 +491,28 @@ def extract_compile_times_from_compiler_output(content, dummy=False):
         C_COMPILE_TIME: float(c_time)
         }
 
-
-def compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
-    env = os.environ.copy()
-
+def compile_scheme_with_bbv(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
     base_command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
 
     if only_executable:
         primitive_count = None
     else:
         command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
-
-        output_with_primitives = run_command(command_with_primitives, timeout, env)
-        primitive_count = PrimitivesCountParser(output_with_primitives)
+        output = run_command(command_with_primitives, timeout)
+        primitive_count = PrimitivesCountParser(output)
 
         if not primitive_count:
             logger.warning("Failed to parse primitive count")
         else:
             logger.debug(f"Primitive count: {dict(primitive_count)}")
 
+    base_command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
     timed_command = f"perf stat {base_command}"
-    output = run_command(timed_command, timeout, env)
+    output = run_command(timed_command, timeout)
     compile_times = extract_compile_times_from_compiler_output(output)
     executable = extract_executable_from_compiler_output(output)
 
-    logger.info(f"executable created at: {executable}")    
+    logger.info(f"executable created at: {executable}")
 
     return executable, primitive_count, compile_times
 
@@ -526,37 +523,6 @@ def get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optim
     path_flag = f'-D {compiler.path}' if compiler.path else ''
     return f"{COMPILE_SCRIPT} -S {compiler.name} {path_flag} -V {vlimit} {arithmetic_flag} {optimization_flag} {primitive_count_flag} -f {file}"
 
-def compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
-    # First execution with primitive count
-    if only_executable:
-        primitive_count = None
-    else:
-        command_with_primitives = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, True)
-
-        output = run_command(command_with_primitives, timeout)
-
-        executable = extract_executable_from_compiler_output(output)
-
-        executable_output = run_command(executable, timeout)
-
-        primitive_count = PrimitivesCountParser(executable_output)
-
-    # Second execution without primitive count
-    base_command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
-    timed_command = f"perf stat {base_command}"
-    output = run_command(timed_command, timeout)
-    compile_times = extract_compile_times_from_compiler_output(output)
-    executable = extract_executable_from_compiler_output(output)
-
-    logger.info(f"executable created at: {executable}")
-
-    if not primitive_count:
-        logger.warning("Failed to parse primitive count")
-    else:
-        logger.debug(f"Primitive count: {dict(primitive_count)}")
-
-    return executable, primitive_count, compile_times
-
 def compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
     command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
     output = run_command(command, timeout)
@@ -564,10 +530,8 @@ def compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimization
     return executable, PrimitivesCountParser(""), extract_compile_times_from_compiler_output("", dummy=True)
 
 def compile(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
-    if compiler.name == "bigloo":
-        return compile_bigloo(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
-    elif compiler.name == "gambit":
-        return compile_gambit(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
+    if compiler.name in ("bigloo", "gambit"):
+        return compile_scheme_with_bbv(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
     else:
         return compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
 

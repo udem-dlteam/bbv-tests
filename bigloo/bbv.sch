@@ -55,7 +55,10 @@
       ((make-vector) `($make-vector ,@args ,@(if (pair? (cdr args)) '() '(#f))))
       ((make-string) `($make-string ,@args ,@(if (pair? (cdr args)) '() '(#\space))))
       ((fixnum->string) `($fixnum->string ,@args ,@(if (pair? (cdr args)) '() '(10))))
-      ((string->number) `(strtol ,(car args) 0 ,(if (pair? (cdr args)) (cadr args) 10)))
+      ((string->number)
+        ;`(strtol ,(car args) 0 ,(if (pair? (cdr args)) (cadr args) 10))
+        ;; TODO: implement an unsafe primitive that returns #f when not a number
+        `(string->number ,(car args) ,(if (pair? (cdr args)) (cadr args) 10)))
       ((bit-lsh) `($bitlsh ,@args))
       ((bit-rsh) `($bitrsh ,@args))
       ((bit-and) `($bitand ,@args))

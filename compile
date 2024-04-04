@@ -287,6 +287,7 @@ case "$SYSTEM" in
       PRELUDE="$PRELUDE
                (##include \"$SCRIPT_DIR/gambit/lib.scm\")"
       POSTLUDE="(##include \"$SCRIPT_DIR/gambit/main.scm\")"
+      FLAGS="$FLAGS -c" # only interested in primitive count, do not call gcc
       (cd $INPUT_FILE_DIRNAME && \
        $GAMBITCOMP  $EXPANSION_FLAG -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS -gvm-interpret $INPUT_FILE)
     else
@@ -362,6 +363,10 @@ case "$SYSTEM" in
      /usr/bin/time -f "$C_COMPILE_TIME_MARKER %e" sh -c "($C_COMPILER $BIGLOO_C_OPTIONS bbv.c && \
                                                           $C_COMPILER bbv.o $BIGLOO_LD_OPTIONS)" && \
      rm bbv.c)
+
+    if [ "$PRIMITIVE_COUNT" = "1" ]; then
+      $OUTPUT_FILE_EXE
+    fi
 
     if [ -f $OUTPUT_FILE_BASE-program.bbv.cfg ]; then
       (cd $SCRIPT_DIR/bigloo && $BGLCFG $OUTPUT_FILE_BASE-program.bbv.cfg > OUTPUT_FILE_CFG_DOT)
@@ -457,8 +462,10 @@ case "$SYSTEM" in
     ;;
 esac
 
-chmod u+x $OUTPUT_FILE_EXE
-echo "$EXECUTABLE_NAME_MARKER $OUTPUT_FILE_EXE"
+if [ "$PRIMITIVE_COUNT" != "1" ]; then
+  chmod u+x $OUTPUT_FILE_EXE
+  echo "$EXECUTABLE_NAME_MARKER $OUTPUT_FILE_EXE"
+fi
 
 if [ "$GENERATE_CFG" = "1" ]; then
   run_dot $OUTPUT_FILE_CFG_DOT
