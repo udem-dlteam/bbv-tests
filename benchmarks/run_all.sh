@@ -29,7 +29,7 @@ for file in ${scm_files[@]}; do
 done
 
 # BBV runs
-for limit in 0 1 2 3 4 5 6 7 8 9 10 15 20; do
+for limit in 0 1 2 3 4 5 6 7 8 9 10 20; do
   for file in ${scm_files[@]}; do
     # Gambit
     python ./benchmark.py $verbosity benchmark ${file} -O --gambit ${gambit} -l ${limit} -r ${reps} -t ${timeout}

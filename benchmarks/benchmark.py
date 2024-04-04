@@ -1488,8 +1488,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             cols = [n for n in cols if not is_macro(get_bench_name_from_col_name(n))]
             df = df[cols]
 
-        macro_mean_name = "Macrobench. Mean"
-        micro_mean_name = "Microbench. Mean"
+        macro_mean_name = "Geometric Mean"
+        micro_mean_name = "Geometric Mean"
         mean_names = [macro_mean_name, micro_mean_name]
         _mean = statistics.mean if absolute else statistics.geometric_mean
 
@@ -1511,10 +1511,18 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                                 and not is_macro(get_bench_name_from_col_name(df.columns[i])))
                             for i, row in df.iterrows()]
 
-            if macro_means:
-                df.insert(n_macro, macro_mean_name, macro_means)
-            if micro_means:
-                df.insert(df.shape[1], micro_mean_name, micro_means, allow_duplicates=True)
+            mean_pos = "left"
+
+            if mean_pos == "right":
+                if macro_means:
+                    df.insert(n_macro, macro_mean_name, macro_means)
+                if micro_means:
+                    df.insert(df.shape[1], micro_mean_name, micro_means, allow_duplicates=True)
+            else:
+                if macro_means:
+                    df.insert(0, macro_mean_name, macro_means)
+                if micro_means:
+                    df.insert(n_macro + 1, micro_mean_name, micro_means, allow_duplicates=True)
 
         
         # Reorder columns according to last entry
@@ -1633,16 +1641,19 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             for i in mean_indices:
                 #ax.axvline(i, color='white', lw=3)
                 labels = ax.get_xticklabels()
-                labels[i].set_fontweight('bold')
+                #labels[i].set_fontweight('bold')
 
-                if i != mean_indices[-1]:
+                skip_index = mean_indices[-1] if mean_pos == "right" else mean_indices[0]
+                if i != skip_index:
                     # space after
-                    ax.axvline(i + 1, color='black', gapcolor='white', lw=sep_lw)
+                    offset = 1 if mean_pos == "right" else 0
+                    ax.axvline(i + offset, color='black', gapcolor='white', lw=sep_lw)
 
                     xticks = ax.get_xticks()
 
-                    new_tick_position = (xticks[i] + xticks[i+1]) / 2
-                    new_label = "‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾"
+                    position_offset = 1 if mean_pos == "right" else - 1
+                    new_tick_position = (xticks[i] + xticks[i+position_offset]) / 2
+                    new_label = "‾" * (len(macro_mean_name) + 1)
                     xticks = np.append(xticks, new_tick_position)
                     xticklabels = [label.get_text() for label in ax.get_xticklabels()]
                     xticklabels.append(new_label)
@@ -1657,10 +1668,30 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                             tick.tick2line.set_markeredgewidth(sep_lw)  # Adjusts the width of the tick line
                             tick.tick2line.set_markersize(16.5)  # Adjusts the length of the tick
 
+            for label in ax.get_xticklabels():
+                if label._text in mean_names:
+                    label.set_fontweight('bold')
+
+        # Add axis to delimit micro and macro
+        delimite_subaxis = ax.secondary_xaxis("bottom")
+        sub_xticks = delimite_subaxis.get_xticks()
+        macro_micro_delim = n_macro + 1
+        delimite_subaxis.set_xticks([0,
+                                     macro_micro_delim,
+                                     len(df.columns)])
+        delimite_subaxis.set_xticklabels([""] * 3)
+        delimite_subaxis.tick_params(size=13)
+
+        # Label the axis to delimit micro and macro
+        micro_macro_subaxis = ax.secondary_xaxis("bottom")
+        sub_xticks = micro_macro_subaxis.get_xticks()
+        micro_macro_subaxis.set_xticks([n_macro // 2,
+                                        macro_micro_delim + n_micro // 2 + 1])
+        micro_macro_subaxis.set_xticklabels(["Macrobenchmarks", "Microbenchmarks"])
+        micro_macro_subaxis.tick_params(size=0)
+
         if title:
             plt.title(f'{path_base} {compiler.name}')
-
-        plt.tight_layout()
 
         output_path = choose_heatmap_output_path(output, path_base, compiler_name, system_name)
 
