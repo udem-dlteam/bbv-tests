@@ -1388,6 +1388,9 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         loc = round(math.ceil(loc / 10) * 10)
         return f"{run.benchmark.name} ({loc:,} LOC)"
 
+    def get_bench_name_from_col_name(col_name):
+        return col_name.split()[0]
+
     def get_version_limit_name(v):
         return "No SBBV" if v == 0 else str(v) + " "
 
@@ -1477,15 +1480,17 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         if not include_micro:
             cols = df.columns.tolist()
-            cols = [n for n in cols if is_macro(n.split()[0])]
+            cols = [n for n in cols if is_macro(get_bench_name_from_col_name(n))]
             df = df[cols]
 
         if not include_macro:
             cols = df.columns.tolist()
-            cols = [n for n in cols if not is_macro(n.split()[0])]
+            cols = [n for n in cols if not is_macro(get_bench_name_from_col_name(n))]
             df = df[cols]
 
-        mean_name = "Mean" if absolute else "Geometric Mean"
+        macro_mean_name = "Macrobench. Mean"
+        micro_mean_name = "Microbench. Mean"
+        mean_names = [macro_mean_name, micro_mean_name]
         _mean = statistics.mean if absolute else statistics.geometric_mean
 
         @nan_on(statistics.StatisticsError)
@@ -1493,12 +1498,23 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             it = list(it)
             return _mean(it)
 
+        n_macro = sum(1 for n in column_names if is_macro(get_bench_name_from_col_name(n)))
+        n_micro = sum(1 for n in column_names if not is_macro(get_bench_name_from_col_name(n)))
+
         if include_geometric_mean:
-            means = [mean(x for x in row if not math.isnan(x)) for i, row in df.iterrows()]
-            geo_df = pd.DataFrame(means,
-                                  columns=[mean_name],
-                         index=heatmap_row_names)
-            df = df.join(geo_df)
+            macro_means = [mean(x for i, x in enumerate(row)
+                                if not math.isnan(x)
+                                and is_macro(get_bench_name_from_col_name(df.columns[i])))
+                            for i, row in df.iterrows()]
+            micro_means = [mean(x for i, x in enumerate(row)
+                                if not math.isnan(x)
+                                and not is_macro(get_bench_name_from_col_name(df.columns[i])))
+                            for i, row in df.iterrows()]
+
+            if macro_means:
+                df.insert(n_macro, macro_mean_name, macro_means)
+            if micro_means:
+                df.insert(df.shape[1], micro_mean_name, micro_means, allow_duplicates=True)
 
         
         # Reorder columns according to last entry
@@ -1512,7 +1528,6 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         fig, ax = plt.subplots(figsize=(15, 5))
 
         # I made some ranges wider because it adds nice edges to the bar in the legend
-
 
         def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=256):
             '''
@@ -1612,9 +1627,35 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.ylabel('Version limit')
 
         if include_geometric_mean:
-            ax.axvline(df.shape[1]-1, color='white', lw=3)
-            labels = ax.get_xticklabels()
-            labels[-1].set_fontweight('bold')
+            sep_lw = 1
+
+            mean_indices = [i for i in range(df.shape[1]) if df.columns[i] in mean_names]
+            for i in mean_indices:
+                #ax.axvline(i, color='white', lw=3)
+                labels = ax.get_xticklabels()
+                labels[i].set_fontweight('bold')
+
+                if i != mean_indices[-1]:
+                    # space after
+                    ax.axvline(i + 1, color='black', gapcolor='white', lw=sep_lw)
+
+                    xticks = ax.get_xticks()
+
+                    new_tick_position = (xticks[i] + xticks[i+1]) / 2
+                    new_label = "‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾"
+                    xticks = np.append(xticks, new_tick_position)
+                    xticklabels = [label.get_text() for label in ax.get_xticklabels()]
+                    xticklabels.append(new_label)
+                    ax.set_xticks(xticks)
+                    ax.set_xticklabels(xticklabels)
+
+                    new_tick_index = np.where(xticks == new_tick_position)[0][0]
+
+                    # Make the specific tick longer
+                    for i, tick in enumerate(ax.xaxis.get_major_ticks()):
+                        if i == new_tick_index:
+                            tick.tick2line.set_markeredgewidth(sep_lw)  # Adjusts the width of the tick line
+                            tick.tick2line.set_markersize(16.5)  # Adjusts the length of the tick
 
         if title:
             plt.title(f'{path_base} {compiler.name}')
@@ -1629,11 +1670,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.savefig(output_path)
 
     # Execution time
-    one_heatmap("time", average_time, include_micro=False)
-    one_heatmap("micro_time", average_time, include_macro=False)
-
-    # old way to compute checks
-    # one_heatmap("checks", sum_checks)
+    one_heatmap("time", average_time)
 
     # Program size
     one_heatmap("program_size", run_program_size)
