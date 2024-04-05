@@ -2945,7 +2945,7 @@
   (tfo-apply (var-tfo var) (atom (var-nuc var))))
 
 (define (get-var id lst) (set-bbv-version-limit! #f) 
-  (let ((v (car lst)))
+  (let ((v (Scar lst)))
     (if (GEN= id (var-id v))
       v
       (get-var id (cdr lst)))))

@@ -189,7 +189,7 @@
   (newline)
   (display "*** ERROR -- ")
   (display msg)
-  (for-each (lambda (x) (set-bbv-version-limit! #f)  (display " ") (write x)) args)
+  (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (display " ") (write x)) args)
   (newline)
   (compiler-abort))
 (define (compiler-user-error loc msg . args) (set-bbv-version-limit! #f) 
@@ -199,7 +199,7 @@
   (newline)
   (display "*** ")
   (display msg)
-  (for-each (lambda (x) (set-bbv-version-limit! #f)  (display " ") (write x)) args)
+  (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (display " ") (write x)) args)
   (newline)
   (compiler-abort))
 (define (compiler-internal-error msg . args) (set-bbv-version-limit! #f) 
@@ -208,7 +208,7 @@
   (newline)
   (display "*** in procedure ")
   (display msg)
-  (for-each (lambda (x) (set-bbv-version-limit! #f)  (display " ") (write x)) args)
+  (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (display " ") (write x)) args)
   (newline)
   (compiler-abort))
 (define (compiler-limitation-error msg . args) (set-bbv-version-limit! #f) 
@@ -217,7 +217,7 @@
   (newline)
   (display "*** ")
   (display msg)
-  (for-each (lambda (x) (set-bbv-version-limit! #f)  (display " ") (write x)) args)
+  (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (display " ") (write x)) args)
   (newline)
   (compiler-abort))
 (define (compiler-abort) (set-bbv-version-limit! #f)  (throw-to-exception-handler #f))
@@ -892,7 +892,7 @@
 (define (node-source-set! x y) (set-bbv-version-limit! #f)  (Svector-set! x 5 y))
 (define (node-children-set! x y) (set-bbv-version-limit! #f) 
   (Svector-set! x 2 y)
-  (for-each (lambda (child) (set-bbv-version-limit! #f)  (node-parent-set! child x)) y)
+  (Sfor-each2 (lambda (child) (set-bbv-version-limit! #f)  (node-parent-set! child x)) y)
   (node-fv-invalidate! x))
 (define (node-fv-invalidate! x) (set-bbv-version-limit! #f) 
   (let loop ((node x))
@@ -1036,7 +1036,7 @@
       (compiler-internal-error "disj-alt, 'disj' node expected" x)))
 (define (new-prc source decl name min rest parms body) (set-bbv-version-limit! #f) 
   (let ((node (make-prc #f (list body) #t decl source name min rest parms)))
-    (for-each (lambda (x) (set-bbv-version-limit! #f)  (var-bound-set! x node)) parms)
+    (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (var-bound-set! x node)) parms)
     (node-parent-set! body node)
     node))
 (define (prc-body x) (set-bbv-version-limit! #f) 
@@ -1046,7 +1046,7 @@
 (define (new-call source decl oper args) (set-bbv-version-limit! #f) 
   (let ((node (make-app #f (cons oper args) #t decl source)))
     (node-parent-set! oper node)
-    (for-each (lambda (x) (set-bbv-version-limit! #f)  (node-parent-set! x node)) args)
+    (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (node-parent-set! x node)) args)
     node))
 (define (new-call* source decl oper args) (set-bbv-version-limit! #f) 
   (if *ptree-port*
@@ -3014,7 +3014,7 @@
          (vals (app-args ptree))
          (vars (prc-parms proc))
          (non-mut-vars (set-keep not-mutable? (list->set vars))))
-    (for-each
+    (Sfor-each2
      (lambda (var) (set-bbv-version-limit! #f) 
        (var-refs-set! var (set-empty))
        (var-sets-set! var (set-empty)))
@@ -3236,7 +3236,7 @@
              (conj? ptree)
              (disj? ptree)
              (fut? ptree))
-         (for-each
+         (Sfor-each2
           (lambda (child) (set-bbv-version-limit! #f)  (ll! child cst-procs env))
           (node-children ptree)))
         ((prc? ptree)
@@ -3247,7 +3247,7 @@
                     (not (prc-rest oper))
                     (SFX= (Slength (prc-parms oper)) (Slength args)))
                (ll!-let ptree cst-procs (new-env env (prc-parms oper)))
-               (for-each
+               (Sfor-each2
                 (lambda (child) (set-bbv-version-limit! #f)  (ll! child cst-procs env))
                 (node-children ptree)))))
         (else (compiler-internal-error "ll!, unknown parse tree node type"))))
@@ -3289,7 +3289,7 @@
              (Smap2 (lambda (var) (set-bbv-version-limit! #f)  (cons var (free-variables (var->val var))))
                   vars)))
         (let loop ((changed? #f))
-          (for-each
+          (Sfor-each2
            (lambda (var-tcfv) (set-bbv-version-limit! #f) 
              (let loop2 ((l (set->list (Scdr var-tcfv))) (fv (Scdr var-tcfv)))
                (if (null? l)
@@ -3319,7 +3319,7 @@
           (define (new-ref* var) (set-bbv-version-limit! #f) 
             (new-ref (var-source var) (node-decl val) var))
           (if (not (null? vars))
-              (for-each
+              (Sfor-each2
                (lambda (oper) (set-bbv-version-limit! #f) 
                  (let ((node (node-parent oper)))
                    (node-children-set!
@@ -3332,13 +3332,13 @@
           (if (not (null? vars))
               (let ((var-copies (Smap2 var-copy vars)))
                 (prc-parms-set! val (Sappend var-copies (prc-parms val)))
-                (for-each (lambda (x) (set-bbv-version-limit! #f)  (var-bound-set! x val)) var-copies)
+                (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (var-bound-set! x val)) var-copies)
                 (node-fv-invalidate! val)
                 (prc-min-set! val (SFX+ (prc-min val) (Slength vars)))
                 (ll-rename! val (pair-up vars var-copies))))))
-      (for-each lift-app! cst-proc-vars-list)
-      (for-each lift-prc! cst-proc-vars-list)
-      (for-each (lambda (node) (set-bbv-version-limit! #f)  (ll! node cst-procs* env)) vals)
+      (Sfor-each2 lift-app! cst-proc-vars-list)
+      (Sfor-each2 lift-prc! cst-proc-vars-list)
+      (Sfor-each2 (lambda (node) (set-bbv-version-limit! #f)  (ll! node cst-procs* env)) vals)
       (ll! (prc-body proc) cst-procs* env))))
 (define (ll-rename! ptree var-map) (set-bbv-version-limit! #f) 
   (cond ((ref? ptree)
@@ -3356,7 +3356,7 @@
                  (var-sets-set! (Scdr x) (set-adjoin (var-sets (Scdr x)) ptree))
                  (set-var-set! ptree (Scdr x)))))))
   (node-fv-set! ptree #t)
-  (for-each (lambda (child) (set-bbv-version-limit! #f)  (ll-rename! child var-map)) (node-children ptree)))
+  (Sfor-each2 (lambda (child) (set-bbv-version-limit! #f)  (ll-rename! child var-map)) (node-children ptree)))
 (define (parse-tree->expression ptree) (set-bbv-version-limit! #f)  (se ptree '() (list 0)))
 (define (se ptree env num) (set-bbv-version-limit! #f) 
   (cond ((cst? ptree) (list quote-sym (cst-val ptree)))
@@ -3798,7 +3798,7 @@
         (else
          (compiler-internal-error
           "bbs-remove-jump-cascades!, unknown branch type")))))
-  (for-each remove-cascade! (queue->list (bbs-bb-queue bbs))))
+  (Sfor-each2 remove-cascade! (queue->list (bbs-bb-queue bbs))))
 (define (jump-lbl? branch) (set-bbv-version-limit! #f) 
   (let ((opnd (jump-opnd branch))) (if (lbl? opnd) (lbl-num opnd) #f)))
 (define put-poll-on-ifjump? #f)
@@ -3824,20 +3824,20 @@
       (case (gvm-instr-type gvm-instr)
         ((label) '())
         ((apply)
-         (for-each scan-opnd (apply-opnds gvm-instr))
+         (Sfor-each2 scan-opnd (apply-opnds gvm-instr))
          (if (apply-loc gvm-instr) (scan-opnd (apply-loc gvm-instr))))
         ((copy)
          (scan-opnd (copy-opnd gvm-instr))
          (scan-opnd (copy-loc gvm-instr)))
         ((close)
-         (for-each
+         (Sfor-each2
           (lambda (parm) (set-bbv-version-limit! #f) 
             (reachable (lbl-num->bb (closure-parms-lbl parm) bbs) bb)
             (scan-opnd (closure-parms-loc parm))
-            (for-each scan-opnd (closure-parms-opnds parm)))
+            (Sfor-each2 scan-opnd (closure-parms-opnds parm)))
           (close-parms gvm-instr)))
         ((ifjump)
-         (for-each scan-opnd (ifjump-opnds gvm-instr))
+         (Sfor-each2 scan-opnd (ifjump-opnds gvm-instr))
          (direct-jump (lbl-num->bb (ifjump-true gvm-instr) bbs) bb)
          (direct-jump (lbl-num->bb (ifjump-false gvm-instr) bbs) bb))
         ((jump)
@@ -3854,7 +3854,7 @@
           (let ((bb (queue-get! scan-queue)))
             (begin
               (scan-instr (bb-label-instr bb) bb)
-              (for-each
+              (Sfor-each2
                (lambda (gvm-instr) (set-bbv-version-limit! #f)  (scan-instr gvm-instr bb))
                (bb-non-branch-instrs bb))
               (scan-instr (bb-branch-instr bb) bb)
@@ -3883,7 +3883,7 @@
                              '())))
                     (bb-branch-instr-set! bb (bb-branch-instr dest-bb))
                     (remove-useless-jump bb)))))))
-    (for-each remove-useless-jump (queue->list (bbs-bb-queue bbs)))
+    (Sfor-each2 remove-useless-jump (queue->list (bbs-bb-queue bbs)))
     changed?))
 (define (bbs-remove-common-code! bbs) (set-bbv-version-limit! #f) 
   (let* ((bb-list (queue->list (bbs-bb-queue bbs)))
@@ -4080,12 +4080,12 @@
                  "eqv-gvm-instr?, unknown 'gvm-instr':"
                  instr1))))))
     (define (update-bb! bb) (set-bbv-version-limit! #f)  (replace-label-references! bb replacement-lbl-num))
-    (for-each enter-bb! bb-list)
+    (Sfor-each2 enter-bb! bb-list)
     (bbs-entry-lbl-num-set! bbs (replacement-lbl-num (bbs-entry-lbl-num bbs)))
     (let loop ((i 0) (result '()))
       (if (SFX< i hash-table-length)
           (let ((bb-kept (Svector-ref hash-table i)))
-            (for-each update-bb! bb-kept)
+            (Sfor-each2 update-bb! bb-kept)
             (loop (SFX+ i 1) (Sappend bb-kept result)))
           (bbs-bb-queue-set! bbs (list->queue result))))
     changed?))
@@ -4208,7 +4208,7 @@
             (let ((bb-list (schedule-back (remove-bb! x) '())))
               (queue-put! new-bb-queue x)
               (schedule-forw bb)
-              (for-each schedule-refs bb-list))
+              (Sfor-each2 schedule-refs bb-list))
             (schedule-from bb))))
     (define (schedule-back bb bb-list) (set-bbv-version-limit! #f) 
       (let ((bb-list* (cons bb bb-list)) (x (prec-bb bb)))
@@ -4227,7 +4227,7 @@
                 (if y (schedule-around (remove-bb! y)))))))
       (schedule-refs bb))
     (define (schedule-refs bb) (set-bbv-version-limit! #f) 
-      (for-each
+      (Sfor-each2
        (lambda (x) (set-bbv-version-limit! #f) 
          (if (Smemq x left-to-schedule) (schedule-around (remove-bb! x))))
        (bb-references bb)))
@@ -4244,7 +4244,7 @@
               (define (replacement-lbl-num x) (set-bbv-version-limit! #f)  (Scdr (Sassv x lbl-map)))
               (define (update-bb! bb) (set-bbv-version-limit! #f) 
                 (replace-label-references! bb replacement-lbl-num))
-              (for-each update-bb! bb-list)
+              (Sfor-each2 update-bb! bb-list)
               (bbs-lbl-counter-set!
                bbs
                (make-counter
@@ -4266,9 +4266,9 @@
       (define (put-instr gvm-instr) (set-bbv-version-limit! #f) 
         (queue-put! code-queue (make-code bb gvm-instr #f)))
       (put-instr (bb-label-instr bb))
-      (for-each put-instr (bb-non-branch-instrs bb))
+      (Sfor-each2 put-instr (bb-non-branch-instrs bb))
       (put-instr (bb-branch-instr bb)))
-    (for-each put-bb (queue->list (bbs-bb-queue bbs)))
+    (Sfor-each2 put-bb (queue->list (bbs-bb-queue bbs)))
     (queue->list code-queue)))
 (define (setup-slots-needed! code-list) (set-bbv-version-limit! #f) 
   (if (null? code-list)
@@ -4355,12 +4355,12 @@
   (write (Smap2 bb-lbl-num (bb-precedents bb)) port)
   (display "]" port)
   (newline port)
-  (for-each
+  (Sfor-each2
    (lambda (x) (set-bbv-version-limit! #f)  (write-gvm-instr x port) (newline port))
    (bb-non-branch-instrs bb))
   (write-gvm-instr (bb-branch-instr bb) port))
 (define (write-bbs bbs port) (set-bbv-version-limit! #f) 
-  (for-each
+  (Sfor-each2
    (lambda (bb) (set-bbv-version-limit! #f) 
      (if (SFX= (bb-lbl-num bb) (bbs-entry-lbl-num bbs))
          (begin (display "**** Entry block:" port) (newline port)))
@@ -4386,18 +4386,18 @@
           (newline port)
           (case (gvm-instr-type gvm-instr)
             ((apply)
-             (for-each scan-opnd (apply-opnds gvm-instr))
+             (Sfor-each2 scan-opnd (apply-opnds gvm-instr))
              (if (apply-loc gvm-instr) (scan-opnd (apply-loc gvm-instr))))
             ((copy)
              (scan-opnd (copy-opnd gvm-instr))
              (scan-opnd (copy-loc gvm-instr)))
             ((close)
-             (for-each
+             (Sfor-each2
               (lambda (parms) (set-bbv-version-limit! #f) 
                 (scan-opnd (closure-parms-loc parms))
-                (for-each scan-opnd (closure-parms-opnds parms)))
+                (Sfor-each2 scan-opnd (closure-parms-opnds parms)))
               (close-parms gvm-instr)))
-            ((ifjump) (for-each scan-opnd (ifjump-opnds gvm-instr)))
+            ((ifjump) (Sfor-each2 scan-opnd (ifjump-opnds gvm-instr)))
             ((jump) (scan-opnd (jump-opnd gvm-instr)))
             (else '()))))
       (if (proc-obj-primitive? p)
@@ -4901,7 +4901,7 @@
           (display c-id-prefix port)
           (display "BEGIN_MODULE" port)
           (newline port)
-          (for-each
+          (Sfor-each2
            (lambda (x) (set-bbv-version-limit! #f) 
              (let ((scheme-name (Svector-ref x 0)))
                (display c-id-prefix port)
@@ -4913,10 +4913,10 @@
                (newline port)))
            procs)
           (newline port)
-          (for-each (lambda (x) (set-bbv-version-limit! #f)  (display x port) (newline port)) decls)
+          (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (display x port) (newline port)) decls)
           (if (not (null? procs))
               (begin
-                (for-each
+                (Sfor-each2
                  (lambda (x) (set-bbv-version-limit! #f) 
                    (let ((scheme-name (Svector-ref x 0))
                          (c-name (Svector-ref x 1))
@@ -4984,7 +4984,7 @@
           (display c-id-prefix port)
           (display "BEGIN_PRM" port)
           (newline port)
-          (for-each (lambda (x) (set-bbv-version-limit! #f)  (display x port) (newline port)) inits)
+          (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (display x port) (newline port)) inits)
           (display c-id-prefix port)
           (display "END_PRM" port)
           (newline port)
@@ -6160,7 +6160,7 @@
   (let ((slot (lowest-dead-slot live)))
     (put-copy opnd slot (get-var opnd) live comment)))
 (define (save-regs regs live comment) (set-bbv-version-limit! #f) 
-  (for-each
+  (Sfor-each2
    (lambda (i) (set-bbv-version-limit! #f)  (save-opnd (make-reg i) live comment))
    (set->list regs)))
 (define (save-opnd-to-reg opnd reg var live comment) (set-bbv-version-limit! #f) 
@@ -6303,8 +6303,8 @@
       (cond ((null? l) '())
             ((eq? x (Scar l)) (Scdr l))
             (else (cons (Scar l) (remove x (Scdr l))))))
-    (for-each
-     (lambda (x) (set-bbv-version-limit! #f)  (for-each add-to-bin! (set->list (free-v (Scar x)))))
+    (Sfor-each2
+     (lambda (x) (set-bbv-version-limit! #f)  (Sfor-each2 add-to-bin! (set->list (free-v (Scar x)))))
      l)
     (let loop ((args l) (ordered-args '()))
       (if (null? args)
@@ -6367,7 +6367,7 @@
            (clo-vars
             (set-keep (lambda (x) (set-bbv-version-limit! #f)  (closed-vars? x const-proc-vars)) proc-vars))
            (clo-vars-list (set->list clo-vars)))
-      (for-each
+      (Sfor-each2
        (lambda (proc-var) (set-bbv-version-limit! #f) 
          (let ((label (schedule-gen-proc (var->val proc-var) '())))
            (add-known-proc (lbl-num label) (var->val proc-var))
@@ -7096,7 +7096,7 @@
       (let ()
         (if ofile-asm-bits?
             (begin (ofile-tabs-to 32) (asm-display "|" *ofile-port2*)))
-        (for-each (lambda (x) (set-bbv-version-limit! #f)  (asm-display x *ofile-port2*)) l)
+        (Sfor-each2 (lambda (x) (set-bbv-version-limit! #f)  (asm-display x *ofile-port2*)) l)
         (asm-newline *ofile-port2*)
         (set! *ofile-pos* 0))))
 (define (ofile-gvm-instr code) (set-bbv-version-limit! #f) 
@@ -7479,7 +7479,7 @@
                             (loop1 rest (SFX+ loc stat-len))))))
                       (loop2 rest (SFX+ loc 2)))))))
         (ofile-word end-of-code-tag)
-        (for-each ofile-ref const-list)
+        (Sfor-each2 ofile-ref const-list)
         (ofile-long (obj-encoding (SFX+ (Slength const-list) 1))))
       (replace-lbl-refs-by-pointer-to-label)
       (branch-tensioning-pass)
@@ -8505,7 +8505,7 @@
   (let ((l (integer->digits (abs x))))
     (ofile-long (SFX+ (SFX* (SFX+ (Slength l) 1) 512) (SFX* subtype-bignum 8)))
     (if (GEN< x 0) (ofile-word 0) (ofile-word 1))
-    (for-each ofile-word l)))
+    (Sfor-each2 ofile-word l)))
 (define (dump-procedure proc) (set-bbv-version-limit! #f) 
   (let ((bbs (proc-obj-code proc)))
     (set! entry-lbl-num (bbs-entry-lbl-num bbs))
@@ -8568,7 +8568,7 @@
   (define (index x l) (set-bbv-version-limit! #f) 
     (let loop ((l l) (i 0))
       (cond ((not (pair? l)) #f)
-            ((equal? (Scar l) x) i)
+            ((Sequal? (Scar l) x) i)
             (else (loop (Scdr l) (SFX+ i 1))))))
   (let ((n (index descr (queue->list var-descr-queue))))
     (if n
@@ -9288,7 +9288,7 @@
                (Smap2 opnd-stat opnds)
                (if loc (opnd-stat loc) #f))
          1)
-        (for-each fetch-stat-add! opnds)
+        (Sfor-each2 fetch-stat-add! opnds)
         (if loc (store-stat-add! loc))))
   (let ((x (proc-obj-inlinable prim)))
     (if (not x)
@@ -9317,7 +9317,7 @@
            (parms->bytes (Scdr parms)))))
   (if ofile-stats?
       (begin
-        (for-each
+        (Sfor-each2
          (lambda (x) (set-bbv-version-limit! #f) 
            (stat-add!
             (list 'gvm-instr
@@ -9327,7 +9327,7 @@
             1)
            (store-stat-add! (closure-parms-loc x))
            (fetch-stat-add! (make-lbl (closure-parms-lbl x)))
-           (for-each fetch-stat-add! (closure-parms-opnds x)))
+           (Sfor-each2 fetch-stat-add! (closure-parms-opnds x)))
          parms)))
   (let ((total-space-needed (parms->bytes parms)) (lbl1 (new-lbl!)))
     (emit-move.l closure-ptr-slot atemp2)
@@ -9392,7 +9392,7 @@
                (Smap2 opnd-stat opnds)
                (if poll? 'poll 'not-poll))
          1)
-        (for-each fetch-stat-add! opnds)
+        (Sfor-each2 fetch-stat-add! opnds)
         (stat-dump!)))
   (let ((proc (proc-obj-test test)))
     (if proc
