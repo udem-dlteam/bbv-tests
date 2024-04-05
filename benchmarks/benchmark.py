@@ -1631,7 +1631,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.yticks(rotation=0, rotation_mode="anchor", ha='right')
 
         ax.xaxis.set_label_position('top')
-        plt.xlabel('Benchmark')
+        #plt.xlabel('Benchmark')
         plt.ylabel('Version limit')
 
         if include_geometric_mean:
@@ -1680,7 +1680,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                                      macro_micro_delim,
                                      len(df.columns)])
         delimite_subaxis.set_xticklabels([""] * 3)
-        delimite_subaxis.tick_params(size=13)
+        delimite_subaxis.tick_params(size=14)
 
         # Label the axis to delimit micro and macro
         micro_macro_subaxis = ax.secondary_xaxis("bottom")
@@ -1688,7 +1688,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         micro_macro_subaxis.set_xticks([n_macro // 2,
                                         macro_micro_delim + n_micro // 2 + 1])
         micro_macro_subaxis.set_xticklabels(["Macrobenchmarks", "Microbenchmarks"])
-        micro_macro_subaxis.tick_params(size=0)
+        micro_macro_subaxis.tick_params(size=0, labelsize=14)
 
         if title:
             plt.title(f'{path_base} {compiler.name}')
