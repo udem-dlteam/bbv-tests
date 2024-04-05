@@ -17,7 +17,7 @@ for file in ${js_files[@]}; do
     js_benchmarks+=("$base")
 done
 
-version_limits="0 1 2 3 4 5 6 7 8 9 10 15 20"
+version_limits="0 1 2 3 4 5 6 7 8 9 10 20"
 system="arctic"
 
 . ./venv/bin/activate
