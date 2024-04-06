@@ -157,6 +157,7 @@ class Benchmark(db.Entity):
 TYPECHECK_NAMES = (
         # Gambit             # Bigloo
         # Typechecks
+        "#gvm:jump/safe"
         "##fixnum?",
         '##flonum?',
         "##vector?",
