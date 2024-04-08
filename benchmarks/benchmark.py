@@ -628,7 +628,12 @@ def get_gambit_program_size(executable, benchmark):
     logger.debug(objdump_output)
     lines = objdump_output.splitlines()
 
-    marker_name = benchmark.name.replace("-", "_2d_") # TODO: support all special characters
+    if isinstance(benchmark, str):
+        benchmark_name = benchmark
+    else:
+        benchmark_name = benchmark.name
+
+    marker_name = benchmark_name.replace("-", "_2d_") # TODO: support all special characters
 
     start_marker = f"<___H_{marker_name}>"
     end_marker = f"<___LNK_{marker_name}>"
@@ -729,7 +734,8 @@ def test_benchmark(compiler, file, version_limit, safe_arithmetic, compiler_opti
     def log_rest():
         for step_name in steps:
             if step_name not in done:
-                log_step(step_name, status=step_name == INTERNAL)
+                if step_name != INTERNAL:
+                    log_step(step_name, False)
 
     def log_step(step_name, status=False):
         if status:
