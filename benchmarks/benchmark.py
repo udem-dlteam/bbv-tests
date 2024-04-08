@@ -259,6 +259,9 @@ def bind_db(filename):
 # Utils
 ##############################################################################
 
+class CommandError(Exception):
+    pass
+
 def run_command(command, timeout, env=None, extend_env=None):
     logger.info(command)
 
@@ -288,7 +291,7 @@ def run_command(command, timeout, env=None, extend_env=None):
 
         if return_code != 0:
             logger.error(f"Process did not run as expected, return code: {return_code}")
-            raise ValueError(f"Process return code {return_code}")
+            raise CommandError(f"Process return code {return_code}")
 
         return output.decode()
     finally:
@@ -338,6 +341,9 @@ class PrimitivesCountParser:
 
     def __getitem__(self, name):
         return self.primitives.get(name, 0)
+
+    def __bool__(self):
+        return bool(self.primitives)
 
     def keys(self):
         return self.primitives.keys()
@@ -708,6 +714,72 @@ def get_heap_size_arguments(compiler_name):
     else:
         logger.error(f'cannot set heap size for {compiler_name}')
         return "", None
+
+def test_benchmark(compiler, file, version_limit, safe_arithmetic, compiler_optimizations, timeout=None):
+    from colorama import Fore, Style
+
+    compilation = False
+    counting_primitives = False
+    execution = False
+    computing_size = False
+    integrity = False
+    fatal_error = None
+
+    def log_test():
+        steps = [
+            ("Compilation", compilation),
+            ("Counting Primitives", counting_primitives),
+            ("Execution", execution),
+            ("Computing Size", computing_size),
+            ("Internal Error", integrity),
+        ]
+
+        print(f"- {benchmark_name} ({compiler.name}, V={version_limit})")
+
+        for step_name, status in steps:
+            if status:
+                print(f"  {step_name:<20}: {Fore.GREEN}OK{Style.RESET_ALL}")
+            else:
+                print(f"  {step_name:<20}: {Fore.RED}FAILED{Style.RESET_ALL}")
+
+    def try_test(thunk, check_result=lambda *args: True):
+        result = thunk()
+
+        if not check_result(result):
+            raise CommandError
+
+        return result
+        
+
+    benchmark_name = os.path.splitext(os.path.basename(file))[0]
+    base_arguments = get_benchmark_cli_arguments(benchmark_name)
+    heap_args, env = get_heap_size_arguments(compiler.name)
+    arguments = f"{heap_args} {base_arguments}"
+
+    try:
+        executable, _, _ = compile(compiler, file, version_limit, safe_arithmetic, compiler_optimizations, timeout, only_executable=True)
+        compilation = True
+
+        _, primitive_count, _ = compile(compiler, file, version_limit, safe_arithmetic, compiler_optimizations, timeout)
+        if primitive_count:
+            counting_primitives = True
+
+        perf_results, scheme_stats = run_benchmark(executable, arguments, timeout=timeout, env=env)
+        execution = True
+
+        size = get_program_size(executable, benchmark_name, compiler)
+        if size > 0:
+            computing_size = True
+
+    except CommandError:
+        integrity = True
+    else:
+        integrity = True
+    finally:
+        log_test()
+        if not integrity:
+            logger.exception("Something wrong happened with the test script")
+
 
 @db_session
 def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repetitions, compiler_optimizations, force_execution=False, timeout=None):
@@ -1998,6 +2070,45 @@ if __name__ == "__main__":
                                   action='store_true',
                                   help='rerun benchmark even if results already exist')
 
+    # Parser for running benchmarks
+    test_parser = subparsers.add_parser('test', help='Test benchmark')
+
+    test_parser.add_argument('file', type=file_path)
+
+    test_compiler_parser_group = test_parser.add_mutually_exclusive_group()
+
+    test_compiler_parser_group.add_argument('--gambit', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Gambit compiler. Optional directory path can follow.')
+    test_compiler_parser_group.add_argument('--bigloo', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Bigloo compiler. Optional directory path can follow.')
+    test_compiler_parser_group.add_argument('--chez',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Chez compiler. Optional directory path can follow.')
+    test_compiler_parser_group.add_argument('--node',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use NodeJS compiler. Optional directory path can follow.')
+    test_compiler_parser_group.add_argument('--racket', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Racket compiler. Optional directory path can follow.')
+
+    test_parser.add_argument('-l', '--limit',
+                                  dest="version_limits",
+                                  metavar="LIMIT",
+                                  nargs="+",
+                                  default=(0, 1, 5, 10),
+                                  type=int,
+                                  help="BBV versions limits")
+
+    test_parser.add_argument('-u', '--unsafe',
+                                  dest="safe_arithmetic",
+                                  action='store_false',
+                                  default=True,
+                                  help="Execute benchmark with unsafe arithmetic")
+
+    test_parser.add_argument('-t', '--timeout',
+                                  dest="timeout",
+                                  metavar='T',
+                                  type=float,
+                                  help="Compilation timeout (in secondes)")
+
+    test_parser.add_argument('-O', '--compiler-optimizations',
+                                  dest='compiler_optimizations',
+                                  action='store_true',
+                                  default=False,
+                                  help='Compile benchmark with compiler optimizations')
+
     # Parser for profile-guided version limit selection
     profile_guided_parser = subparsers.add_parser('profile_guided', help='Look for an optimial combination of version limits')
 
@@ -2136,6 +2247,14 @@ if __name__ == "__main__":
                       benchmark_names=args.benchmark_names,
                       version_limits=args.version_limits,
                       output=args.output)
+    elif args.command == 'test':
+        for vlimit in args.version_limits:
+            test_benchmark(args.compiler,
+                           args.file,
+                           vlimit,
+                           args.safe_arithmetic,
+                           args.compiler_optimizations,
+                           args.timeout)
     else:
         parser.print_help()
 
