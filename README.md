@@ -133,7 +133,7 @@ Options:
   -f <filename>    File to compile
   -S <system>      Specify the system ('gambit', 'bigloo', 'chez', 'racket', 'node')
   -D <dir>         Specify compiler directory
-  -V <limits>...   Set the version limits (integers or 'custom')
+  -V <limits>...   Set the version limits (default: 0 1 5 10)
   -O <level>       Set optimization level (0 or 1)
   -U               Use unsafe arithmetic
   -h               Display this help and exit

@@ -88,7 +88,7 @@ while getopts ":f:S:D:V:O:UPGWIEchv" opt; do
       echo "  -f <filename>    File to compile"
       echo "  -S <system>      Specify the system ('gambit', 'bigloo', 'chez', 'racket', 'node')"
       echo "  -D <dir>         Specify compiler directory"
-      echo "  -V <limits>...   Set the version limits (integers or 'custom')"
+      echo "  -V <limits>...   Set the version limits (default: 0 1 5 10)"
       echo "  -O <level>       Set optimization level (0 or 1)"
       echo "  -U               Use unsafe arithmetic"
       echo "  -h               Display this help and exit"
