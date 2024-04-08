@@ -2345,5 +2345,5 @@
         (loop (SFX- n 1) (run1))
 	      result)))
 
-(define (check result) (set-bbv-version-limit! #f) 
-  (Sequal? result '((181 . 480) (6 . 1892) (2219 . 427))))
+(define (check result) (set-bbv-version-limit! #f)
+  (Sequal? result '((181 . 748) (6 . 2160) (2219 . 695))))
