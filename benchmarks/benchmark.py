@@ -1715,7 +1715,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                 if i != skip_index:
                     # space after
                     offset = 1 if mean_pos == "right" else 0
-                    ax.axvline(i + offset, color='black', gapcolor='white', lw=sep_lw)
+                    ax.axvline(i + offset, color='white', lw=5)
+                    ax.axvline(i + offset, color='black', lw=sep_lw, linestyle='--')
 
                     xticks = ax.get_xticks()
 
@@ -1734,7 +1735,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                     for i, tick in enumerate(ax.xaxis.get_major_ticks()):
                         if i == new_tick_index:
                             tick.tick2line.set_markeredgewidth(sep_lw)  # Adjusts the width of the tick line
-                            tick.tick2line.set_markersize(16.5)  # Adjusts the length of the tick
+                            tick.tick2line.set_markersize(16)  # Adjusts the length of the tick
 
             for label in ax.get_xticklabels():
                 if label._text in mean_names:
