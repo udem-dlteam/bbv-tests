@@ -26,7 +26,7 @@
 
 (define k 0)
 (define (++) (set-bbv-version-limit! #f) 
-   (set! k (+fx k 1))
+   (set! k (SFX+ k 1))
    k)
 
 (define-macro (trace . l)
