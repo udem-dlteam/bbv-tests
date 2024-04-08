@@ -103,6 +103,6 @@ done
 
 . ./venv/bin/activate
 
-python ./benchmark.py $SCRIPT_VERBOSITY test ${INPUT_FILE} ${OPTIM} --${SYSTEM} ${COMPILER_DIR} -l "${VERSION_LIMITS[@]}"
+python ./benchmark.py $SCRIPT_VERBOSITY test ${INPUT_FILE} ${OPTIM} --${SYSTEM} ${COMPILER_DIR} -t 1800 -l "${VERSION_LIMITS[@]}"
 
-deactiavte
+deactivate

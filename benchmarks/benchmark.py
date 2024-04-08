@@ -718,67 +718,56 @@ def get_heap_size_arguments(compiler_name):
 def test_benchmark(compiler, file, version_limit, safe_arithmetic, compiler_optimizations, timeout=None):
     from colorama import Fore, Style
 
-    compilation = False
-    counting_primitives = False
-    execution = False
-    computing_size = False
-    integrity = False
-    fatal_error = None
+    COMPILATION = "Compilation"
+    PRIMITIVES = "Counting Primitives"
+    EXECUTION = "Execution"
+    SIZE = "Computing Size"
+    INTERNAL = "Internal Error"
+    done = set()
+    steps = [COMPILATION, PRIMITIVES, EXECUTION, SIZE, INTERNAL]
 
-    def log_test():
-        steps = [
-            ("Compilation", compilation),
-            ("Counting Primitives", counting_primitives),
-            ("Execution", execution),
-            ("Computing Size", computing_size),
-            ("Internal Error", integrity),
-        ]
+    def log_rest():
+        for step_name in steps:
+            if step_name not in done:
+                log_step(step_name, status=step_name == INTERNAL)
 
-        print(f"- {benchmark_name} ({compiler.name}, V={version_limit})")
-
-        for step_name, status in steps:
-            if status:
-                print(f"  {step_name:<20}: {Fore.GREEN}OK{Style.RESET_ALL}")
-            else:
-                print(f"  {step_name:<20}: {Fore.RED}FAILED{Style.RESET_ALL}")
-
-    def try_test(thunk, check_result=lambda *args: True):
-        result = thunk()
-
-        if not check_result(result):
-            raise CommandError
-
-        return result
+    def log_step(step_name, status=False):
+        if status:
+            print(f"  {step_name:<20}: {Fore.GREEN}OK{Style.RESET_ALL}")
+        else:
+            print(f"  {step_name:<20}: {Fore.RED}FAILED{Style.RESET_ALL}")
+        done.add(step_name)
         
-
     benchmark_name = os.path.splitext(os.path.basename(file))[0]
     base_arguments = get_benchmark_cli_arguments(benchmark_name)
     heap_args, env = get_heap_size_arguments(compiler.name)
     arguments = f"{heap_args} {base_arguments}"
 
+    if not timeout:
+        logger.warning("no timeout given: use -t [timeout] to")
+    print(f"- {benchmark_name} ({compiler.name}, V={version_limit})")
+
     try:
         executable, _, _ = compile(compiler, file, version_limit, safe_arithmetic, compiler_optimizations, timeout, only_executable=True)
-        compilation = True
+        log_step(COMPILATION, True)
 
         _, primitive_count, _ = compile(compiler, file, version_limit, safe_arithmetic, compiler_optimizations, timeout)
-        if primitive_count:
-            counting_primitives = True
+        log_step(PRIMITIVES, primitive_count)
+
 
         perf_results, scheme_stats = run_benchmark(executable, arguments, timeout=timeout, env=env)
-        execution = True
+        log_step(EXECUTION, True)
 
         size = get_program_size(executable, benchmark_name, compiler)
-        if size > 0:
-            computing_size = True
+        log_step(SIZE, size > 0)
 
     except CommandError:
         integrity = True
-    else:
-        integrity = True
+    except BaseException:
+        log_step(INTERNAL, False)
+        logger.exception("Something wrong happened with the test script")
     finally:
-        log_test()
-        if not integrity:
-            logger.exception("Something wrong happened with the test script")
+        log_rest()
 
 
 @db_session
