@@ -68,6 +68,7 @@
       ((string->list) `((@ string->list __r4_strings_6_7) ,@args))
       ((vector->list) `((@ vector->list __r4_vectors_6_8) ,@args))
       ((vector-map) `((@ vector-map __r4_vectors_6_8) ,@args))
+      ((+ / - * < <= > >= =) `((@ ,op __r4_numbers_6_5) ,@args))
       (else `(,op ,@args))))
 
 (define (unknown x . rest)
