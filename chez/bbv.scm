@@ -136,6 +136,8 @@
 (define-macro (GENcos x)         `(MAPop GEN cos ,x))
 (define-macro (GENatan x)        `(MAPop GEN atan ,x))
 (define-macro (GENatan2 x y)     `(MAPop GEN atan2 ,x ,y))
+(define-macro (GENmin . args)    `(MAPop GEN min ,@args))
+(define-macro (GENmax . args)    `(MAPop GEN max ,@args))
 
 (define-macro (SFL+ x . rest)    `(MAPop* SFL + ,x ,@rest))
 (define-macro (SFL- x . rest)    `(MAPop* SFL - ,x ,@rest))
@@ -157,6 +159,8 @@
 (define-macro (SFLacos x)        `(MAPop SFL acos ,x))
 (define-macro (SFLatan x)        `(MAPop SFL atan ,x))
 (define-macro (SFLatan2 x y)     `(MAPop SFL atan2 ,x ,y))
+(define-macro (SFLmin . args)    `(MAPop SFL min ,@args))
+(define-macro (SFLmax . args)    `(MAPop SFL max ,@args))
 
 (define-macro (SFX+ x . rest)    `(MAPop* SFX + ,x ,@rest))
 (define-macro (SFX- x . rest)    `(MAPop* SFX - ,x ,@rest))
@@ -172,6 +176,8 @@
 (define-macro (SFXzero? x)       `(MAPop SFX zero? ,x))
 (define-macro (SFXodd? x)        `(MAPop SFX odd? ,x))
 (define-macro (SFXeven? x)       `(MAPop SFX even? ,x))
+(define-macro (SFXmin . args)    `(MAPop SFX min ,@args))
+(define-macro (SFXmax . args)    `(MAPop SFX max ,@args))
 
 (define-macro (SFXbit-lsh x y)   `(MAPop SFX bit-lsh ,x ,y))
 (define-macro (SFXbit-and x y)   `(MAPop SFX bit-and ,x ,y))
@@ -198,6 +204,8 @@
 (define-macro (FLacos x)        `(FLop acos ,x))
 (define-macro (FLatan x)        `(FLop atan ,x))
 (define-macro (FLatan2 x y)     `(FLop atan ,x ,y))
+(define-macro (FLmin . args)    `(MAPop FL min ,@args))
+(define-macro (FLmax . args)    `(MAPop FL max ,@args))
 
 (define-macro (FX+ x y)         `(FXop + ,x ,y))
 (define-macro (FX- x . rest)    `(FXop - ,x ,@rest))
@@ -213,6 +221,8 @@
 (define-macro (FXzero? x)       `(FXop zero? ,x))
 (define-macro (FXodd? x)        `(FXop odd? ,x))
 (define-macro (FXeven? x)       `(FXop even? ,x))
+(define-macro (FXmin . args)    `(MAPop FX min ,@args))
+(define-macro (FXmax . args)    `(MAPop FX max ,@args))
 
 (define-macro (FXbit-lsh x y)   `(MAPop FX arithmetic-shift-left ,x ,y))
 (define-macro (FXbit-and x y)   `(MAPop FX and ,x ,y))
@@ -523,6 +533,34 @@
           (PRIMop atan ,a ,b))))
     (else
      `(atan ,x ,y))))
+
+(define-macro (BBVmax . args)
+  (let* ((best (gensym))
+         (vars (cons best (map (lambda (_) (gensym)) (cdr args))))
+         (bindings (map (lambda (var arg) `(,var ,arg)) vars args)))
+    `(let (,@bindings)
+      ,(let loop ((vars (cdr vars)))
+          (cond 
+            ((null? vars) best)
+            ((null? (cdr vars))
+              `(if (GEN< ,best ,(car vars)) ,(car vars) ,best))
+            (else
+              `(begin (if (GEN< ,best ,(car vars)) (set! ,best ,(car vars)))
+                      ,(loop (cdr vars)))))))))
+
+(define-macro (BBVmin . args)
+  (let* ((best (gensym))
+         (vars (cons best (map (lambda (_) (gensym)) (cdr args))))
+         (bindings (map (lambda (var arg) `(,var ,arg)) vars args)))
+    `(let (,@bindings)
+      ,(let loop ((vars (cdr vars)))
+          (cond 
+            ((null? vars) best)
+            ((null? (cdr vars))
+              `(if (GEN> ,best ,(car vars)) ,(car vars) ,best))
+            (else
+              `(begin (if (GEN< ,best ,(car vars)) (set! ,best ,(car vars)))
+                      ,(loop (cdr vars)))))))))
 
 (define-macro (Scar x)
   (cond-expand
