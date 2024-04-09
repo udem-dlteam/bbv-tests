@@ -157,6 +157,7 @@ class Benchmark(db.Entity):
 TYPECHECK_NAMES = (
         # Gambit             # Bigloo
         # Typechecks
+        #"#gvm:jump/safe"
         "##fixnum?",
         '##flonum?',
         "##vector?",
@@ -258,6 +259,9 @@ def bind_db(filename):
 # Utils
 ##############################################################################
 
+class CommandError(Exception):
+    pass
+
 def run_command(command, timeout, env=None, extend_env=None):
     logger.info(command)
 
@@ -287,7 +291,7 @@ def run_command(command, timeout, env=None, extend_env=None):
 
         if return_code != 0:
             logger.error(f"Process did not run as expected, return code: {return_code}")
-            raise ValueError(f"Process return code {return_code}")
+            raise CommandError(f"Process return code {return_code}")
 
         return output.decode()
     finally:
@@ -337,6 +341,9 @@ class PrimitivesCountParser:
 
     def __getitem__(self, name):
         return self.primitives.get(name, 0)
+
+    def __bool__(self):
+        return bool(self.primitives)
 
     def keys(self):
         return self.primitives.keys()
@@ -621,7 +628,12 @@ def get_gambit_program_size(executable, benchmark):
     logger.debug(objdump_output)
     lines = objdump_output.splitlines()
 
-    marker_name = benchmark.name.replace("-", "_2d_") # TODO: support all special characters
+    if isinstance(benchmark, str):
+        benchmark_name = benchmark
+    else:
+        benchmark_name = benchmark.name
+
+    marker_name = benchmark_name.replace("-", "_2d_") # TODO: support all special characters
 
     start_marker = f"<___H_{marker_name}>"
     end_marker = f"<___LNK_{marker_name}>"
@@ -707,6 +719,62 @@ def get_heap_size_arguments(compiler_name):
     else:
         logger.error(f'cannot set heap size for {compiler_name}')
         return "", None
+
+def test_benchmark(compiler, file, version_limit, safe_arithmetic, compiler_optimizations, timeout=None):
+    from colorama import Fore, Style
+
+    COMPILATION = "Compilation"
+    PRIMITIVES = "Counting Primitives"
+    EXECUTION = "Execution"
+    SIZE = "Computing Size"
+    INTERNAL = "Internal Error"
+    done = set()
+    steps = [COMPILATION, PRIMITIVES, EXECUTION, SIZE, INTERNAL]
+
+    def log_rest():
+        for step_name in steps:
+            if step_name not in done:
+                if step_name != INTERNAL:
+                    log_step(step_name, False)
+
+    def log_step(step_name, status=False):
+        if status:
+            print(f"  {step_name:<20}: {Fore.GREEN}OK{Style.RESET_ALL}")
+        else:
+            print(f"  {step_name:<20}: {Fore.RED}FAILED{Style.RESET_ALL}")
+        done.add(step_name)
+        
+    benchmark_name = os.path.splitext(os.path.basename(file))[0]
+    base_arguments = get_benchmark_cli_arguments(benchmark_name)
+    heap_args, env = get_heap_size_arguments(compiler.name)
+    arguments = f"{heap_args} {base_arguments}"
+
+    if not timeout:
+        logger.warning("no timeout given: use -t [timeout] to")
+    print(f"- {benchmark_name} ({compiler.name}, V={version_limit})")
+
+    try:
+        executable, _, _ = compile(compiler, file, version_limit, safe_arithmetic, compiler_optimizations, timeout, only_executable=True)
+        log_step(COMPILATION, True)
+
+        _, primitive_count, _ = compile(compiler, file, version_limit, safe_arithmetic, compiler_optimizations, timeout)
+        log_step(PRIMITIVES, primitive_count)
+
+
+        perf_results, scheme_stats = run_benchmark(executable, arguments, timeout=timeout, env=env)
+        log_step(EXECUTION, True)
+
+        size = get_program_size(executable, benchmark_name, compiler)
+        log_step(SIZE, size > 0)
+
+    except CommandError:
+        integrity = True
+    except BaseException:
+        log_step(INTERNAL, False)
+        logger.exception("Something wrong happened with the test script")
+    finally:
+        log_rest()
+
 
 @db_session
 def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repetitions, compiler_optimizations, force_execution=False, timeout=None):
@@ -1631,7 +1699,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.yticks(rotation=0, rotation_mode="anchor", ha='right')
 
         ax.xaxis.set_label_position('top')
-        plt.xlabel('Benchmark')
+        #plt.xlabel('Benchmark')
         plt.ylabel('Version limit')
 
         if include_geometric_mean:
@@ -1647,7 +1715,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                 if i != skip_index:
                     # space after
                     offset = 1 if mean_pos == "right" else 0
-                    ax.axvline(i + offset, color='black', gapcolor='white', lw=sep_lw)
+                    ax.axvline(i + offset, color='white', lw=5)
+                    ax.axvline(i + offset, color='black', lw=sep_lw, linestyle='--')
 
                     xticks = ax.get_xticks()
 
@@ -1666,7 +1735,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                     for i, tick in enumerate(ax.xaxis.get_major_ticks()):
                         if i == new_tick_index:
                             tick.tick2line.set_markeredgewidth(sep_lw)  # Adjusts the width of the tick line
-                            tick.tick2line.set_markersize(16.5)  # Adjusts the length of the tick
+                            tick.tick2line.set_markersize(16)  # Adjusts the length of the tick
 
             for label in ax.get_xticklabels():
                 if label._text in mean_names:
@@ -1680,7 +1749,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                                      macro_micro_delim,
                                      len(df.columns)])
         delimite_subaxis.set_xticklabels([""] * 3)
-        delimite_subaxis.tick_params(size=13)
+        delimite_subaxis.tick_params(size=14)
 
         # Label the axis to delimit micro and macro
         micro_macro_subaxis = ax.secondary_xaxis("bottom")
@@ -1688,7 +1757,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         micro_macro_subaxis.set_xticks([n_macro // 2,
                                         macro_micro_delim + n_micro // 2 + 1])
         micro_macro_subaxis.set_xticklabels(["Macrobenchmarks", "Microbenchmarks"])
-        micro_macro_subaxis.tick_params(size=0)
+        micro_macro_subaxis.tick_params(size=0, labelsize=14)
 
         if title:
             plt.title(f'{path_base} {compiler.name}')
@@ -1997,6 +2066,45 @@ if __name__ == "__main__":
                                   action='store_true',
                                   help='rerun benchmark even if results already exist')
 
+    # Parser for running benchmarks
+    test_parser = subparsers.add_parser('test', help='Test benchmark')
+
+    test_parser.add_argument('file', type=file_path)
+
+    test_compiler_parser_group = test_parser.add_mutually_exclusive_group()
+
+    test_compiler_parser_group.add_argument('--gambit', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Gambit compiler. Optional directory path can follow.')
+    test_compiler_parser_group.add_argument('--bigloo', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Bigloo compiler. Optional directory path can follow.')
+    test_compiler_parser_group.add_argument('--chez',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Chez compiler. Optional directory path can follow.')
+    test_compiler_parser_group.add_argument('--node',   dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use NodeJS compiler. Optional directory path can follow.')
+    test_compiler_parser_group.add_argument('--racket', dest='compiler', metavar="path", action=StoreFlagAndOptionalArg, nargs='?', type=str, help='Use Racket compiler. Optional directory path can follow.')
+
+    test_parser.add_argument('-l', '--limit',
+                                  dest="version_limits",
+                                  metavar="LIMIT",
+                                  nargs="+",
+                                  default=(0, 1, 5, 10),
+                                  type=int,
+                                  help="BBV versions limits")
+
+    test_parser.add_argument('-u', '--unsafe',
+                                  dest="safe_arithmetic",
+                                  action='store_false',
+                                  default=True,
+                                  help="Execute benchmark with unsafe arithmetic")
+
+    test_parser.add_argument('-t', '--timeout',
+                                  dest="timeout",
+                                  metavar='T',
+                                  type=float,
+                                  help="Compilation timeout (in secondes)")
+
+    test_parser.add_argument('-O', '--compiler-optimizations',
+                                  dest='compiler_optimizations',
+                                  action='store_true',
+                                  default=False,
+                                  help='Compile benchmark with compiler optimizations')
+
     # Parser for profile-guided version limit selection
     profile_guided_parser = subparsers.add_parser('profile_guided', help='Look for an optimial combination of version limits')
 
@@ -2135,6 +2243,14 @@ if __name__ == "__main__":
                       benchmark_names=args.benchmark_names,
                       version_limits=args.version_limits,
                       output=args.output)
+    elif args.command == 'test':
+        for vlimit in args.version_limits:
+            test_benchmark(args.compiler,
+                           args.file,
+                           vlimit,
+                           args.safe_arithmetic,
+                           args.compiler_optimizations,
+                           args.timeout)
     else:
         parser.print_help()
 

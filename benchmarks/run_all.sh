@@ -11,7 +11,7 @@ gambit=../../bbv-gambit
 racket=../../racket
 
 reps=50
-timeout=1800
+timeout=3600
 
 verbosity="-v"
 

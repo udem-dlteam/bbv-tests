@@ -274,6 +274,7 @@ case "$SYSTEM" in
              $VERSION_LIMIT_POSTFIX"
 
     FLAGS=""
+    CC_FLAGS="-cc-options \"-U___SINGLE_HOST\""
     if [ "$GENERATE_CFG" = "1" ]; then
       FLAGS="$FLAGS -keep-temp -gvm -cfg"
     fi
@@ -294,9 +295,9 @@ case "$SYSTEM" in
       # Compilation
       (cd $INPUT_FILE_DIRNAME && \
        /usr/bin/time -f "$SCHEME_COMPILE_TIME_MARKER %e" $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE)
-      $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
-      $GAMBITCOMP -prelude "$PRELUDE" -c -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
-      /usr/bin/time -f "$C_COMPILE_TIME_MARKER %e" $GAMBITCOMP -exe -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
+      $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
+      $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
+      /usr/bin/time -f "$C_COMPILE_TIME_MARKER %e" $GAMBITCOMP -exe $CC_FLAGS -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
       rm $OUTPUT_FILE_C
     fi
 

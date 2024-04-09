@@ -113,3 +113,42 @@ cat ./chez/bbv.scm ./tests/paper/micro/fib.scm ./chez/main.scm > fib.bundle.scm
 chez --quiet --optimize-level 2 --script fib.bundle.scm
 ```
 
+### Test a benchmark
+
+```
+cd benchmarks
+
+python -m venv venv               # Only required once
+. ./venv/bin/activate             # Only required once
+pip install -r requirements.txt   # Only required once
+
+./test_benchmark [options]
+```
+
+To see `./test_benchmark` options us `./test_benchmark -h`:
+
+```
+Usage: ./test_benchmark.sh [options]
+Options:
+  -f <filename>    File to compile
+  -S <system>      Specify the system ('gambit', 'bigloo', 'chez', 'racket', 'node')
+  -D <dir>         Specify compiler directory
+  -V <limits>...   Set the version limits (default: 0 1 5 10)
+  -O <level>       Set optimization level (0 or 1)
+  -U               Use unsafe arithmetic
+  -h               Display this help and exit
+  -v               Execute this script in verbose mode
+```
+
+The ouput looks like this:
+
+```
+- almabench (bigloo, V=0)
+  Compilation         : OK
+  Counting Primitives : OK
+  Execution           : OK
+  Computing Size      : OK
+  Internal Error      : OK
+```
+
+Where each line indicate whether the benchmark script was able to compile, count primitive, execute the benchmark without error and compute the size of the execuatble respectively. The last line, Internal Error, indicate whether an unexpected error happened during the test.
