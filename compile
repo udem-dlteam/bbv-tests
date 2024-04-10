@@ -274,7 +274,7 @@ case "$SYSTEM" in
              $VERSION_LIMIT_POSTFIX"
 
     FLAGS=""
-    CC_FLAGS="-cc-options \"-U___SINGLE_HOST\""
+    CC_FLAGS="" #"-cc-options \"-U___SINGLE_HOST\""
     if [ "$GENERATE_CFG" = "1" ]; then
       FLAGS="$FLAGS -keep-temp -gvm -cfg"
     fi
