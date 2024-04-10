@@ -3,7 +3,7 @@
 /*    -------------------------------------------------------------    */
 /*    Author      :  Manuel Serrano                                    */
 /*    Creation    :  Thu Mar 16 18:48:21 1995                          */
-/*    Last change :  Tue Mar  5 08:12:53 2024 (serrano)                */
+/*    Last change :  Wed Apr 10 15:11:01 2024 (serrano)                */
 /*    -------------------------------------------------------------    */
 /*    Bigloo's stuff                                                   */
 /*=====================================================================*/
@@ -101,7 +101,7 @@ static long saw_charp = 0;
 #  define BGL_SUBFX_SANS_OV(x, y) (saw_sub++, BINT(CINT(x) - CINT(y)))
 
 #  undef BGL_MULFX_SANS_OV
-#  define BGL_MULFX_SANS_OV(x, y) (saw_mul++, BINT(CINT(x) * CINT(y)))
+#  define BGL_MULFX_SANS_OV(x, y) (saw_mul++, BINT(CINT(x) * (y)))
 
 #  undef PAIRP
 #  if(defined(TAG_PAIR))
