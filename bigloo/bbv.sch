@@ -107,6 +107,8 @@
 (define-macro-arithmetic (GENcos x)         `(MAPop GEN cos ,x))
 (define-macro-arithmetic (GENatan2 x y)     `(MAPop GEN atan2 ,x ,y))
 (define-macro-arithmetic (GENatan x)        `(MAPop GEN atan ,x))
+(define-macro-arithmetic (GENmin . args)    `(MAPop GEN min ,@args))
+(define-macro-arithmetic (GENmax . args)    `(MAPop GEN max ,@args))
 
 (define-macro-arithmetic (SFL+ x y . z)     (if (pair? z)
 						`(SFL+ (SFL+ ,x ,y) ,@z)
@@ -136,6 +138,8 @@
 (define-macro-arithmetic (SFLacos x)        `(MAPop SFL acos ,x))
 (define-macro-arithmetic (SFLatan2 x y)     `(MAPop SFL atan2 ,x ,y))
 (define-macro-arithmetic (SFLatan x)        `(MAPop SFL atan ,x))
+(define-macro-arithmetic (SFLmin . args)    `(MAPop SFL min ,@args))
+(define-macro-arithmetic (SFLmax . args)    `(MAPop SFL max ,@args))
 
 (define-macro-arithmetic (SFX+ x y)         `(MAPop SFX + ,x ,y))
 (define-macro-arithmetic (SFX2- x y)        `(MAPop SFX - ,x ,y))
@@ -153,6 +157,8 @@
 (define-macro-arithmetic (SFXzero? x)       `(MAPop SFX zero? ,x))
 (define-macro-arithmetic (SFXodd? x)        `(MAPop SFX odd? ,x))
 (define-macro-arithmetic (SFXeven? x)       `(MAPop SFX even? ,x))
+(define-macro-arithmetic (SFXmin . args)    `(MAPop SFX min ,@args))
+(define-macro-arithmetic (SFXmax . args)    `(MAPop SFX max ,@args))
 
 (define-macro-arithmetic (SFXbit-and x y)   `(MAPop SFX bit-and ,x ,y))
 (define-macro-arithmetic (SFXbit-or x y)    `(MAPop SFX bit-or ,x ,y))
@@ -179,6 +185,8 @@
 (define-macro-arithmetic (FLacos x)        `(FLop acos ,x))
 (define-macro-arithmetic (FLatan2 x y)     `(FLop atan2 ,x ,y))
 (define-macro-arithmetic (FLatan x)        `(FLop atan ,x))
+(define-macro-arithmetic (FLmin . args)    `(MAPop FL min ,@args))
+(define-macro-arithmetic (FLmax . args)    `(MAPop FL max ,@args))
 
 (define-macro-arithmetic (FX+ x y)         `(FXop + ,x ,y))
 (define-macro-arithmetic (FX- x y)         `(FXop - ,x ,y))
@@ -195,6 +203,8 @@
 (define-macro-arithmetic (FXzero? x)       `(FXop zero? ,x))
 (define-macro-arithmetic (FXodd? x)        `(FXop odd? ,x))
 (define-macro-arithmetic (FXeven? x)       `(FXop even? ,x))
+(define-macro-arithmetic (FXmin . args)    `(MAPop FX min ,@args))
+(define-macro-arithmetic (FXmax . args)    `(MAPop FX max ,@args))
 
 (define-macro-arithmetic (FXbit-lsh x y)   `(FXop bit-lsh ,x ,y))
 (define-macro-arithmetic (FXbit-and x y)   `(FXop bit-and ,x ,y))
@@ -375,6 +385,34 @@
          (FLatan2 ,a ,b))
         (else
          (PRIMop atan2 ,a ,b))))))
+
+(define-macro (BBVmax . args)
+  (let* ((best (gensym))
+         (vars (cons best (map (lambda (_) (gensym)) (cdr args))))
+         (bindings (map (lambda (var arg) `(,var ,arg)) vars args)))
+    `(let (,@bindings)
+      ,(let loop ((vars (cdr vars)))
+          (cond 
+            ((null? vars) best)
+            ((null? (cdr vars))
+              `(if (GEN< ,best ,(car vars)) ,(car vars) ,best))
+            (else
+              `(begin (if (GEN< ,best ,(car vars)) (set! ,best ,(car vars)))
+                      ,(loop (cdr vars)))))))))
+
+(define-macro (BBVmin . args)
+  (let* ((best (gensym))
+         (vars (cons best (map (lambda (_) (gensym)) (cdr args))))
+         (bindings (map (lambda (var arg) `(,var ,arg)) vars args)))
+    `(let (,@bindings)
+      ,(let loop ((vars (cdr vars)))
+          (cond 
+            ((null? vars) best)
+            ((null? (cdr vars))
+              `(if (GEN> ,best ,(car vars)) ,(car vars) ,best))
+            (else
+              `(begin (if (GEN< ,best ,(car vars)) (set! ,best ,(car vars)))
+                      ,(loop (cdr vars)))))))))
 
 (define-macro-arithmetic (BBVatan x)
   (let ((a (gensym)))
