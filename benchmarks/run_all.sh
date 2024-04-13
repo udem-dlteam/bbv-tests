@@ -36,16 +36,16 @@ for file in ${scm_files[@]}; do
 done
 
 # NodeJS, Chez and Racket
+for file in ${scm_files[@]}; do
+  python ./benchmark.py $verbosity benchmark ${file} -O --chez -l 0 -r ${reps} -t ${timeout}
+done
+
 for file in ${rkt_files[@]}; do
   python ./benchmark.py $verbosity benchmark ${file} -O --racket ${racket} -l 0 -r ${reps} -t ${timeout}
 done
 
 for file in ${js_files[@]}; do
   python ./benchmark.py $verbosity benchmark ${file} -O --node -l 0 -r ${reps} -t ${timeout}
-done
-
-for file in ${scm_files[@]}; do
-  python ./benchmark.py $verbosity benchmark ${file} -O --chez -l 0 -r ${reps} -t ${timeout}
 done
 
 deactivate
