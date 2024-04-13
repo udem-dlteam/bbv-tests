@@ -1458,7 +1458,7 @@
         token
         (cond (slatex.*in-qtd-tkn*
                (set! slatex.*in-qtd-tkn* #f)
-               (cond ((equal? token "else") 'syntax)
+               (cond ((LIBequal? token "else") 'syntax)
                      ((slatex.data-token? token) 'data)
                      (else 'constant)))
               ((slatex.data-token? token) 'data)
@@ -1551,7 +1551,7 @@
 (define slatex.file-extension
   (lambda (filename) (set-bbv-version-limit! #f) 
     (let ((i (slatex.string-position-right #\. filename)))
-      (if i (substring filename i (Sstring-length filename)) #f))))
+      (if i (Ssubstring filename i (Sstring-length filename)) #f))))
 
 (define slatex.basename
   (lambda (filename ext) (set-bbv-version-limit! #f) 
@@ -1559,8 +1559,8 @@
            (ext-len (Sstring-length ext))
            (len-diff (SFX- filename-len ext-len)))
       (cond ((SFX> ext-len filename-len) filename)
-            ((equal? ext (substring filename len-diff filename-len))
-             (substring filename 0 len-diff))
+            ((LIBequal? ext (Ssubstring filename len-diff filename-len))
+             (Ssubstring filename 0 len-diff))
             (else filename)))))
 
 (define slatex.full-texfile-name
