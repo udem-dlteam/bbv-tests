@@ -67,7 +67,7 @@ while getopts "f:S:D:o:V:G:O:UPGWIEchv" opt; do
         exit 1
       fi
       ;;
-    G)
+    B)
       GLOBAL_VERSION_LIMIT=$OPTARG
       if [ "$GLOBAL_VERSION_LIMIT" -eq "$GLOBAL_VERSION_LIMIT" ] 2> /dev/null; then
         :
