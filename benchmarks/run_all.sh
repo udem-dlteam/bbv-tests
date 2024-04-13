@@ -10,7 +10,7 @@ rkt_files=$(find ../tests/paper -type f -regex '^.*/[^.]*\.rkt$')
 gambit=../../bbv-gambit
 racket=../../racket
 
-reps=50
+reps=10
 timeout=3600
 
 verbosity="-v"
