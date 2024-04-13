@@ -1454,7 +1454,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     def get_col_name(run):
         loc = run.benchmark.content.count("\n")        
         loc = round(math.ceil(loc / 10) * 10)
-        return f"{run.benchmark.name} ({loc:,} LOC)"
+        return f"{run.benchmark.name}"
+        #return f"{run.benchmark.name} ({loc:,} LOC)"
 
     def get_bench_name_from_col_name(col_name):
         return col_name.split()[0]
@@ -1556,8 +1557,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             cols = [n for n in cols if not is_macro(get_bench_name_from_col_name(n))]
             df = df[cols]
 
-        macro_mean_name = "Geometric Mean"
-        micro_mean_name = "Geometric Mean"
+        macro_mean_name = "Geo. Mean"
+        micro_mean_name = "Geo. Mean"
         mean_names = [macro_mean_name, micro_mean_name]
         _mean = statistics.mean if absolute else statistics.geometric_mean
 
@@ -1601,7 +1602,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         plt.rc('font', size=10.5)
 
-        fig, ax = plt.subplots(figsize=(15, 5))
+        fig, ax = plt.subplots(figsize=(15, 4.7))
 
         # I made some ranges wider because it adds nice edges to the bar in the legend
 
@@ -1722,7 +1723,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
                     position_offset = 1 if mean_pos == "right" else - 1
                     new_tick_position = (xticks[i] + xticks[i+position_offset]) / 2
-                    new_label = "‾" * (len(macro_mean_name) + 1)
+                    new_label = "‾" * (len(macro_mean_name) + 3)
                     xticks = np.append(xticks, new_tick_position)
                     xticklabels = [label.get_text() for label in ax.get_xticklabels()]
                     xticklabels.append(new_label)
