@@ -15,19 +15,6 @@ timeout=3600
 
 verbosity="-v"
 
-# Do NodeJS, Chez and Racket runs first they should be quick, having no version limits
-for file in ${rkt_files[@]}; do
-  python ./benchmark.py $verbosity benchmark ${file} -O --racket ${racket} -l 0 -r ${reps} -t ${timeout}
-done
-
-for file in ${js_files[@]}; do
-  python ./benchmark.py $verbosity benchmark ${file} -O --node -l 0 -r ${reps} -t ${timeout}
-done
-
-for file in ${scm_files[@]}; do
-  python ./benchmark.py $verbosity benchmark ${file} -O --chez -l 0 -r ${reps} -t ${timeout}
-done
-
 # BBV runs
 for limit in 0 1 2 3 4 5 6 7 8 9 10 20; do
   for file in ${scm_files[@]}; do
@@ -46,6 +33,19 @@ for file in ${scm_files[@]}; do
   
   # Gambit with no optimizations at all for primitive count
   python ./benchmark.py $verbosity benchmark ${file} --gambit ${gambit} -l 0 -r 1 -t ${timeout}
+done
+
+# NodeJS, Chez and Racket
+for file in ${rkt_files[@]}; do
+  python ./benchmark.py $verbosity benchmark ${file} -O --racket ${racket} -l 0 -r ${reps} -t ${timeout}
+done
+
+for file in ${js_files[@]}; do
+  python ./benchmark.py $verbosity benchmark ${file} -O --node -l 0 -r ${reps} -t ${timeout}
+done
+
+for file in ${scm_files[@]}; do
+  python ./benchmark.py $verbosity benchmark ${file} -O --chez -l 0 -r ${reps} -t ${timeout}
 done
 
 deactivate
