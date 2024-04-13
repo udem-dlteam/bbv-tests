@@ -1284,8 +1284,14 @@ def average_base_time(run):
     base_run = max(base_runs, key=lambda r: r.timestamp)
     return average_time(base_run)
 
-def average_time(run):
+def average_time(run, trim_outliers=False):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
+
+    if trim_outliers and len(results) >= 3:
+        offset = math.ceil(len(results) / 10)
+        results = sorted(results)
+        results = results[offset:-offset]
+        
     return statistics.mean(results)
 
 def compile_time(run):
