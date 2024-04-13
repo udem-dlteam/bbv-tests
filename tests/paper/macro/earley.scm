@@ -152,7 +152,7 @@
   (define (ind nt nts) (set-bbv-version-limit! #f)  ; return index of non-terminal `nt' in `nts'
     (let loop ((i (SFX- (Svector-length nts) 1)))
       (if (SFX>= i 0)
-        (if (equal? (Svector-ref nts i) nt) i (loop (SFX- i 1)))
+        (if (LIBequal? (Svector-ref nts i) nt) i (loop (SFX- i 1)))
         #f)))
 
   (define (nb-configurations grammar) (set-bbv-version-limit! #f)  ; return nb of configurations in grammar
@@ -241,7 +241,7 @@
         (define (ind nt nts) (set-bbv-version-limit! #f)  ; return index of non-terminal `nt' in `nts'
           (let loop ((i (SFX- (Svector-length nts) 1)))
             (if (SFX>= i 0)
-              (if (equal? (Svector-ref nts i) nt) i (loop (SFX- i 1)))
+              (if (LIBequal? (Svector-ref nts i) nt) i (loop (SFX- i 1)))
               #f)))
 
         (define (comp-tok tok nts) (set-bbv-version-limit! #f)  ; transform token to parsing format
