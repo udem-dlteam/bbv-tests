@@ -1645,8 +1645,8 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             cmap = colors.LinearSegmentedColormap.from_list("checks_cmap", cmap(checks_interp))
 
         if path_base == 'time':
-            vmin, vmax = 0.7, 1.1
-            extra_ticks = [0.8, 0.9]
+            vmin, vmax = 0.6, 1.2
+            extra_ticks = [0.8, 1.0]
         elif path_base == 'micro_time':
             vmin, vmax = 0.5, 1.0
             extra_ticks = [0.75]
@@ -1658,7 +1658,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             # Remove red from cmap. It must not appear in color bar since it cannot happen
             remove_red()
         elif path_base == "compile_time":
-            vmin, vmax = 0.5, 32
+            vmin, vmax = 0.5, 64
             
         locator = LogLocator(base=2)
         ticks = [t for t in locator.tick_values(vmin, vmax) if vmin <= t <= vmax]
