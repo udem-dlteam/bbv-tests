@@ -34,7 +34,7 @@ SYSTEM=                 # system (gambit or bigloo)
 CUSTOM_OUTPUT_FILE=     # user's output file
 
 # Parse parameters
-while getopts "f:S:D:o:V:G:O:UPGWIEchv" opt; do
+while getopts "f:S:D:o:V:B:O:UPGWIEchv" opt; do
   case $opt in
     f)
       INPUT_FILE=$(readlink -f $OPTARG)
