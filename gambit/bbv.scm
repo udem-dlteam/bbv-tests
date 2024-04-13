@@ -14,7 +14,7 @@
 
 (define-macro (FLop op . args)   `(PRIMop ,(symbol-append '|fl| op) ,@args))
 (define-macro (FXop op . args)   `(PRIMop ,(symbol-append '|fx| op) ,@args))
-(define-macro (PRIMop op . args) `(let () (declare (not safe))
+(define-macro (PRIMop op . args) `(let () (declare (not safe) (not inline-primitives))
                                     (,(symbol-append '|##| op) ,@args)))
 
 (define-macro (unknown . args) `(PRIMop first-argument ,@args))
