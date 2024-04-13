@@ -204,8 +204,8 @@
 (define-macro (FLacos x)        `(FLop acos ,x))
 (define-macro (FLatan x)        `(FLop atan ,x))
 (define-macro (FLatan2 x y)     `(FLop atan ,x ,y))
-(define-macro (FLmin . args)    `(MAPop FL min ,@args))
-(define-macro (FLmax . args)    `(MAPop FL max ,@args))
+(define-macro (FLmin . args)    `(FLop min ,@args))
+(define-macro (FLmax . args)    `(FLop max ,@args))
 
 (define-macro (FX+ x y)         `(FXop + ,x ,y))
 (define-macro (FX- x . rest)    `(FXop - ,x ,@rest))
@@ -221,8 +221,8 @@
 (define-macro (FXzero? x)       `(FXop zero? ,x))
 (define-macro (FXodd? x)        `(FXop odd? ,x))
 (define-macro (FXeven? x)       `(FXop even? ,x))
-(define-macro (FXmin . args)    `(MAPop FX min ,@args))
-(define-macro (FXmax . args)    `(MAPop FX max ,@args))
+(define-macro (FXmin . args)    `(FXop min ,@args))
+(define-macro (FXmax . args)    `(FXop max ,@args))
 
 (define-macro (FXbit-lsh x y)   `(MAPop FX arithmetic-shift-left ,x ,y))
 (define-macro (FXbit-and x y)   `(MAPop FX and ,x ,y))
