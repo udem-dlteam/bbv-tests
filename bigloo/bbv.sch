@@ -185,8 +185,8 @@
 (define-macro-arithmetic (FLacos x)        `(FLop acos ,x))
 (define-macro-arithmetic (FLatan2 x y)     `(FLop atan2 ,x ,y))
 (define-macro-arithmetic (FLatan x)        `(FLop atan ,x))
-(define-macro-arithmetic (FLmin . args)    `(MAPop FL min ,@args))
-(define-macro-arithmetic (FLmax . args)    `(MAPop FL max ,@args))
+(define-macro-arithmetic (FLmin . args)    `(FLop min ,@args))
+(define-macro-arithmetic (FLmax . args)    `(FLop max ,@args))
 
 (define-macro-arithmetic (FX+ x y)         `(FXop + ,x ,y))
 (define-macro-arithmetic (FX- x y)         `(FXop - ,x ,y))
@@ -203,8 +203,8 @@
 (define-macro-arithmetic (FXzero? x)       `(FXop zero? ,x))
 (define-macro-arithmetic (FXodd? x)        `(FXop odd? ,x))
 (define-macro-arithmetic (FXeven? x)       `(FXop even? ,x))
-(define-macro-arithmetic (FXmin . args)    `(MAPop FX min ,@args))
-(define-macro-arithmetic (FXmax . args)    `(MAPop FX max ,@args))
+(define-macro-arithmetic (FXmin . args)    `(FXop min ,@args))
+(define-macro-arithmetic (FXmax . args)    `(FXop max ,@args))
 
 (define-macro-arithmetic (FXbit-lsh x y)   `(FXop bit-lsh ,x ,y))
 (define-macro-arithmetic (FXbit-and x y)   `(FXop bit-and ,x ,y))
