@@ -60,9 +60,10 @@ db = Database()
 if not hasattr(db.Entity, "get_or_create"):
     @classmethod
     def get_or_create(cls, **kwargs):
+        timestamp = kwargs.pop('timestamp', None)
         r = cls.get(**kwargs)
         if r is None:
-            return cls(**kwargs), True
+            return cls(**kwargs) if not timestamp else cls(**kwargs, timestamp=timestamp), True
         else:
             return r, False
     db.Entity.get_or_create=get_or_create
@@ -1318,7 +1319,7 @@ def sum_checks(run):
 
 @nan_on(ValueError)
 def sum_removable_checks(run):
-    unsafe_run = Run.get_latest(compiler=run.compiler, system=run.system, safe_arithmetic=False,
+    unsafe_run = Run.get_latest(compiler=run.compiler, safe_arithmetic=False,
                          version_limit=0, compiler_optimizations=run.compiler_optimizations,
                          benchmark=run.benchmark)
 
@@ -1785,14 +1786,14 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     # Execution time vs unsafe
     unsafe_base_runs = list(select(
         r for r in Run
-        if r.system == system and r.compiler.name == compiler_name
+        if r.compiler.name == compiler_name
         and r.benchmark.name in benchmark_names
         and r.version_limit == 0
         and not r.safe_arithmetic
         and r.compiler_optimizations
         and r.timestamp == max(select(
             r2.timestamp for r2 in Run
-            if r2.system == system and r2.compiler.name == compiler_name
+            if r2.system == r.system and r2.compiler.name == compiler_name
             and r2.version_limit == r.version_limit
             and r2.benchmark == r.benchmark
             and r2.version_limit == 0
