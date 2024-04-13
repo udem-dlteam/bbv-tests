@@ -554,7 +554,7 @@ def compile(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, tim
     else:
         return compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout, only_executable=only_executable)
 
-def run_benchmark(executable, arguments, timeout=None, env=None, only_time=False):
+def run_benchmark(executable, arguments, timeout=None, env=None, only_time=True):
     # Run program to measure time only
     time_command = f"perf stat {executable} {arguments}"
     time_output = run_command(time_command, timeout, extend_env=env)
