@@ -10,13 +10,13 @@ rkt_files=$(find ../tests/paper -type f -regex '^.*/[^.]*\.rkt$')
 gambit=../../bbv-gambit
 racket=../../racket
 
-reps=10
+reps=50
 timeout=3600
 
 verbosity="-v"
 
 # BBV runs
-for limit in 0 1 2 3 4 5 6 7 8 9 10 20; do
+for limit in 0 1 2 3 4 5 10 20; do
   for file in ${scm_files[@]}; do
     # Gambit
     python ./benchmark.py $verbosity benchmark ${file} -O --gambit ${gambit} -l ${limit} -r ${reps} -t ${timeout}

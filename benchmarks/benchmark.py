@@ -583,39 +583,44 @@ def run_benchmark(executable, arguments, timeout=None, env=None, only_time=True)
 default_arguments = "repeat: 10"
 
 benchmark_args = {
-    "ack": "repeat: 100 m: 3 n: 9",
-    "bague": "repeat: 2 nombre-de-pierres: 28",
-    "fib": "repeat: 6 n: 39",
-    "fibfp": "repeat: 2 n: 39.0",
-    "tak": "repeat: 20000 x: 18 y: 12 z: 6",
+    # Unused
     "takl": "repeat: 1000 x: 18 y: 12 z: 6",
     "diviter": "repeat: 100000 ",
     "divrec": "repeat: 100000 ",
     "array1": "repeat: 5 n: 200000",
     "browse": "repeat: 1000 ",
     "mazefun": "repeat: 2000 n: 11 m: 11",
-    "nqueens": "repeat: 4 n: 13",
     "puzzle": "repeat: 200 n: 511",
     "quicksort": "repeat: 500 ",
     "sum": "repeat: 10000 n: 10000",
     "sumfp": "repeat: 200 n: 1e6",
     "triangl": "repeat: 20 i: 22 depth: 1",
-    "almabench": "repeat: 2 K: 36525",
     "fft": "repeat: 1 n: 1048576",
-    "primes": "repeat: 1000000",
     "rev": "repeat: 100000000",
     "vlen": "repeat: 100000000",
-    "boyer": "repeat: 1 n: 500",
-    "earley": "repeat: 1 n: 10000",
-    "compiler": "repeat: 1 n: 2000",
-    "dynamic": "repeat: 2 n: 200",
-    "scheme": "repeat: 1 n: 100000",
-    "nucleic": "repeat: 3 n: 50",
-    "conform": "repeat: 1 n: 1000",
-    "maze": "repeat: 1 n: 50000",
-    "peval": "repeat: 1 n: 3000",
-    "leval": "repeat: 1 n: 60",
-    "slatex": "repeat: 1 n: 10000",
+
+    # Micro
+    "ack": "repeat: 500 m: 3 n: 9",
+    "bague": "repeat: 6 nombre-de-pierres: 28",
+    "fib": "repeat: 20 n: 39",
+    "fibfp": "repeat: 5 n: 39.0",
+    "nqueens": "repeat: 15 n: 13",
+    "primes": "repeat: 2000000",
+    "tak": "repeat: 80000 x: 18 y: 12 z: 6",
+
+    # Macro
+    "almabench": "repeat: 7 K: 36525",
+    "boyer": "repeat: 1 n: 1000",
+    "compiler": "repeat: 1 n: 10000",
+    "conform": "repeat: 1 n: 4000",
+    "dynamic": "repeat: 1 n: 800",
+    "earley": "repeat: 1 n: 15000",
+    "leval": "repeat: 1 n: 120",
+    "maze": "repeat: 1 n: 150000",
+    "nucleic": "repeat: 3 n: 100",
+    "peval": "repeat: 1 n: 15000",
+    "scheme": "repeat: 1 n: 1000000",
+    "slatex": "repeat: 1 n: 20000",
 }
 
 def convert_to_node_arguments(arguments):
@@ -1809,6 +1814,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
     # Execution time
     max_var_coeff = [0, 0] # micro, macro
+    too_low_time = {}
     def wrapped_average_time(run):
         nonlocal max_var_coeff
         results = average_time_select_results(run)
@@ -1820,8 +1826,11 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         average = statistics.mean(results)
         var_coeff = dev / average
 
+        if average < 5:
+            too_low_time[run.benchmark.name] = min(too_low_time.get(run.benchmark.name, 999), average)
+
         if var_coeff > max_var_coeff[macro]:
-            print('new max:', run.benchmark.name, run.compiler.name, f"V={run.version_limit}", dev, '/', average, '=', var_coeff)
+            # print('new max:', run.benchmark.name, run.compiler.name, f"V={run.version_limit}", dev, '/', average, '=', var_coeff)
             max_var_coeff[macro] = var_coeff
 
         return average
@@ -1830,6 +1839,9 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
     print(f"MAX COEFFICIENT OF VARIATION (micro): {max_var_coeff[0]:.2%}")
     print(f"MAX COEFFICIENT OF VARIATION (macro): {max_var_coeff[1]:.2%}")
+
+    for bname, btime in too_low_time.items():
+        print(f'TOO LOW: {bname}, {btime:.1f}s')
 
     # Program size
     one_heatmap("program_size", run_program_size)
