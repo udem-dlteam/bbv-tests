@@ -1285,14 +1285,16 @@ def average_base_time(run):
     base_run = max(base_runs, key=lambda r: r.timestamp)
     return average_time(base_run)
 
-def average_time(run, trim_outliers=False):
+def average_time_select_results(run, trim_outliers=False):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
-
     if trim_outliers and len(results) >= 3:
         offset = math.ceil(len(results) / 10)
         results = sorted(results)
         results = results[offset:-offset]
-        
+    return results
+
+def average_time(run, trim_outliers=False):
+    results = average_time_select_results(run, trim_outliers=trim_outliers)
     return statistics.mean(results)
 
 def compile_time(run):
@@ -1806,7 +1808,28 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.savefig(output_path)
 
     # Execution time
-    one_heatmap("time", average_time)
+    max_var_coeff = [0, 0] # micro, macro
+    def wrapped_average_time(run):
+        nonlocal max_var_coeff
+        results = average_time_select_results(run)
+
+        macro = is_macro(run.benchmark.name)
+
+        # Compute error
+        dev = statistics.stdev(results)
+        average = statistics.mean(results)
+        var_coeff = dev / average
+
+        if var_coeff > max_var_coeff[macro]:
+            print('new max:', run.benchmark.name, run.compiler.name, f"V={run.version_limit}", dev, '/', average, '=', var_coeff)
+            max_var_coeff[macro] = var_coeff
+
+        return average
+
+    one_heatmap("time", wrapped_average_time)
+
+    print(f"MAX COEFFICIENT OF VARIATION (micro): {max_var_coeff[0]:.2%}")
+    print(f"MAX COEFFICIENT OF VARIATION (macro): {max_var_coeff[1]:.2%}")
 
     # Program size
     one_heatmap("program_size", run_program_size)
