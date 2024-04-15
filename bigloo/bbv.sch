@@ -68,7 +68,11 @@
       ((string->list) `((@ string->list __r4_strings_6_7) ,@args))
       ((vector->list) `((@ vector->list __r4_vectors_6_8) ,@args))
       ((vector-map) `((@ vector-map __r4_vectors_6_8) ,@args))
-      ((+ / - * < <= > >= =) `((@ ,op __r4_numbers_6_5) ,@args))
+      ((+ / - * < <= > >= =)
+       (case (length args)
+	  ((2) `(,(symbol-append '|2| op) ,@args))
+	  ((0 1) `((@ ,op __r4_numbers_6_5) ,@args)
+	   (else `(,(symbol-append '|2| op) ,(car args) (,op ,@(cdr args)))))))
       (else `(,op ,@args))))
 
 (define (unknown x . rest)

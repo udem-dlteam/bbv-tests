@@ -375,7 +375,7 @@ function check(result) {
 }
 
 function main(argv) {
-   const arg = argv.length > 2 ? argv[2] : `{repeat: 1, K: ${TEST_LENGTH}}`;
+   const arg = argv.length > 2 ? argv[2] : `{"repeat": 1, "K": ${TEST_LENGTH}}`;
    const { repeat, K } = JSON.parse(arg);
    const o = { K };
    let result = false;
