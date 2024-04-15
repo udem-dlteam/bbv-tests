@@ -1335,11 +1335,14 @@ def to_csv(system_name, version_limits, output):
         system = get_system_from_name_or_default(system_name)
         compiler = get_compiler_from_name(compiler_name)
 
+        benchmark_names = ['almabench', 'boyer', 'maze', 'earley', 'leval', 'bague']
+
         runs = list(select(
             r for r in Run
             if r.system == system
             and r.compiler.name == compiler_name # TODO switch back to using compiler when no commit-split
             and r.version_limit in version_limits
+            and r.benchmark.name in benchmark_names
             and r.compiler_optimizations
             and r.safe_arithmetic
             and r.timestamp == max(select(
@@ -1358,7 +1361,7 @@ def to_csv(system_name, version_limits, output):
         def get_run_column_name(run):
             return get_column_name(run.version_limit)
 
-        benchmark_names = set(run.benchmark.name for run in runs)
+        # benchmark_names = set(run.benchmark.name for run in runs)
         benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
 
         column_names = ["Benchmark"]
@@ -1607,9 +1610,11 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         #df = df[cols]
 
-        plt.rc('font', size=10.5)
+        plt.rc('font', size=12)
 
-        fig, ax = plt.subplots(figsize=(15, 4.7))
+        height = 4.7 # if len(version_limits) >= 10 else 4
+
+        fig, ax = plt.subplots(figsize=(15, height))
 
         # I made some ranges wider because it adds nice edges to the bar in the legend
 
@@ -1655,10 +1660,12 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             vmin, vmax = 0.5, 8
         elif path_base == 'checks':
             vmin, vmax = 0.1, 1.1
+            # Even lighter blue?
+            # cmap = truncate_colormap(cmap_base, 1.2 * cmap_brightness, 1 - 1.2 * cmap_brightness)
             # Remove red from cmap. It must not appear in color bar since it cannot happen
             remove_red()
         elif path_base == "compile_time":
-            vmin, vmax = 0.5, 64
+            vmin, vmax = 0.5, 32
             
         locator = LogLocator(base=2)
         ticks = [t for t in locator.tick_values(vmin, vmax) if vmin <= t <= vmax]
@@ -1683,6 +1690,20 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         shifted_cmap = colors.LinearSegmentedColormap.from_list("shifted", cmap(color_interpolation))
 
+        # Hack to pass my own format to seaborn
+        class Formatter:
+            def __add__(self, other):
+                return self
+
+            def __radd__(self, other):
+                return self
+
+            def format(self, x):
+                if x >= 10:
+                    return f"{x:.1f}"
+                else:
+                    return f"{x:.2f}"
+
         fmt=".2f"
         cbar_kws = {
             'format': f'{{x:{fmt}}}',
@@ -1691,11 +1712,11 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             'extendrect': True,
         }
 
-        heatmap_ax = sns.heatmap(df, annot=True, fmt=fmt, cmap=shifted_cmap,
+        heatmap_ax = sns.heatmap(df, annot=True, fmt=Formatter(), cmap=shifted_cmap,
                                  linewidths=.5,
                                  norm=norm,
                                  vmin=tick_min, vmax=tick_max,
-                                 annot_kws={"size": 11.5,
+                                 annot_kws={"size": 12,
                                             'color': 'black'},
                                  cbar_kws=cbar_kws)
 
@@ -1746,8 +1767,12 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                             tick.tick2line.set_markersize(16)  # Adjusts the length of the tick
 
             for label in ax.get_xticklabels():
+                label.set_fontsize(12)
                 if label._text in mean_names:
                     label.set_fontweight('bold')
+
+            for label in ax.get_yticklabels():
+                label.set_fontsize(12)
 
         # Add axis to delimit micro and macro
         delimite_subaxis = ax.secondary_xaxis("bottom")
@@ -1766,6 +1791,9 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                                         macro_micro_delim + n_micro // 2 + 1])
         micro_macro_subaxis.set_xticklabels(["Macrobenchmarks", "Microbenchmarks"])
         micro_macro_subaxis.tick_params(size=0, labelsize=14)
+
+        for text in heatmap_ax.texts:
+            text.set_fontsize(12)
 
         if title:
             plt.title(f'{path_base} {compiler.name}')
