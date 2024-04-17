@@ -1619,7 +1619,7 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         plt.rc('font', size=12)
 
-        height = 4.7 # if len(version_limits) >= 10 else 4
+        height = 4.7 if len(version_limits) >= 10 else 4.1
 
         fig, ax = plt.subplots(figsize=(15, height))
 
