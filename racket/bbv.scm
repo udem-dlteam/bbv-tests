@@ -171,7 +171,7 @@
   `(modulo ,x ,y))
 
 (define-macro (BBVbit-lsh x y)
-  `(ash ,x ,y))
+  `(arithmetic-shift ,x ,y))
 
 (define-macro (BBVbit-and x y)
   `(bitwise-and ,x ,y))
