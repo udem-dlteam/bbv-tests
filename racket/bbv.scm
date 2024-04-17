@@ -174,13 +174,13 @@
   `(ash ,x ,y))
 
 (define-macro (BBVbit-and x y)
-  `(logand ,x ,y))
+  `(bitwise-and ,x ,y))
 
 (define-macro (BBVbit-or x y)
-  `(logior ,x ,y))
+  `(bitwise-ior ,x ,y))
 
 (define-macro (BBVbit-not x)
-  `(lognot ,x))
+  `(bitwise-not ,x))
 
 (define-macro (BBV= x y) `(BBVcmp = ,x ,y))
 (define-macro (BBV< x y) `(BBVcmp < ,x ,y))
