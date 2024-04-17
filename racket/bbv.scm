@@ -43,7 +43,7 @@
     `(PRIMop ,(symbol-append 'fl op) ,@args))
    ((eq? kind 'FX)
     `(PRIMop ,(symbol-append 'fx op) ,@args))
-   ((or (eq? kind 'GEN) (eq? 'arithmetic 'G)) ;; force generic?
+   ((or (eq? kind 'GEN) #t) ;; force generic for racket?
     `(,(symbol-append 'BBV op) ,@args))
    ((eq? kind 'SFL)
     `(,(symbol-append 'FL op) ,@args))
