@@ -12,14 +12,6 @@
 
 (require racket/mpair)
 (require racket/fixnum)
-(define cons mcons)
-(define pair? mpair?)
-(define list? mlist?)
-(define car mcar)
-(define cdr mcdr)
-(define set-car! set-mcar!)
-(define set-cdr! set-mcdr!)
-(define list mlist)
 
 (define-macro (mquote x)
   (if (pair? x)
@@ -27,13 +19,13 @@
     `(quote ,x)))
 
 (define (random-state n)
-  (cons n #f))
+  (mcons n #f))
 
 (define (fx32 a)
    (SFXbit-and (SFX- (SFXbit-lsh 1 31) 1) a))
 
 (define (rand state)
-  (let ((seed (Scar state))
+  (let ((seed (Smcar state))
         (A 2813) ; 48271
         (M 8388607) ; 2147483647
         (Q 2787) ; 44488
@@ -125,20 +117,20 @@
 ;;; we walk the cdr-chain, we'll go directly to the representative in one hop.
 
 
-(define (base-set nelts) (cons nelts '()))
+(define (base-set nelts) (mcons nelts '()))
 
 ;;; Sets are chained together through cdr links. Last guy in the chain
 ;;; is the root of the set.
 
 (define (get-set-root s)
   (let lp ((r s))                       ; Find the last pair
-    (let ((next (Scdr r)))               ; in the list. That's
-      (cond ((pair? next) (lp next))    ; the root r.
+    (let ((next (Smcdr r)))               ; in the list. That's
+      (cond ((mpair? next) (lp next))    ; the root r.
 
             (else
              (if (not (eq? r s))        ; Now zip down the list again,
                  (let lp ((x s))        ; changing everyone's cdr to r.
-                   (let ((next (Scdr x)))        
+                   (let ((next (Smcdr x)))        
                      (cond ((not (eq? r next))
                             (Sset-mcdr! x r)
                             (lp next))))))
@@ -146,7 +138,7 @@
 
 (define (set-equal? s1 s2) (eq? (get-set-root s1) (get-set-root s2)))
 
-(define (set-size s) (Scar (get-set-root s)))
+(define (set-size s) (Smcar (get-set-root s)))
 
 (define (union! s1 s2)
   (let* ((r1 (get-set-root s1))
@@ -434,7 +426,7 @@
 (define south-east 4)
 
 (define (gen-maze-array r c)
-  (harr-tabulate r c (lambda (x y) (make-cell (base-set 1) (cons x y)))))
+  (harr-tabulate r c (lambda (x y) (make-cell (base-set 1) (mcons x y)))))
 
 ;;; This could be made more efficient.
 (define (make-wall-vec harr)
@@ -445,7 +437,7 @@
          ;; Accumulate walls.
          (walls '())
          (add-wall (lambda (o n b) ; owner neighbor bit
-                     (set! walls (cons (make-wall o n b) walls)))))
+                     (set! walls (mcons (make-wall o n b) walls)))))
         
     ;; Do everything but the bottom row.
     (do ((x (SFX* (SFX- ncols 1) 3) (SFX- x 3)))
@@ -517,8 +509,8 @@
 (define (for-each-hex-child proc harr cell)
   (let* ((walls (cell:walls cell))
          (id (cell:id cell))
-         (x (Scar id))
-         (y (Scdr id))
+         (x (Smcar id))
+         (y (Smcdr id))
          (nr (harr:nrows harr))
          (nc (harr:ncols harr))
          (maxy (SFX* 2 (SFX- nr 1)))
@@ -600,7 +592,7 @@
 (define output #f) ; the list of all characters written out, in reverse order.
 
 (define (write-ch c)
-  (set! output (cons c output)))
+  (set! output (mcons c output)))
 
 (define (print-hexmaze harr entrance)
   (let* ((nrows  (harr:nrows harr))
