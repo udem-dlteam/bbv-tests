@@ -381,6 +381,14 @@
                 lst
                 (loop (Scdr lst)))))))
 
+(define-macro (Smmember key lst)
+  `(let ((key ,key) (lst ,lst))
+     (let loop ((lst lst))
+       (and (mpair? lst)
+            (if (Sequal? key (Smcar lst))
+                lst
+                (loop (Smcdr lst)))))))
+
 (define-macro (Sassq key lst)
   `(let ((key ,key) (lst ,lst))
      (let loop ((lst lst))
@@ -389,6 +397,15 @@
               (if (eq? key (Scar x))
                   x
                   (loop (Scdr lst))))))))
+
+(define-macro (Smassq key lst)
+  `(let ((key ,key) (lst ,lst))
+     (let loop ((lst lst))
+       (and (mpair? lst)
+            (let ((x (Smcar lst)))
+              (if (eq? key (Smcar x))
+                  x
+                  (loop (Smcdr lst))))))))
 
 (define-macro (Sassv key lst)
   `(let ((key ,key) (lst ,lst))
