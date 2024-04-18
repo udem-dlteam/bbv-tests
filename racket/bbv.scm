@@ -1,4 +1,5 @@
 (require compatibility/defmacro)
+(require racket/mpair)
 
 (define-macro (if c . branches)
   (if (= (length branches) 1)
@@ -349,6 +350,13 @@
            (loop (Scdr lst) (SFX+ len 1))
            len))))
 
+(define-macro (Smlength lst)
+  `(let ((lst ,lst))
+     (let loop ((lst lst) (len 0))
+       (if (mpair? lst)
+           (loop (Smcdr lst) (SFX+ len 1))
+           len))))
+
 (define-macro (Smemq key lst)
   `(let ((key ,key) (lst ,lst))
      (let loop ((lst lst))
@@ -414,6 +422,17 @@
                 (lambda (f lst)
                   (if (pair? lst)
                       (cons (f (Scar lst)) (map2 f (Scdr lst)))
+                      '()))))
+        (map2 f lst))
+      (DEAD-END "map type error"))))
+
+(define-macro (Smmap2 f lst) ;; 2 parameter map
+  `(let ((f ,f) (lst ,lst))
+     (if (procedure? f)
+      (letrec ((map2
+                (lambda (f lst)
+                  (if (mpair? lst)
+                      (mcons (f (Smcar lst)) (map2 f (Smcdr lst)))
                       '()))))
         (map2 f lst))
       (DEAD-END "map type error"))))
