@@ -1298,7 +1298,7 @@ def average_time_select_results(run, trim_outliers=True):
         results = results[offset:-offset]
     return results
 
-def average_time(run, trim_outliers=False):
+def average_time(run, trim_outliers=True):
     results = average_time_select_results(run, trim_outliers=trim_outliers)
     return statistics.mean(results)
 
