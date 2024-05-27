@@ -1,0 +1,155 @@
+:root {
+    --navbar-height: 50px;
+
+    --dark-background: #016bb6;
+    --medium-background: #d6e4f2;
+    --light-background: #f7f7f7;
+
+    --dark-border: #000080;
+    --medium-border: #9db4ca;
+    --light-border: #ffffff;
+
+    --light-hover: #e9e9e9;
+    --dark-hover: #7d7d7d;
+
+    --dark-font: #000000;
+    --light-font: #ffffff;
+}
+
+body,
+html {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+.navbar {
+    display: flex;
+    height: var(--navbar-height);
+    background-color: var(--dark-background);
+    align-items: center;
+    padding-left: 20px;
+}
+
+.select-file-input {
+    color: var(--light-font);
+}
+
+.cfg-main {
+    display: flex;
+    margin: 0;
+    height: calc(100% - var(--navbar-height));
+    position: relative;
+}
+
+.panel {
+    flex-grow: 1;
+    margin: 10px;
+    background-color: var(--medium-background);
+    border-radius: 20px;
+}
+
+#resizer {
+    cursor: ew-resize;
+    width: 0;
+    border-left: 2px var(--medium-border) dashed;
+    z-index: 1;
+}
+
+#cfg-control-panel {
+    width: 90vw;
+    padding: 20px;
+    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: scroll;
+}
+
+#cfg-display-panel {
+    padding: 20px;
+    overflow: scroll;
+}
+
+.origin-block-card {
+    width: 80vw;
+    overflow-x: scroll;
+    margin: 10px;
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.origin-block-card h4 {
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+.origin-block-card-header {
+    cursor: pointer;
+    display: flex;
+    padding: 10px 20px;
+    background-color: var(--light-background);
+    font-weight: bold;
+    border-bottom: 1px solid #ddd;
+}
+
+.origin-block-card-title {
+    width: 200px;
+}
+
+.origin-block-card-subtitles {
+    padding-left: 20px;
+    border-left: 1px solid #999;
+    flex-grow: 1;
+    display: grid;
+    grid-template-columns: repeat(20, 1fr);
+    gap: 10px;
+}
+
+.origin-block-card-subtitle {
+    /* Additional styling for subtitles if needed */
+}
+
+.origin-block-card-body {
+    padding: 20px;
+    display: none;
+    background-color: white;
+}
+
+.origin-block-card-body>* {
+    display: block;
+    margin-bottom: 10px;
+}
+
+.origin-block-card-body-row {
+
+}
+
+code {
+    font-size: 15px;
+    white-space: pre-line;
+}
+
+code button {
+    font-size: 15px;
+}
+
+.origin-block-card-header:hover {
+    background-color: var(--light-hover);
+}
+
+@keyframes glow {
+    0% {
+        box-shadow: 0 0 5px yellow;
+    }
+
+    50% {
+        box-shadow: 0 0 20px yellow;
+    }
+
+    100% {
+        box-shadow: 0 0 5px yellow;
+    }
+}
+
+.glowing {
+    animation: glow 2s ease-out;
+}
