@@ -206,7 +206,8 @@ function refreshHTML(cfg) {
                             let specializedId = getHtmlIdLocation(specializedBlock)
                             let originId = getHtmlIdLocation(specializedBlock.originBlock)
                             let tooltip = `usage: ${specializedBlock.usage}`
-                            return `<button data-tooltip="${tooltip}" onclick="scrollToBlock('${originId}', '${specializedId}')">#${number}</button>`;
+                            let cls = specializedBlock.usage === 0 ? "class='low-importance-button'" : ""
+                            return `<button ${cls} data-tooltip="${tooltip}" onclick="scrollToBlock('${originId}', '${specializedId}')">#${number}</button>`;
                         })
                     }
 

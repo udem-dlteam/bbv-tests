@@ -14,6 +14,7 @@
     --dark-hover: #7d7d7d;
 
     --dark-font: #000000;
+    --medium-font: #7d7d7d;
     --light-font: #ffffff;
 
     --emphasis: yellow;
@@ -137,10 +138,23 @@ code button {
     border-style: outset;
     background-color: var(--medium-background);
     border-radius: 5px;
+    padding: 1px;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 1px;
+    margin-top: 1px;
+}
+
+.low-importance-button {
+    opacity: 0.5;
 }
 
 code button:hover {
-    background-color: var(--medium-hover);
+    background-color: var(--light-hover);
+}
+
+[data-tooltip]:hover {
+    opacity: revert;
 }
 
 [data-tooltip]:hover::after {
@@ -149,6 +163,7 @@ code button:hover {
     content: attr(data-tooltip);
     border: 1px solid var(--dark-border);
     background: var(--light-background);
+    opacity: revert !important;
     padding: .25em;
 }
 
