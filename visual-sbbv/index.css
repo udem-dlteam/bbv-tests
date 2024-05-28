@@ -61,7 +61,7 @@ html {
 }
 
 #cfg-control-panel {
-    width: 90vw;
+    width: 50vw;
     padding: 20px;
     overflow: auto;
     overflow-x: hidden;

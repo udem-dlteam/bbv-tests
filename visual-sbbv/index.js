@@ -1,4 +1,4 @@
-// Display
+// General Display
 
 const resizer = document.getElementById('resizer');
 const controlPanel = document.getElementById('cfg-control-panel');
@@ -30,6 +30,135 @@ function panelStopResize() {
     document.removeEventListener('mouseup', panelStopResize);
 }
 
+// Viz Panel
+
+cfgNetwork = null;
+
+function getNetWorkUniqueId(block) {
+    return `${block.bbs}-${block.id}`
+}
+
+function makeNodeGlow(nodeId) {
+    cfgNetwork.body.data.nodes.update({
+        id: nodeId,
+        shadow: {
+            enabled: true,
+            color: 'red', // Customize the glow color
+            size: 30,
+            x: 0,
+            y: 0
+        }
+    })
+
+    setTimeout(() => {
+        cfgNetwork.body.data.nodes.update({
+            id: nodeId,
+            shadow: { enabled: false }
+        })
+    }, 2000)
+}
+
+function centerOnBlockInNetwork(nodeId) {
+    if (!cfgNetwork) return;
+
+    const nodePosition = cfgNetwork.getPositions([nodeId])[nodeId];
+
+    // Move the view to center on the node
+    cfgNetwork.moveTo({
+        position: nodePosition,
+        scale: 1,  // You can adjust the scale as needed
+        animation: {
+            // Optional: animate the transition
+            duration: 1000,
+            easingFunction: "easeInOutQuad"
+        }
+    });
+
+    makeNodeGlow(nodeId)
+}
+
+function refreshGraph(cfg) {
+    if (cfgNetwork) cfgNetwork.destroy();
+
+    // create an array with nodes
+    var nodes = new vis.DataSet(cfg.specializedBlocks.map(
+        (block) => {
+            return {
+                id: getNetWorkUniqueId(block),
+                label: block.details,
+                shape: "box",
+                font: {
+                    "face": "monospace",
+                    "align": "left"
+                },
+                color: {
+                    background: "#f7f7f7",
+                    border: "#9db4ca",
+                },
+                opacity: block.usage === 0 ? 0.3 : 1,
+                block: block
+            }
+        }
+    ));
+
+    // create an array with edges
+    var edges = new vis.DataSet(cfg.specializedBlocks.flatMap(
+        (block) => block.predecessors.map(
+            (pred) => {
+                return {
+                    from: getNetWorkUniqueId(pred),
+                    to: getNetWorkUniqueId(block),
+                    arrows: "to;middle"
+                }
+            }
+        )
+    ));
+
+    // create a network
+    var data = {
+        nodes: nodes,
+        edges: edges
+    };
+    var options = {
+        layout: {
+            improvedLayout: true,
+            hierarchical: {
+                enabled: true,
+                nodeSpacing: 500,
+                blockShifting: false,
+            },
+        },
+        physics: {
+            enabled: false
+        }
+    };
+    cfgNetwork = new vis.Network(cfgPanel, data, options);
+
+    let lastFocus = null;
+    let focusDirection = 'to';
+
+    cfgNetwork.on("doubleClick", function (params) {
+        if (params.nodes.length > 0) {
+            let nodeId = params.nodes[0];
+            let block = cfgNetwork.body.data.nodes.get(nodeId).block;
+            scrollToBlock(block);
+        } else if (params.edges.length > 0) {
+            let edgeId = params.edges[0];
+            let edge = cfgNetwork.body.data.edges.get(edgeId);
+
+            let nextFocus = cfgNetwork.body.data.nodes.get(edge[focusDirection])
+
+            if (lastFocus?.id === nextFocus.id) {
+                focusDirection = focusDirection === "to" ? "from" : "to"
+                nextFocus = cfgNetwork.body.data.nodes.get(edge[focusDirection])
+            }
+            lastFocus = nextFocus
+            scrollToBlock(nextFocus.block)
+        }
+    });
+
+}
+
 // Control Flow Graph
 
 SBBVControlFlowGraph = null;
@@ -38,7 +167,8 @@ class SpecializedCFG {
     #specializedBlocks
     #originBlocks
 
-    constructor() {
+    constructor(compiler) {
+        this.compiler = compiler
         this.#specializedBlocks = {}
         this.#originBlocks = {}
     }
@@ -79,6 +209,16 @@ class SpecializedCFG {
     get originBlocks() {
         let blocks = [];
         for (let bbs of Object.values(this.#originBlocks)) {
+            for (let bb of Object.values(bbs)) {
+                blocks.push(bb)
+            }
+        }
+        return blocks
+    }
+
+    get specializedBlocks() {
+        let blocks = [];
+        for (let bbs of Object.values(this.#specializedBlocks)) {
             for (let bb of Object.values(bbs)) {
                 blocks.push(bb)
             }
@@ -127,10 +267,10 @@ class SpecializedBasicBlock {
     }
 }
 
-function parseCFG(jsonBlocks) {
-    let cfg = new SpecializedCFG();
+function parseCFG({ compiler, specializedCFG }) {
+    let cfg = new SpecializedCFG(compiler);
 
-    for (let block of jsonBlocks) {
+    for (let block of specializedCFG) {
         cfg.addBlock(block)
     }
 
@@ -148,13 +288,21 @@ function getHtmlIdLocation(block) {
     throw new Error("not a block", block)
 }
 
-function scrollToBlock(originBlockId, specializedBlockId) {
+function scrollToBlock(specializedBlock) {
+    let specializedId = getHtmlIdLocation(specializedBlock)
+    let originId = getHtmlIdLocation(specializedBlock.originBlock)
+    let nodeId = getNetWorkUniqueId(specializedBlock);
+    scrollToBlockByIds(originId, specializedId, nodeId);
+}
+
+function scrollToBlockByIds(originBlockId, specializedBlockId, nodeId) {
     let card = document.getElementById(originBlockId);
     openCard(card);
     let section = document.getElementById(specializedBlockId);
-    card.scrollIntoView({behavior: "smooth", block: "center"});
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
     section.classList.add('glowing');
     setTimeout(() => section.classList.remove('glowing'), 2000);
+    centerOnBlockInNetwork(nodeId);
 }
 
 function escapeHtml(unsafe) {
@@ -163,7 +311,7 @@ function escapeHtml(unsafe) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
-        //.replace(/'/g, "&#039;")
+    //.replace(/'/g, "&#039;")
 }
 
 function toggleCard(cardElement) {
@@ -176,6 +324,34 @@ function openCard(cardElement) {
     body.style.display = 'block';
 }
 
+function linkBlockRef(originBlock, code) {
+    let cfg = originBlock.cfg
+    let compiler = cfg.compiler
+    let pattern
+
+    if (compiler === "gambit") {
+        pattern = /#(\d+)/g
+    } else if (compiler === "bigloo") {
+        pattern = /\(go\s+(\d+)\)/g
+    } else {
+        throw new Exception("unknown compiler", compiler)
+    }
+
+    console.log(code)
+
+    return code.replace(pattern, (match, number) => {
+        let specializedBlock = cfg.getSpecializedBlock(originBlock.bbs, parseInt(number))
+        if (!specializedBlock) return match; // may have mismatched a non-label
+
+        let specializedId = getHtmlIdLocation(specializedBlock)
+        let originId = getHtmlIdLocation(specializedBlock.originBlock)
+        let tooltip = `usage: ${specializedBlock.usage}`
+        let cls = specializedBlock.usage === 0 ? "class='low-importance-button'" : ""
+        let nodeId = getNetWorkUniqueId(specializedBlock);
+        return `<button ${cls} data-tooltip="${tooltip}" onclick="scrollToBlockByIds('${originId}', '${specializedId}', '${nodeId}')">${match}</button>`;
+    })
+}
+
 function refreshHTML(cfg) {
     let newControlPanelHTML = ""
 
@@ -185,7 +361,7 @@ function refreshHTML(cfg) {
     for (let block of blocks) {
         let versions = [...block.versions]
         versions.sort((b1, b2) => b2.usage - b1.usage)
-        
+
         newControlPanelHTML += `
         <div id="${getHtmlIdLocation(block)}" class="origin-block-card">
             <div class="origin-block-card-header">
@@ -200,26 +376,15 @@ function refreshHTML(cfg) {
                 <h4>source</h4>
                 <code>${escapeHtml(block.source)}</code>
                 ${versions.map((b) => {
-                    function linkBlockRef(code) {
-                        return code.replace(/#(\d+)/g, (match, number) => {
-                            let specializedBlock = cfg.getSpecializedBlock(b.bbs, parseInt(number))
-
-                            if (!specializedBlock) return match; // may have mismatched a non-label
-
-                            let specializedId = getHtmlIdLocation(specializedBlock)
-                            let originId = getHtmlIdLocation(specializedBlock.originBlock)
-                            let tooltip = `usage: ${specializedBlock.usage}`
-                            let cls = specializedBlock.usage === 0 ? "class='low-importance-button'" : ""
-                            return `<button ${cls} data-tooltip="${tooltip}" onclick="scrollToBlock('${originId}', '${specializedId}')">${match}</button>`;
-                        })
-                    }
-
-                    return `
+            return `
                         <span id="${getHtmlIdLocation(b)}" class="origin-block-card-body-row">
                             <h4>Block #${b.id} (usage: ${b.usage})</h4>
-                            <code>${b.details ? linkBlockRef(escapeHtml(b.details)) : linkBlockRef(escapeHtml(b.context))}</code>
+                            <h5>Context</h5>
+                            <code>${b.context}</code>
+                            <h5>Code</h5>
+                            <code>${b.details ? linkBlockRef(b, escapeHtml(b.details)) : linkBlockRef(b, escapeHtml(b.context))}</code>
                         </span>`
-                }).join("")}
+        }).join("")}
             </div>
         </div>
         `
@@ -236,13 +401,14 @@ function refreshHTML(cfg) {
 
 function loadJSON(content) {
     try {
-        var { specializedCFG } = JSON.parse(content)
+        var json = JSON.parse(content)
     } catch (error) {
         alert(error)
         return;
     }
-    SBBVControlFlowGraph = parseCFG(specializedCFG)
+    SBBVControlFlowGraph = parseCFG(json)
     refreshHTML(SBBVControlFlowGraph)
+    refreshGraph(SBBVControlFlowGraph)
 }
 
 function loadCFGFromFile(file) {
