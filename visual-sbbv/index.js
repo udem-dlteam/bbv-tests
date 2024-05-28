@@ -205,7 +205,8 @@ function refreshHTML(cfg) {
                             let specializedBlock = cfg.getSpecializedBlock(b.bbs, parseInt(number))
                             let specializedId = getHtmlIdLocation(specializedBlock)
                             let originId = getHtmlIdLocation(specializedBlock.originBlock)
-                            return `<button onclick="scrollToBlock('${originId}', '${specializedId}')">#${number}</button>`;
+                            let tooltip = `usage: ${specializedBlock.usage}`
+                            return `<button data-tooltip="${tooltip}" onclick="scrollToBlock('${originId}', '${specializedId}')">#${number}</button>`;
                         })
                     }
 
