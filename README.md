@@ -171,7 +171,10 @@ The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It 
             "predecessors": [435],
             "successors": [435],
             "details":"#436 fs=4   <- #435   [#ret|rt . . .] r1=#\n  jump fs=4 #<primitive ##dead-end> r0=#435 nargs=0 [#ret|rt . . .] r1=#"
-        }
+        },
+        ...
+    ]
+}
 ```
 
 The `"compiler"` field should be `"gambit"` or `"bigloo"` and the `"specializedCFG"` should be a list of specialized basic block.
