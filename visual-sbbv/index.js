@@ -141,19 +141,20 @@ function parseCFG(jsonBlocks) {
 
 function getHtmlIdLocation(block) {
     if (block instanceof SpecializedBasicBlock) {
-        return getHtmlIdLocation(block.originBlock)
+        return `specialized-block-${block.bbs}-${block.id}`
     } else if (block instanceof OriginBasicBlock) {
-        return `${block.bbs}-${block.id}`
+        return `origin-block-${block.bbs}-${block.id}`
     }
     throw "not a block", block
 }
 
-function scrollToBlockCard(id) {
-    let card = document.getElementById(id);
-    openCard(card)
+function scrollToBlock(originBlockId, specializedBlockId) {
+    let card = document.getElementById(originBlockId);
+    openCard(card);
+    let section = document.getElementById(specializedBlockId);
     card.scrollIntoView({behavior: "smooth", block: "center"});
-    card.classList.add('glowing');
-    setTimeout(() => card.classList.remove('glowing'), 2000);
+    section.classList.add('glowing');
+    setTimeout(() => section.classList.remove('glowing'), 2000);
 }
 
 function escapeHtml(unsafe) {
@@ -201,13 +202,15 @@ function refreshHTML(cfg) {
                 ${versions.map((b) => {
                     function linkBlockRef(code) {
                         return code.replace(/#(\d+)/g, (match, number) => {
-                            let loc = getHtmlIdLocation(cfg.getSpecializedBlock(b.bbs, parseInt(number)))
-                            return `<button onclick="scrollToBlockCard('${loc}')">#${number}</button>`;
+                            let specializedBlock = cfg.getSpecializedBlock(b.bbs, parseInt(number))
+                            let specializedId = getHtmlIdLocation(specializedBlock)
+                            let originId = getHtmlIdLocation(specializedBlock.originBlock)
+                            return `<button onclick="scrollToBlock('${originId}', '${specializedId}')">#${number}</button>`;
                         })
                     }
 
                     return `
-                        <span class="origin-block-card-body-row">
+                        <span id="${getHtmlIdLocation(b)}" class="origin-block-card-body-row">
                             <h4>Block #${b.id} (usage: ${b.usage})</h4>
                             <code>${b.details ? linkBlockRef(escapeHtml(b.details)) : linkBlockRef(escapeHtml(b.context))}</code>
                         </span>`

@@ -14,6 +14,8 @@
 
     --dark-font: #000000;
     --light-font: #ffffff;
+
+    --emphasis: yellow;
 }
 
 body,
@@ -120,16 +122,24 @@ html {
 }
 
 .origin-block-card-body-row {
-
+    padding: 5px;
 }
 
 code {
-    font-size: 15px;
+    font-size: 18px;
     white-space: pre-line;
 }
 
 code button {
-    font-size: 15px;
+    cursor: pointer;
+    font: inherit;
+    border-style: outset;
+    background-color: var(--medium-background);
+    border-radius: 5px;
+}
+
+code button:hover {
+    background-color: var(--light-hover);
 }
 
 .origin-block-card-header:hover {
@@ -138,15 +148,15 @@ code button {
 
 @keyframes glow {
     0% {
-        box-shadow: 0 0 5px yellow;
+        box-shadow: 0 0 5px var(--emphasis);
     }
 
     50% {
-        box-shadow: 0 0 20px yellow;
+        box-shadow: 0 0 20px var(--emphasis);
     }
 
     100% {
-        box-shadow: 0 0 5px yellow;
+        box-shadow: 0 0 5px var(--emphasis);
     }
 }
 
