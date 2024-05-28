@@ -129,18 +129,16 @@ html {
 
 code {
     font-size: 18px;
-    white-space: pre-line;
+    white-space: pre;
 }
 
 code button {
     cursor: pointer;
     font: inherit;
-    border-style: outset;
+    border-style: none;
     background-color: var(--medium-background);
     border-radius: 5px;
-    padding: 1px;
-    padding-top: 0;
-    padding-bottom: 0;
+    padding: 0;
     margin-bottom: 1px;
     margin-top: 1px;
 }
@@ -163,7 +161,6 @@ code button:hover {
     content: attr(data-tooltip);
     border: 1px solid var(--dark-border);
     background: var(--light-background);
-    opacity: revert !important;
     padding: .25em;
 }
 

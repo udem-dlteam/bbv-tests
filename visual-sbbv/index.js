@@ -145,7 +145,7 @@ function getHtmlIdLocation(block) {
     } else if (block instanceof OriginBasicBlock) {
         return `origin-block-${block.bbs}-${block.id}`
     }
-    throw "not a block", block
+    throw new Error("not a block", block)
 }
 
 function scrollToBlock(originBlockId, specializedBlockId) {
@@ -163,7 +163,7 @@ function escapeHtml(unsafe) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+        //.replace(/'/g, "&#039;")
 }
 
 function toggleCard(cardElement) {
@@ -203,11 +203,14 @@ function refreshHTML(cfg) {
                     function linkBlockRef(code) {
                         return code.replace(/#(\d+)/g, (match, number) => {
                             let specializedBlock = cfg.getSpecializedBlock(b.bbs, parseInt(number))
+
+                            if (!specializedBlock) return match; // may have mismatched a non-label
+
                             let specializedId = getHtmlIdLocation(specializedBlock)
                             let originId = getHtmlIdLocation(specializedBlock.originBlock)
                             let tooltip = `usage: ${specializedBlock.usage}`
                             let cls = specializedBlock.usage === 0 ? "class='low-importance-button'" : ""
-                            return `<button ${cls} data-tooltip="${tooltip}" onclick="scrollToBlock('${originId}', '${specializedId}')">#${number}</button>`;
+                            return `<button ${cls} data-tooltip="${tooltip}" onclick="scrollToBlock('${originId}', '${specializedId}')">${match}</button>`;
                         })
                     }
 
