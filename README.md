@@ -152,3 +152,38 @@ The ouput looks like this:
 ```
 
 Where each line indicate whether the benchmark script was able to compile, count primitive, execute the benchmark without error and compute the size of the execuatble respectively. The last line, Internal Error, indicate whether an unexpected error happened during the test.
+
+## Visualization tools
+
+The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It reads a JSON of the form:
+
+```json
+{
+    "compiler": "gambit",
+    "specializedCFG":[
+        {
+            "id": 436,
+            "origin": 10,
+            "bbs": "exec-bench",
+            "source": "(cdr (command-line))",
+            "usage": 0,
+            "context": "[#ret|rt . . .] r1=#",
+            "predecessors": [435],
+            "successors": [435],
+            "details":"#436 fs=4   <- #435   [#ret|rt . . .] r1=#\n  jump fs=4 #<primitive ##dead-end> r0=#435 nargs=0 [#ret|rt . . .] r1=#"
+        }
+```
+
+The `"compiler"` field should be `"gambit"` or `"bigloo"` and the `"specializedCFG"` should be a list of specialized basic block.
+
+The required keys for a specialized basic block are:
+
+- `id`: label of the bb;
+- `origin`: label of the unspecialized bb which this bb is a version of;
+- `bbs`: the procedure name or identifier of the bb;
+- `source`: source code corresponding to the bb;
+- `usage`: how many time the bb was entered at execution;
+- `context`: string representation of the type context when entering the bb;
+- `predecessors`: a list of `id` of blocks which can jump to this bb;
+- `successors`: a list of `id` to which thi block can jump to;
+- `details`: a string that must contain some representation of the code executed by this bb, for instance Gambit outputs GVM code. It can contain some more information. The tool will display the `details` as is in a `<code>` element.
