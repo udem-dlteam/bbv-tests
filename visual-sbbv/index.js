@@ -85,6 +85,7 @@ function refreshGraph(cfg) {
         (block) => {
             return {
                 id: getNetWorkUniqueId(block),
+                title: `bbs: ${block.bbs}, usage: ${block.usage}`,
                 label: block.details,
                 shape: "box",
                 font: {
@@ -92,10 +93,9 @@ function refreshGraph(cfg) {
                     "align": "left"
                 },
                 color: {
-                    background: "#f7f7f7",
+                    background: block.usage === 0 ? "#d6e4f2" : "#f7f7f7",
                     border: "#9db4ca",
                 },
-                opacity: block.usage === 0 ? 0.3 : 1,
                 block: block
             }
         }
@@ -103,15 +103,33 @@ function refreshGraph(cfg) {
 
     // create an array with edges
     var edges = new vis.DataSet(cfg.specializedBlocks.flatMap(
-        (block) => block.predecessors.map(
-            (pred) => {
-                return {
-                    from: getNetWorkUniqueId(pred),
-                    to: getNetWorkUniqueId(block),
-                    arrows: "to;middle"
+        (from) => {
+            return from.jumps.map(
+                ({block, count, hard, ret}) => {
+                    let active = count > 0 || (ret && from.usage > 0);
+                    return {
+                        from: getNetWorkUniqueId(from),
+                        to: getNetWorkUniqueId(block),
+                        arrows: "to;middle",
+                        color: active ? "#a0a0a0" : "#c0d0e0",
+                        dashes: !hard || ret,
+                        label: count,
+                        title: ret ? `call from: ${from.id}\nreturn to: ${block.id}`
+                                   : `from: ${from.id}\nto: ${block.id}\ntraversed: ${count}`,
+                        selfReference: {
+                            angle: 0,
+                            size: 70,
+                        },
+                        smooth: {
+                            enabled: true,
+                            type: "cubicBezier",
+                            forceDirection: "vertical",
+                            roundness: 0.7,
+                        }
+                    }
                 }
-            }
-        )
+            )
+        }
     ));
 
     // create a network
@@ -124,7 +142,7 @@ function refreshGraph(cfg) {
             improvedLayout: true,
             hierarchical: {
                 enabled: true,
-                nodeSpacing: 500,
+                nodeSpacing: 1000,
                 blockShifting: false,
             },
         },
@@ -137,7 +155,7 @@ function refreshGraph(cfg) {
     let lastFocus = null;
     let focusDirection = 'to';
 
-    cfgNetwork.on("doubleClick", function (params) {
+    cfgNetwork.on("click", function (params) {
         if (params.nodes.length > 0) {
             let nodeId = params.nodes[0];
             let block = cfgNetwork.body.data.nodes.get(nodeId).block;
@@ -173,6 +191,38 @@ class SpecializedCFG {
         this.#originBlocks = {}
     }
 
+    cleanupDeadBBS() {
+        if (this.compiler === "bigloo") return;
+
+        let liveBBS = {};
+
+        this.specializedBlocks.forEach(block => { if (block.usage > 0) liveBBS[block.bbs] = true; })
+
+        let newSpecializedBlocks = {}
+        let newOriginBlocks = {}
+
+        for (let [bbs, blocks] of Object.entries(this.#specializedBlocks)) {
+            for (let [id, block] of Object.entries(blocks)) {
+                if (liveBBS[bbs]) {
+                    if (!newSpecializedBlocks[bbs]) { newSpecializedBlocks[bbs] = {} };
+                    newSpecializedBlocks[bbs][id] = block
+                }
+            }
+        }
+
+        for (let [bbs, blocks] of Object.entries(this.#originBlocks)) {
+            for (let [id, block] of Object.entries(blocks)) {
+                if (liveBBS[bbs]) {
+                    if (!newOriginBlocks[bbs]) { newOriginBlocks[bbs] = {} };
+                    newOriginBlocks[bbs][id] = block
+                }
+            }
+        }
+
+        this.#specializedBlocks = newSpecializedBlocks
+        this.#originBlocks = newOriginBlocks
+    }
+
     #getOrSetOriginBlock(bbs, id, source) {
         if (!this.#originBlocks[bbs]) {
             this.#originBlocks[bbs] = {}
@@ -193,9 +243,9 @@ class SpecializedCFG {
         return this.#originBlocks?.[bbs][id]
     }
 
-    addBlock({ id, bbs, origin, context, details, source, usage, predecessors }) {
+    addBlock({ id, bbs, origin, context, details, source, usage, predecessors, successors, ret, jumps }) {
         let originBlock = this.#getOrSetOriginBlock(bbs, origin, source);
-        let specializedBlock = new SpecializedBasicBlock(id, originBlock, context, details, usage, predecessors, this)
+        let specializedBlock = new SpecializedBasicBlock(id, originBlock, context, details, usage, predecessors, successors, ret, jumps, this)
 
         originBlock.versions.push(specializedBlock)
 
@@ -247,15 +297,27 @@ class OriginBasicBlock {
 
 class SpecializedBasicBlock {
     #predecessors
+    #successors
+    #jumps
+    #ret
 
-    constructor(id, originBlock, context, details, usage, predecessors, cfg) {
+    constructor(id, originBlock, context, details, usage, predecessors, successors, ret, jumps, cfg) {
         this.id = id
         this.originBlock = originBlock
         this.context = context
         this.details = details
         this.usage = usage
         this.#predecessors = predecessors
+        this.#successors = successors
+        this.#ret = ret || []
         this.cfg = cfg
+
+        this.#jumps = jumps || [];
+        for (let succId of this.#successors) {
+            if (!this.#jumps.find(({ bbs, id }) => bbs === this.bbs && id === succId)) {
+                this.#jumps.push({ bbs: this.bbs, id: succId, count: 0 })
+            }
+        }
     }
 
     get bbs() {
@@ -265,6 +327,27 @@ class SpecializedBasicBlock {
     get predecessors() {
         return this.#predecessors.map((id) => this.cfg.getSpecializedBlock(this.bbs, id))
     }
+
+    get successors() {
+        return this.#successors.map((id) => this.cfg.getSpecializedBlock(this.bbs, id))
+    }
+
+    get jumps() {
+        return [...this.#jumps.map(({bbs, id, count }) => {
+            return {
+                block: this.cfg.getSpecializedBlock(bbs, id),
+                hard: bbs === this.bbs && this.#successors.includes(id),
+                count,
+            }
+        }),
+        ...this.#ret.map(id => {
+            return {
+                block: this.cfg.getSpecializedBlock(this.bbs, id),
+                ret: true,
+                count: 0,
+            }
+        })]
+    }
 }
 
 function parseCFG({ compiler, specializedCFG }) {
@@ -273,6 +356,8 @@ function parseCFG({ compiler, specializedCFG }) {
     for (let block of specializedCFG) {
         cfg.addBlock(block)
     }
+
+    cfg.cleanupDeadBBS()
 
     return cfg
 }
@@ -336,8 +421,6 @@ function linkBlockRef(originBlock, code) {
     } else {
         throw new Exception("unknown compiler", compiler)
     }
-
-    console.log(code)
 
     return code.replace(pattern, (match, number) => {
         let specializedBlock = cfg.getSpecializedBlock(originBlock.bbs, parseInt(number))
