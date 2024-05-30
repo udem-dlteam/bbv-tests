@@ -3,8 +3,9 @@
 const resizer = document.getElementById('resizer');
 const controlPanel = document.getElementById('cfg-control-panel');
 const cfgPanel = document.getElementById('cfg-display-panel');
+const vizElement = document.getElementById('viz-element');
 const fileInput = document.getElementById('file-input');
-
+const showAllSwitchElement = document.getElementById("cfg-show-all-switch-input");
 const leftPanel = controlPanel;
 const rightPanel = cfgPanel;
 let isResizing = false;
@@ -78,11 +79,15 @@ function centerOnBlockInNetwork(nodeId) {
 }
 
 function refreshGraph(cfg) {
+    let showAll = showAllSwitchElement.checked;
     if (cfgNetwork) cfgNetwork.destroy();
 
+    const isActive = (block) => block.usage > 0;
+
     // create an array with nodes
-    var nodes = new vis.DataSet(cfg.specializedBlocks.map(
+    var nodes = new vis.DataSet(cfg.specializedBlocks.flatMap(
         (block) => {
+            if (!showAll && !isActive(block)) return  [];
             return {
                 id: getNetWorkUniqueId(block),
                 title: `bbs: ${block.bbs}, usage: ${block.usage}`,
@@ -104,18 +109,32 @@ function refreshGraph(cfg) {
     // create an array with edges
     var edges = new vis.DataSet(cfg.specializedBlocks.flatMap(
         (from) => {
-            return from.jumps.map(
-                ({block, count, hard, ret}) => {
-                    let active = count > 0 || (ret && from.usage > 0);
+            return from.references.map(
+                ({block, count, isReturn, isReturnAddress, isReference, isStatic}) => {
+                    let active = count > 0 || (isReturnAddress && from.usage > 0);
+
+                    let description = `from: ${from.id} | to: ${block.id}\n`;
+                    if (isReturnAddress) {
+                        description += `return address\n`
+                    }
+                    if (isReturn) {
+                        description += `exit function\n`
+                    }
+                    if (isReference) {
+                        description += `reference\n`
+                    }
+                    if (count !== undefined) {
+                        description += `traversed: ${count}\n`
+                    }
+
                     return {
                         from: getNetWorkUniqueId(from),
                         to: getNetWorkUniqueId(block),
                         arrows: "to;middle",
                         color: active ? "#a0a0a0" : "#c0d0e0",
-                        dashes: !hard || ret,
+                        dashes: !isStatic,
                         label: count,
-                        title: ret ? `call from: ${from.id}\nreturn to: ${block.id}`
-                                   : `from: ${from.id}\nto: ${block.id}\ntraversed: ${count}`,
+                        title: description,
                         selfReference: {
                             angle: 0,
                             size: 70,
@@ -150,7 +169,7 @@ function refreshGraph(cfg) {
             enabled: false
         }
     };
-    cfgNetwork = new vis.Network(cfgPanel, data, options);
+    cfgNetwork = new vis.Network(vizElement, data, options);
 
     let lastFocus = null;
     let focusDirection = 'to';
@@ -223,7 +242,8 @@ class SpecializedCFG {
         this.#originBlocks = newOriginBlocks
     }
 
-    #getOrSetOriginBlock(bbs, id, source) {
+    #getOrSetOriginBlock({ bbs, origin, source }) {
+        let id = origin;
         if (!this.#originBlocks[bbs]) {
             this.#originBlocks[bbs] = {}
         }
@@ -243,9 +263,10 @@ class SpecializedCFG {
         return this.#originBlocks?.[bbs][id]
     }
 
-    addBlock({ id, bbs, origin, context, details, source, usage, predecessors, successors, ret, jumps }) {
-        let originBlock = this.#getOrSetOriginBlock(bbs, origin, source);
-        let specializedBlock = new SpecializedBasicBlock(id, originBlock, context, details, usage, predecessors, successors, ret, jumps, this)
+    addBlock(block) {
+        let { id, bbs } = block;
+        let originBlock = this.#getOrSetOriginBlock(block);
+        let specializedBlock = new SpecializedBasicBlock({...block, originBlock, cfg: this})
 
         originBlock.versions.push(specializedBlock)
 
@@ -299,9 +320,10 @@ class SpecializedBasicBlock {
     #predecessors
     #successors
     #jumps
+    #references
     #ret
 
-    constructor(id, originBlock, context, details, usage, predecessors, successors, ret, jumps, cfg) {
+    constructor({ id, originBlock, context, details, usage, predecessors, successors, ret, references, jumps, cfg }) {
         this.id = id
         this.originBlock = originBlock
         this.context = context
@@ -309,44 +331,48 @@ class SpecializedBasicBlock {
         this.usage = usage
         this.#predecessors = predecessors
         this.#successors = successors
+        this.#references = references || []
+        this.#jumps = jumps || [];
         this.#ret = ret || []
         this.cfg = cfg
-
-        this.#jumps = jumps || [];
-        for (let succId of this.#successors) {
-            if (!this.#jumps.find(({ bbs, id }) => bbs === this.bbs && id === succId)) {
-                this.#jumps.push({ bbs: this.bbs, id: succId, count: 0 })
-            }
-        }
     }
 
     get bbs() {
         return this.originBlock.bbs
     }
 
-    get predecessors() {
-        return this.#predecessors.map((id) => this.cfg.getSpecializedBlock(this.bbs, id))
-    }
+    get references() {
+        let refs = {}
+        let bbs = this.bbs
 
-    get successors() {
-        return this.#successors.map((id) => this.cfg.getSpecializedBlock(this.bbs, id))
-    }
+        const addRef = (bbs, id, data) => {
+            let exists = !!refs[bbs] && !!refs[bbs][id];
+            if (!refs[bbs]) refs[bbs] = {};
+            if (!refs[bbs][id]) refs[bbs][id] = {};
 
-    get jumps() {
-        return [...this.#jumps.map(({bbs, id, count }) => {
-            return {
-                block: this.cfg.getSpecializedBlock(bbs, id),
-                hard: bbs === this.bbs && this.#successors.includes(id),
-                count,
+
+            if (typeof data === 'function') {
+                refs[bbs][id] = { ...(data(exists)), ...refs[bbs][id] }
+            } else {
+                refs[bbs][id] = { ...data, ...refs[bbs][id] }
             }
-        }),
-        ...this.#ret.map(id => {
-            return {
-                block: this.cfg.getSpecializedBlock(this.bbs, id),
-                ret: true,
-                count: 0,
-            }
-        })]
+        }
+
+        this.#successors.forEach(id => addRef(bbs, id, { isStatic: true }))
+        this.#ret.forEach(id => addRef(bbs, id, { isReturnAdress: true }))
+        this.#jumps.forEach(({ id, bbs, count }) => addRef(bbs, id, { count, isReturn: bbs !== this.bbs }))
+        this.#references.forEach(id => addRef(bbs, id, (exists) => ({ isReference: !exists })))
+
+        return Object.entries(refs).flatMap(
+            ([bbs, bbsRefs]) => Object.entries(bbsRefs).map(
+                ([id, data]) => {
+                    return {
+                        block: this.cfg.getSpecializedBlock(bbs, id),
+                        ...data
+                    }
+                }
+            )
+        )
     }
 }
 
@@ -433,6 +459,11 @@ function linkBlockRef(originBlock, code) {
         let nodeId = getNetWorkUniqueId(specializedBlock);
         return `<button ${cls} data-tooltip="${tooltip}" onclick="scrollToBlockByIds('${originId}', '${specializedId}', '${nodeId}')">${match}</button>`;
     })
+}
+
+function handleShowAllSwitch() {
+    if (!SBBVControlFlowGraph) return;
+    refreshGraph(SBBVControlFlowGraph)
 }
 
 function refreshHTML(cfg) {

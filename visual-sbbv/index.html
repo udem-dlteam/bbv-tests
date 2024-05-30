@@ -16,7 +16,15 @@
     <div class="cfg-main">
         <div class="panel" id="cfg-control-panel"></div>
         <div id="resizer"></div>
-        <div class="panel" id="cfg-display-panel"></div>
+        <div class="panel" id="cfg-display-panel">
+            <div id="cfg-window">
+                <label id="cfg-show-all-switch" class="switch">
+                    <input id="cfg-show-all-switch-input" type="checkbox" onclick="handleShowAllSwitch()">
+                    <span class="slider round" title="Show inactive nodes (may cause performance issues)"></span>
+                </label>
+                <div id="viz-element"></div>
+            </div>
+        </div>
     </div>
 
     <script src="index.js"></script>
