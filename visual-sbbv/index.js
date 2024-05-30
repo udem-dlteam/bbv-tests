@@ -110,15 +110,12 @@ function refreshGraph(cfg) {
     var edges = new vis.DataSet(cfg.specializedBlocks.flatMap(
         (from) => {
             return from.references.map(
-                ({block, count, isReturn, isReturnAddress, isReference, isStatic}) => {
+                ({block, count, isReturnAddress, isReference, isStatic}) => {
                     let active = count > 0 || (isReturnAddress && from.usage > 0);
 
                     let description = `from: ${from.id} | to: ${block.id}\n`;
                     if (isReturnAddress) {
                         description += `return address\n`
-                    }
-                    if (isReturn) {
-                        description += `exit function\n`
                     }
                     if (isReference) {
                         description += `reference\n`
@@ -360,7 +357,7 @@ class SpecializedBasicBlock {
 
         this.#successors.forEach(id => addRef(bbs, id, { isStatic: true }))
         this.#ret.forEach(id => addRef(bbs, id, { isReturnAdress: true }))
-        this.#jumps.forEach(({ id, bbs, count }) => addRef(bbs, id, { count, isReturn: bbs !== this.bbs }))
+        this.#jumps.forEach(({ id, bbs, count }) => addRef(bbs, id, { count }))
         this.#references.forEach(id => addRef(bbs, id, (exists) => ({ isReference: !exists })))
 
         return Object.entries(refs).flatMap(
