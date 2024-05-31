@@ -252,7 +252,7 @@ Only the `"created"` and `"merge"` events are required. Other events are there t
 
 Here is the meaning of each event:
 
- - `"created"`: a version was requested and a new specialized block was created for that exact version;
+ - `"created"`: a context was requested and a new specialized block was created for that exact context;
  - `"merge"`: merge of some versions to another version;
  - `"request"`: a specific context was requested, but a specialized block already existed for it;
  - `"replace"`: some specialized block was replaced by an replacement because its context has previsouly been merged to that replacement. This event allows a fine-grained description of `"merge"` and `"request"` events where a block was created but the resulting block was immediately replaced by the result of a previous merge;
