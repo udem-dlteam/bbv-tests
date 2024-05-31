@@ -193,7 +193,7 @@ The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It 
             "bbs": "exec-bench",
             "origin": 4,
             "merged": [123, 234],
-            "id" 235,
+            "id": 235,
             "context": "[#ret|rt . . .] r1=#"
         },
         {
@@ -247,6 +247,8 @@ To visualize the merge history, the json must contain a `"history"` field which 
 - `event`: a string (`"created"`, `"merge"`, `"request"`, `"replace"`, `"reachable"` or `"unreachable"`);
 - `bbs`: the procedure name or identifier of the bb;
 - `origin`: label of the unspecialized bb on which the event takes place;
+
+Only the `"created"` and `"merge"` events are required. Other events are there to allow a finer-grained description of the algorithm.
 
 Here is the meaning of each event:
 
