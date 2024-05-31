@@ -178,8 +178,7 @@ The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It 
               "count":1
             }]
             "details":"#436 fs=4   <- #435   [#ret|rt #123 . .] r1=#\n  jump fs=4 #<primitive ##dead-end> r0=#435 nargs=0 [#ret|rt . . .] r1=#"
-        },
-        ...
+        }
     ],
     "history": [
         {
