@@ -182,7 +182,7 @@ The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It 
     ],
     "history": [
         {
-            "event": "created",
+            "event": "create",
             "bbs": "exec-bench",
             "origin": 4,
             "id": 123,
