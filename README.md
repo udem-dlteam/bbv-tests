@@ -201,20 +201,26 @@ The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It 
             "event": "request",
             "bbs": "exec-bench",
             "origin": 4,
-            "context": "[#ret|rt fx . .] r1=#",
-            "id": 235
+            "id": 123,
         },
+        {
+            "event": "replace",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "from": 123,
+            "to": 124,
+        }
         {
             "event": "unreachable",
             "bbs": "exec-bench",
             "origin": 4,
-            "id": 235
+            "id": 236
         },
         {
             "event": "reachable",
             "bbs": "exec-bench",
             "origin": 4,
-            "id": 235
+            "id": 236
         }
     ]
 }
@@ -236,3 +242,17 @@ The required keys for a specialized basic block are:
 - `ret`: (optional) if this block does a call with a return address, this list contains the return address;
 - `jumps`: (optional) a list of jumps from this block at execution. A jump is an object with an `id`, a `bbs` and a `count`. This allows tracing hot paths at execution;
 - `details`: a string that must contain some representation of the code executed by this bb, for instance Gambit outputs GVM code. It can contain some more information. The tool will display the `details` as is in a `<code>` element.
+
+To visualize the merge history, the json must contain a `"history"` field which is a list of events. Events must be in chronological order in the list. Each event has these common fields:
+
+- `event`: a string (`"created"`, `"merge"`, `"request"`, `"replace"`, `"reachable"` or `"unreachable"`);
+- `bbs`: the procedure name or identifier of the bb;
+- `origin`: label of the unspecialized bb on which the event takes place;
+
+Here is the meaning of each event:
+
+ - `created`: a version was requested and a new specialized block was created for that exact version;
+ - `"merge"`: merge of some versions to another version;
+ - `"request"`: a specific context was requested, but a specialized block already existed for it;
+ - `"replace"`: some specialized block was replaced by an replacement because its context has previsouly been merged to that replacement. This event allows a fine-grained description of `"merge"` and `"request"` events where a block was created but the resulting block was immediately replaced by the result of a previous merge;
+ - `"unreachable"` and `"reachable"`: a specialized block was made unreachable or reachable due to another manipulation (for instance a merge can make blocks unreachable).
