@@ -64,6 +64,11 @@ function centerOnBlockInNetwork(nodeId) {
 
     const nodePosition = cfgNetwork.getPositions([nodeId])[nodeId];
 
+    if (nodePosition === undefined) {
+        glowElement(document.getElementById("cfg-show-all-switch").querySelector(".slider"))
+        return
+    }
+
     // Move the view to center on the node
     cfgNetwork.moveTo({
         position: nodePosition,
@@ -403,13 +408,17 @@ function scrollToBlock(specializedBlock) {
     scrollToBlockByIds(originId, specializedId, nodeId);
 }
 
+function glowElement(element) {
+    element.classList.add('glowing');
+    setTimeout(() => element.classList.remove('glowing'), 2000);
+}
+
 function scrollToBlockByIds(originBlockId, specializedBlockId, nodeId) {
     let card = document.getElementById(originBlockId);
     openCard(card);
     let section = document.getElementById(specializedBlockId);
-    card.scrollIntoView({ behavior: "smooth", block: "center" });
-    section.classList.add('glowing');
-    setTimeout(() => section.classList.remove('glowing'), 2000);
+    card.scrollIntoView({ behavior: "smooth", block: "center", inline: 'nearest' });
+    glowElement(section);
     centerOnBlockInNetwork(nodeId);
 }
 
@@ -429,7 +438,7 @@ function toggleCard(cardElement) {
 
 function openCard(cardElement) {
     const body = cardElement.querySelector('.origin-block-card-body');
-    body.style.display = 'block';
+    if (body.style.display !== 'block') body.style.display = 'block';
 }
 
 function linkBlockRef(originBlock, code) {
