@@ -180,6 +180,42 @@ The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It 
             "details":"#436 fs=4   <- #435   [#ret|rt #123 . .] r1=#\n  jump fs=4 #<primitive ##dead-end> r0=#435 nargs=0 [#ret|rt . . .] r1=#"
         },
         ...
+    ],
+    "history": [
+        {
+            "event": "created",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "id": 123
+            "context": "[#ret|rt fx . .] r1=#"
+        },
+        {
+            "event": "merge",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "merged": [123, 234],
+            "id" 235,
+            "context": "[#ret|rt . . .] r1=#"
+        },
+        {
+            "event": "request",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "context": "[#ret|rt fx . .] r1=#",
+            "id": 235,
+        },
+        {
+            "event": "unreachable",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "id": 235,
+        },
+        {
+            "event": "reachable",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "id": 235,
+        }
     ]
 }
 ```
