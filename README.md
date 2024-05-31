@@ -186,7 +186,7 @@ The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It 
             "event": "created",
             "bbs": "exec-bench",
             "origin": 4,
-            "id": 123
+            "id": 123,
             "context": "[#ret|rt fx . .] r1=#"
         },
         {
@@ -202,19 +202,19 @@ The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It 
             "bbs": "exec-bench",
             "origin": 4,
             "context": "[#ret|rt fx . .] r1=#",
-            "id": 235,
+            "id": 235
         },
         {
             "event": "unreachable",
             "bbs": "exec-bench",
             "origin": 4,
-            "id": 235,
+            "id": 235
         },
         {
             "event": "reachable",
             "bbs": "exec-bench",
             "origin": 4,
-            "id": 235,
+            "id": 235
         }
     ]
 }
