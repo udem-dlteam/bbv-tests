@@ -244,15 +244,15 @@ The required keys for a specialized basic block are:
 
 To visualize the merge history, the json must contain a `"history"` field which is a list of events. Events must be in chronological order in the list. Each event has these common fields:
 
-- `event`: a string (`"created"`, `"merge"`, `"request"`, `"replace"`, `"reachable"` or `"unreachable"`);
+- `event`: a string (`"create"`, `"merge"`, `"request"`, `"replace"`, `"reachable"` or `"unreachable"`);
 - `bbs`: the procedure name or identifier of the bbs;
 - `origin`: label of the unspecialized bb on which the event takes place;
 
-Only the `"created"` and `"merge"` events are required. Other events are there to allow a finer-grained description of the algorithm.
+Only the `"create"` and `"merge"` events are required. Other events are there to allow a finer-grained description of the algorithm.
 
 Here is the meaning of each event:
 
- - `"created"`: a context was requested and a new specialized block was created for that exact context;
+ - `"create"`: a context was requested and a new specialized block was created for that exact context;
  - `"merge"`: merge of some versions to another version;
  - `"request"`: a specific context was requested, but a specialized block already existed for it (either nothing happened of the block was unreachable and made reachable anew);
  - `"replace"`: some specialized block was replaced by an replacement because its context has previsouly been merged to that replacement. This event allows a fine-grained description of `"merge"` and `"request"` events where a block was created but the resulting block was immediately replaced by the result of a previous merge;
