@@ -257,3 +257,32 @@ Here is the meaning of each event:
  - `"request"`: a specific context was requested, but a specialized block already existed for it (either nothing happened of the block was unreachable and made reachable anew);
  - `"replace"`: some specialized block was replaced by an replacement because its context has previsouly been merged to that replacement. This event allows a fine-grained description of `"merge"` and `"request"` events where a block was created but the resulting block was immediately replaced by the result of a previous merge;
  - `"unreachable"` and `"reachable"`: a specialized block was made unreachable or reachable due to another manipulation (for instance a merge can make blocks unreachable).
+
+The `"replace"` event can be added to give a fine-grained description of merges and requests. For instance, if some context is requested and had an existing block with id `123`, but that block was previsouly merged to `456`. Then a coarse-grained event chain would be:
+
+```json
+{
+    "event": "request",
+    "bbs": "foo",
+    "origin": 1,
+    "id": 456  # Result of the request
+}
+```
+
+But a fine-grained history would be:
+
+```json
+{
+    "event": "request",
+    "bbs": "foo",
+    "origin": 1,
+    "id": 123   # Block of the initially requested context
+},
+{
+    "event": "replace",
+    "bbs": "foo",
+    "origin": 1,
+    "from": 123,
+    "to": 456   # Replacement of 123 by 456
+}
+```
