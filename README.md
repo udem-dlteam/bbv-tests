@@ -231,7 +231,7 @@ The required keys for a specialized basic block are:
 
 - `id`: label of the bb;
 - `origin`: label of the unspecialized bb which this bb is a version of;
-- `bbs`: the procedure name or identifier of the bb;
+- `bbs`: the procedure name or identifier of the bbs;
 - `source`: source code corresponding to the bb;
 - `usage`: how many time the bb was entered at execution;
 - `context`: string representation of the type context when entering the bb;
@@ -245,7 +245,7 @@ The required keys for a specialized basic block are:
 To visualize the merge history, the json must contain a `"history"` field which is a list of events. Events must be in chronological order in the list. Each event has these common fields:
 
 - `event`: a string (`"created"`, `"merge"`, `"request"`, `"replace"`, `"reachable"` or `"unreachable"`);
-- `bbs`: the procedure name or identifier of the bb;
+- `bbs`: the procedure name or identifier of the bbs;
 - `origin`: label of the unspecialized bb on which the event takes place;
 
 Only the `"created"` and `"merge"` events are required. Other events are there to allow a finer-grained description of the algorithm.
