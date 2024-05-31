@@ -254,6 +254,6 @@ Here is the meaning of each event:
 
  - `"created"`: a context was requested and a new specialized block was created for that exact context;
  - `"merge"`: merge of some versions to another version;
- - `"request"`: a specific context was requested, but a specialized block already existed for it;
+ - `"request"`: a specific context was requested, but a specialized block already existed for it (either nothing happened of the block was unreachable and made reachable anew);
  - `"replace"`: some specialized block was replaced by an replacement because its context has previsouly been merged to that replacement. This event allows a fine-grained description of `"merge"` and `"request"` events where a block was created but the resulting block was immediately replaced by the result of a previous merge;
  - `"unreachable"` and `"reachable"`: a specialized block was made unreachable or reachable due to another manipulation (for instance a merge can make blocks unreachable).
