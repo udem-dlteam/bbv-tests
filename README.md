@@ -170,7 +170,14 @@ The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It 
             "context": "[#ret|rt . . .] r1=#",
             "predecessors": [435],
             "successors": [435],
-            "details":"#436 fs=4   <- #435   [#ret|rt . . .] r1=#\n  jump fs=4 #<primitive ##dead-end> r0=#435 nargs=0 [#ret|rt . . .] r1=#"
+            "references": [123],
+            "ret": [456],
+            "jumps":[{
+              "bbs":"exec-bench",
+              "id":118,
+              "count":1
+            }]
+            "details":"#436 fs=4   <- #435   [#ret|rt #123 . .] r1=#\n  jump fs=4 #<primitive ##dead-end> r0=#435 nargs=0 [#ret|rt . . .] r1=#"
         },
         ...
     ]
@@ -188,5 +195,8 @@ The required keys for a specialized basic block are:
 - `usage`: how many time the bb was entered at execution;
 - `context`: string representation of the type context when entering the bb;
 - `predecessors`: a list of `id` of blocks which can jump to this bb;
-- `successors`: a list of `id` to which thi block can jump to;
+- `successors`: a list of `id` to which this block can jump to;
+- `references`: (optional) a list of `id` to which this block has references (for instance a label being moved to a register);
+- `ret`: (optional) if this block does a call with a return address, this list contains the return address;
+- `jumps`: (optional) a list of jumps from this block at execution. A jump is an object with an `id`, a `bbs` and a `count`. This allows tracing hot paths at execution;
 - `details`: a string that must contain some representation of the code executed by this bb, for instance Gambit outputs GVM code. It can contain some more information. The tool will display the `details` as is in a `<code>` element.
