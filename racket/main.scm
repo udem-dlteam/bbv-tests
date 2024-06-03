@@ -15,15 +15,15 @@
         (if (pair? args)
             (error 'exec-bench "invalid arguments")
             (let ((args (reverse rev-args)))
-              (let loop2 ((repeat repeat) (result #f))
+              (let loop2 ((repeat repeat) (result #f));;;;;;;changé
                 (define (deep-apply align-stack run args)
                   (if (> align-stack 0)
                       (unknown (deep-apply (- align-stack 1) run args))
                       (if (pair? args) (apply run args) (run))))
                 (if (> repeat 0)
-                    (loop2 (- repeat 1) (deep-apply align-stack run args))
+                    (loop2 (- repeat 1) (deep-apply align-stack run args));;;;;;;changé
                     (if (and (null? args) (not (check result)))
                         (error 'wrong-result result)
-                        result))))))))
+                        #f))))))));;;;;;;changé
 
 (exec-bench)

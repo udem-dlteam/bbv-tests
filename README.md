@@ -152,3 +152,137 @@ The ouput looks like this:
 ```
 
 Where each line indicate whether the benchmark script was able to compile, count primitive, execute the benchmark without error and compute the size of the execuatble respectively. The last line, Internal Error, indicate whether an unexpected error happened during the test.
+
+## Visualization tools
+
+The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It reads a JSON of the form:
+
+```json
+{
+    "compiler": "gambit",
+    "specializedCFG":[
+        {
+            "id": 436,
+            "origin": 10,
+            "bbs": "exec-bench",
+            "source": "(cdr (command-line))",
+            "usage": 0,
+            "context": "[#ret|rt . . .] r1=#",
+            "predecessors": [435],
+            "successors": [435],
+            "references": [123],
+            "ret": [456],
+            "jumps":[{
+              "bbs":"exec-bench",
+              "id":118,
+              "count":1
+            }]
+            "details":"#436 fs=4   <- #435   [#ret|rt #123 . .] r1=#\n  jump fs=4 #<primitive ##dead-end> r0=#435 nargs=0 [#ret|rt . . .] r1=#"
+        }
+    ],
+    "history": [
+        {
+            "event": "create",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "id": 123,
+            "context": "[#ret|rt fx . .] r1=#"
+        },
+        {
+            "event": "merge",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "merged": [123, 234],
+            "id": 235,
+            "context": "[#ret|rt . . .] r1=#"
+        },
+        {
+            "event": "request",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "id": 123,
+        },
+        {
+            "event": "replace",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "from": 123,
+            "to": 124,
+        }
+        {
+            "event": "unreachable",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "id": 236
+        },
+        {
+            "event": "reachable",
+            "bbs": "exec-bench",
+            "origin": 4,
+            "id": 236
+        }
+    ]
+}
+```
+
+The `"compiler"` field should be `"gambit"` or `"bigloo"` and the `"specializedCFG"` should be a list of specialized basic block.
+
+The required keys for a specialized basic block are:
+
+- `id`: label of the bb;
+- `origin`: label of the unspecialized bb which this bb is a version of;
+- `bbs`: the procedure name or identifier of the bbs;
+- `source`: source code corresponding to the bb;
+- `usage`: how many time the bb was entered at execution;
+- `context`: string representation of the type context when entering the bb;
+- `predecessors`: a list of `id` of blocks which can jump to this bb;
+- `successors`: a list of `id` to which this block can jump to;
+- `references`: (optional) a list of `id` to which this block has references (for instance a label being moved to a register);
+- `ret`: (optional) if this block does a call with a return address, this list contains the return address;
+- `jumps`: (optional) a list of jumps from this block at execution. A jump is an object with an `id`, a `bbs` and a `count`. This allows tracing hot paths at execution;
+- `details`: a string that must contain some representation of the code executed by this bb, for instance Gambit outputs GVM code. It can contain some more information. The tool will display the `details` as is in a `<code>` element.
+
+To visualize the merge history, the json must contain a `"history"` field which is a list of events. Events must be in chronological order in the list. Each event has these common fields:
+
+- `event`: a string (`"create"`, `"merge"`, `"request"`, `"replace"`, `"reachable"` or `"unreachable"`);
+- `bbs`: the procedure name or identifier of the bbs;
+- `origin`: label of the unspecialized bb on which the event takes place;
+
+Only the `"create"` and `"merge"` events are required. Other events are there to allow a finer-grained description of the algorithm.
+
+Here is the meaning of each event:
+
+ - `"create"`: a context was requested and a new specialized block was created for that exact context;
+ - `"merge"`: merge of some versions to another version;
+ - `"request"`: a specific context was requested, but a specialized block already existed for it (either nothing happened of the block was unreachable and made reachable anew);
+ - `"replace"`: some specialized block was replaced by an replacement because its context has previsouly been merged to that replacement. This event allows a fine-grained description of `"merge"` and `"request"` events where a block was created but the resulting block was immediately replaced by the result of a previous merge;
+ - `"unreachable"` and `"reachable"`: a specialized block was made unreachable or reachable due to another manipulation (for instance a merge can make blocks unreachable).
+
+The `"replace"` event can be added to give a fine-grained description of merges and requests. For instance, if some context is requested and had an existing block with id `123`, but that block was previsouly merged to `456`. Then a coarse-grained event chain would be:
+
+```json
+{
+    "event": "request",
+    "bbs": "foo",
+    "origin": 1,
+    "id": 456  # Result of the request
+}
+```
+
+But a fine-grained history would be:
+
+```json
+{
+    "event": "request",
+    "bbs": "foo",
+    "origin": 1,
+    "id": 123   # Block of the initially requested context
+},
+{
+    "event": "replace",
+    "bbs": "foo",
+    "origin": 1,
+    "from": 123,
+    "to": 456   # Replacement of 123 by 456
+}
+```

@@ -583,39 +583,44 @@ def run_benchmark(executable, arguments, timeout=None, env=None, only_time=True)
 default_arguments = "repeat: 10"
 
 benchmark_args = {
-    "ack": "repeat: 100 m: 3 n: 9",
-    "bague": "repeat: 2 nombre-de-pierres: 28",
-    "fib": "repeat: 6 n: 39",
-    "fibfp": "repeat: 2 n: 39.0",
-    "tak": "repeat: 20000 x: 18 y: 12 z: 6",
+    # Unused
     "takl": "repeat: 1000 x: 18 y: 12 z: 6",
     "diviter": "repeat: 100000 ",
     "divrec": "repeat: 100000 ",
     "array1": "repeat: 5 n: 200000",
     "browse": "repeat: 1000 ",
     "mazefun": "repeat: 2000 n: 11 m: 11",
-    "nqueens": "repeat: 4 n: 13",
     "puzzle": "repeat: 200 n: 511",
     "quicksort": "repeat: 500 ",
     "sum": "repeat: 10000 n: 10000",
     "sumfp": "repeat: 200 n: 1e6",
     "triangl": "repeat: 20 i: 22 depth: 1",
-    "almabench": "repeat: 2 K: 36525",
     "fft": "repeat: 1 n: 1048576",
-    "primes": "repeat: 1000000",
     "rev": "repeat: 100000000",
     "vlen": "repeat: 100000000",
-    "boyer": "repeat: 1 n: 500",
-    "earley": "repeat: 1 n: 10000",
-    "compiler": "repeat: 1 n: 2000",
-    "dynamic": "repeat: 2 n: 200",
-    "scheme": "repeat: 1 n: 100000",
-    "nucleic": "repeat: 3 n: 50",
-    "conform": "repeat: 1 n: 1000",
-    "maze": "repeat: 1 n: 50000",
-    "peval": "repeat: 1 n: 3000",
-    "leval": "repeat: 1 n: 60",
-    "slatex": "repeat: 1 n: 10000",
+
+    # Micro
+    "ack": "repeat: 500 m: 3 n: 9",
+    "bague": "repeat: 6 nombre-de-pierres: 28",
+    "fib": "repeat: 20 n: 39",
+    "fibfp": "repeat: 5 n: 39.0",
+    "nqueens": "repeat: 15 n: 13",
+    "primes": "repeat: 2000000",
+    "tak": "repeat: 80000 x: 18 y: 12 z: 6",
+
+    # Macro
+    "almabench": "repeat: 7 K: 36525",
+    "boyer": "repeat: 1 n: 1000",
+    "compiler": "repeat: 1 n: 10000",
+    "conform": "repeat: 1 n: 4000",
+    "dynamic": "repeat: 1 n: 800",
+    "earley": "repeat: 1 n: 15000",
+    "leval": "repeat: 1 n: 120",
+    "maze": "repeat: 1 n: 150000",
+    "nucleic": "repeat: 3 n: 100",
+    "peval": "repeat: 1 n: 15000",
+    "scheme": "repeat: 1 n: 1000000",
+    "slatex": "repeat: 1 n: 20000",
 }
 
 def convert_to_node_arguments(arguments):
@@ -1285,14 +1290,16 @@ def average_base_time(run):
     base_run = max(base_runs, key=lambda r: r.timestamp)
     return average_time(base_run)
 
-def average_time(run, trim_outliers=False):
+def average_time_select_results(run, trim_outliers=True):
     results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
-
     if trim_outliers and len(results) >= 3:
-        offset = math.ceil(len(results) / 10)
+        offset = len(results) // 10
         results = sorted(results)
         results = results[offset:-offset]
-        
+    return results
+
+def average_time(run, trim_outliers=True):
+    results = average_time_select_results(run, trim_outliers=trim_outliers)
     return statistics.mean(results)
 
 def compile_time(run):
@@ -1335,11 +1342,14 @@ def to_csv(system_name, version_limits, output):
         system = get_system_from_name_or_default(system_name)
         compiler = get_compiler_from_name(compiler_name)
 
+        benchmark_names = ['almabench', 'boyer', 'maze', 'earley', 'leval', 'bague']
+
         runs = list(select(
             r for r in Run
             if r.system == system
             and r.compiler.name == compiler_name # TODO switch back to using compiler when no commit-split
             and r.version_limit in version_limits
+            and r.benchmark.name in benchmark_names
             and r.compiler_optimizations
             and r.safe_arithmetic
             and r.timestamp == max(select(
@@ -1358,7 +1368,7 @@ def to_csv(system_name, version_limits, output):
         def get_run_column_name(run):
             return get_column_name(run.version_limit)
 
-        benchmark_names = set(run.benchmark.name for run in runs)
+        # benchmark_names = set(run.benchmark.name for run in runs)
         benchmark_names = sorted(benchmark_names, key=lambda n: (not is_macro(n), n))
 
         column_names = ["Benchmark"]
@@ -1607,9 +1617,11 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         #df = df[cols]
 
-        plt.rc('font', size=10.5)
+        plt.rc('font', size=12)
 
-        fig, ax = plt.subplots(figsize=(15, 4.7))
+        height = 4.7 if len(version_limits) >= 10 else 4.1
+
+        fig, ax = plt.subplots(figsize=(15, height))
 
         # I made some ranges wider because it adds nice edges to the bar in the legend
 
@@ -1655,10 +1667,12 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             vmin, vmax = 0.5, 8
         elif path_base == 'checks':
             vmin, vmax = 0.1, 1.1
+            # Even lighter blue?
+            # cmap = truncate_colormap(cmap_base, 1.2 * cmap_brightness, 1 - 1.2 * cmap_brightness)
             # Remove red from cmap. It must not appear in color bar since it cannot happen
             remove_red()
         elif path_base == "compile_time":
-            vmin, vmax = 0.5, 64
+            vmin, vmax = 0.5, 32
             
         locator = LogLocator(base=2)
         ticks = [t for t in locator.tick_values(vmin, vmax) if vmin <= t <= vmax]
@@ -1683,6 +1697,20 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
 
         shifted_cmap = colors.LinearSegmentedColormap.from_list("shifted", cmap(color_interpolation))
 
+        # Hack to pass my own format to seaborn
+        class Formatter:
+            def __add__(self, other):
+                return self
+
+            def __radd__(self, other):
+                return self
+
+            def format(self, x):
+                if x >= 10:
+                    return f"{x:.1f}"
+                else:
+                    return f"{x:.2f}"
+
         fmt=".2f"
         cbar_kws = {
             'format': f'{{x:{fmt}}}',
@@ -1691,11 +1719,11 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
             'extendrect': True,
         }
 
-        heatmap_ax = sns.heatmap(df, annot=True, fmt=fmt, cmap=shifted_cmap,
+        heatmap_ax = sns.heatmap(df, annot=True, fmt=Formatter(), cmap=shifted_cmap,
                                  linewidths=.5,
                                  norm=norm,
                                  vmin=tick_min, vmax=tick_max,
-                                 annot_kws={"size": 11.5,
+                                 annot_kws={"size": 12,
                                             'color': 'black'},
                                  cbar_kws=cbar_kws)
 
@@ -1746,8 +1774,12 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
                             tick.tick2line.set_markersize(16)  # Adjusts the length of the tick
 
             for label in ax.get_xticklabels():
+                label.set_fontsize(12)
                 if label._text in mean_names:
                     label.set_fontweight('bold')
+
+            for label in ax.get_yticklabels():
+                label.set_fontsize(12)
 
         # Add axis to delimit micro and macro
         delimite_subaxis = ax.secondary_xaxis("bottom")
@@ -1767,6 +1799,9 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         micro_macro_subaxis.set_xticklabels(["Macrobenchmarks", "Microbenchmarks"])
         micro_macro_subaxis.tick_params(size=0, labelsize=14)
 
+        for text in heatmap_ax.texts:
+            text.set_fontsize(12)
+
         if title:
             plt.title(f'{path_base} {compiler.name}')
 
@@ -1778,7 +1813,35 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
         plt.savefig(output_path)
 
     # Execution time
-    one_heatmap("time", average_time)
+    max_var_coeff = [0, 0] # micro, macro
+    too_low_time = {}
+    def wrapped_average_time(run):
+        nonlocal max_var_coeff
+        results = average_time_select_results(run)
+
+        macro = is_macro(run.benchmark.name)
+
+        # Compute error
+        dev = statistics.stdev(results)
+        average = statistics.mean(results)
+        var_coeff = dev / average
+
+        if average < 5:
+            too_low_time[run.benchmark.name] = min(too_low_time.get(run.benchmark.name, 999), average)
+
+        if var_coeff > max_var_coeff[macro]:
+            # print('new max:', run.benchmark.name, run.compiler.name, f"V={run.version_limit}", dev, '/', average, '=', var_coeff)
+            max_var_coeff[macro] = var_coeff
+
+        return average
+
+    one_heatmap("time", wrapped_average_time)
+
+    print(f"MAX COEFFICIENT OF VARIATION (micro): {max_var_coeff[0]:.2%}")
+    print(f"MAX COEFFICIENT OF VARIATION (macro): {max_var_coeff[1]:.2%}")
+
+    for bname, btime in too_low_time.items():
+        print(f'TOO LOW: {bname}, {btime:.1f}s')
 
     # Program size
     one_heatmap("program_size", run_program_size)

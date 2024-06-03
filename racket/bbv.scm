@@ -1,12 +1,5 @@
 (require compatibility/defmacro)
-
-(define-macro (dummy)
-  (eval '(define arithmetic 'G))
-  (eval '(define (cond-expand . cases)
-            (cdr (or (assq #t cases)
-                     (assq 'else cases))))))
-
-(dummy)
+(require racket/mpair)
 
 (define-macro (if c . branches)
   (if (= (length branches) 1)
@@ -43,12 +36,8 @@
     `(PRIMop ,(symbol-append 'fl op) ,@args))
    ((eq? kind 'FX)
     `(PRIMop ,(symbol-append 'fx op) ,@args))
-   ((or (eq? kind 'GEN) (eq? 'arithmetic 'G)) ;; force generic?
-    `(,(symbol-append 'BBV op) ,@args))
-   ((eq? kind 'SFL)
-    `(,(symbol-append 'FL op) ,@args))
-   ((eq? kind 'SFX)
-    `(,(symbol-append 'FX op) ,@args))))
+   (else
+    `(,(symbol-append 'BBV op) ,@args))))
 
 (define-macro (GEN+ x . rest)    `(MAPop* GEN + ,x ,@rest))
 (define-macro (GEN- x . rest)    `(MAPop* GEN - ,x ,@rest))
@@ -183,16 +172,16 @@
   `(modulo ,x ,y))
 
 (define-macro (BBVbit-lsh x y)
-  `(ash ,x ,y))
+  `(arithmetic-shift ,x ,y))
 
 (define-macro (BBVbit-and x y)
-  `(logand ,x ,y))
+  `(bitwise-and ,x ,y))
 
 (define-macro (BBVbit-or x y)
-  `(logior ,x ,y))
+  `(bitwise-ior ,x ,y))
 
 (define-macro (BBVbit-not x)
-  `(lognot ,x))
+  `(bitwise-not ,x))
 
 (define-macro (BBV= x y) `(BBVcmp = ,x ,y))
 (define-macro (BBV< x y) `(BBVcmp < ,x ,y))
@@ -361,6 +350,13 @@
            (loop (Scdr lst) (SFX+ len 1))
            len))))
 
+(define-macro (Smlength lst)
+  `(let ((lst ,lst))
+     (let loop ((lst lst) (len 0))
+       (if (mpair? lst)
+           (loop (Smcdr lst) (SFX+ len 1))
+           len))))
+
 (define-macro (Smemq key lst)
   `(let ((key ,key) (lst ,lst))
      (let loop ((lst lst))
@@ -385,6 +381,14 @@
                 lst
                 (loop (Scdr lst)))))))
 
+(define-macro (Smmember key lst)
+  `(let ((key ,key) (lst ,lst))
+     (let loop ((lst lst))
+       (and (mpair? lst)
+            (if (Sequal? key (Smcar lst))
+                lst
+                (loop (Smcdr lst)))))))
+
 (define-macro (Sassq key lst)
   `(let ((key ,key) (lst ,lst))
      (let loop ((lst lst))
@@ -393,6 +397,15 @@
               (if (eq? key (Scar x))
                   x
                   (loop (Scdr lst))))))))
+
+(define-macro (Smassq key lst)
+  `(let ((key ,key) (lst ,lst))
+     (let loop ((lst lst))
+       (and (mpair? lst)
+            (let ((x (Smcar lst)))
+              (if (eq? key (Smcar x))
+                  x
+                  (loop (Smcdr lst))))))))
 
 (define-macro (Sassv key lst)
   `(let ((key ,key) (lst ,lst))
@@ -426,6 +439,17 @@
                 (lambda (f lst)
                   (if (pair? lst)
                       (cons (f (Scar lst)) (map2 f (Scdr lst)))
+                      '()))))
+        (map2 f lst))
+      (DEAD-END "map type error"))))
+
+(define-macro (Smmap2 f lst) ;; 2 parameter map
+  `(let ((f ,f) (lst ,lst))
+     (if (procedure? f)
+      (letrec ((map2
+                (lambda (f lst)
+                  (if (mpair? lst)
+                      (mcons (f (Smcar lst)) (map2 f (Smcdr lst)))
                       '()))))
         (map2 f lst))
       (DEAD-END "map type error"))))
@@ -507,54 +531,6 @@
 (define-macro (Svector-set! v i x)
   `(vector-set! ,v ,i ,x))
 
-(define-macro (Svector-ref-with-FX>=0-FX< v i)
-  (let ((a (gensym))
-        (b (gensym)))
-    `(let ((,a ,v)
-           (,b ,i))
-       ,(if (eq? arithmetic 'S)
-            `(PRIMop vector-ref ,a ,b)
-            `(if (and (vector? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop vector-length ,a)))
-                 (PRIMop vector-ref ,a ,b)
-                 (DEAD-END "vector-ref type error"))))))
-
-(define-macro (Svector-ref-with-in-bounds v i)
-  (let ((a (gensym))
-        (b (gensym)))
-    `(let ((,a ,v)
-           (,b ,i))
-       ,(if (eq? arithmetic 'S)
-            `(PRIMop vector-ref ,a ,b)
-            `(if (and (vector? ,a) (FIXNUM? ,b) (PRIMop vector-in-bounds? ,a ,b))
-                 (PRIMop vector-ref ,a ,b)
-                 (DEAD-END "vector-ref type error"))))))
-
-(define-macro (Svector-set!-with-FX>=0-FX< v i x)
-  (let ((a (gensym))
-        (b (gensym))
-        (c (gensym)))
-    `(let ((,a ,v)
-           (,b ,i)
-           (,c ,x))
-       ,(if (eq? arithmetic 'S)
-            `(PRIMop vector-set! ,a ,b ,c)
-            `(if (and (vector? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop vector-length ,a)))
-                 (PRIMop vector-set! ,a ,b ,c)
-                 (DEAD-END "vector-set! type error"))))))
-
-(define-macro (Svector-set!-with-in-bounds v i x)
-  (let ((a (gensym))
-        (b (gensym))
-        (c (gensym)))
-    `(let ((,a ,v)
-           (,b ,i)
-           (,c ,x))
-       ,(if (eq? arithmetic 'S)
-            `(PRIMop vector-set! ,a ,b ,c)
-            `(if (and (vector? ,a) (FIXNUM? ,b) (PRIMop vector-in-bounds? ,a ,b))
-                 (PRIMop vector-set! ,a ,b ,c)
-                 (DEAD-END "vector-set! type error"))))))
-
 (define-macro (Svector-length v)
   `(vector-length ,v))
 
@@ -569,54 +545,6 @@
 
 (define-macro (Sstring-set! s i x)
   `(string-set! ,s ,i ,x))
-
-(define-macro (Sstring-ref-with-FX>=0-FX< s i)
-  (let ((a (gensym))
-        (b (gensym)))
-    `(let ((,a ,s)
-           (,b ,i))
-       ,(if (eq? arithmetic 'S)
-            `(PRIMop string-ref ,a ,b)
-            `(if (and (string? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop string-length ,a)))
-                 (PRIMop string-ref ,a ,b)
-                 (DEAD-END "string-ref type error"))))))
-
-(define-macro (Sstring-ref-with-in-bounds s i)
-  (let ((a (gensym))
-        (b (gensym)))
-    `(let ((,a ,s)
-           (,b ,i))
-       ,(if (eq? arithmetic 'S)
-            `(PRIMop string-ref ,a ,b)
-            `(if (and (string? ,a) (FIXNUM? ,b) (PRIMop string-in-bounds? ,a ,b))
-                 (PRIMop string-ref ,a ,b)
-                 (DEAD-END "string-ref type error"))))))
-
-(define-macro (Sstring-set!-with-FX>=0-FX< s i x)
-  (let ((a (gensym))
-        (b (gensym))
-        (c (gensym)))
-    `(let ((,a ,s)
-           (,b ,i)
-           (,c ,x))
-       ,(if (eq? arithmetic 'S)
-            `(PRIMop string-set! ,a ,b ,c)
-            `(if (and (string? ,a) (FIXNUM? ,b) (FX>= ,b 0) (FX< ,b (PRIMop string-length ,a)) (char? ,c))
-                 (PRIMop string-set! ,a ,b ,c)
-                 (DEAD-END "string-set! type error"))))))
-
-(define-macro (Sstring-set!-with-in-bounds s i x)
-  (let ((a (gensym))
-        (b (gensym))
-        (c (gensym)))
-    `(let ((,a ,s)
-           (,b ,i)
-           (,c ,x))
-       ,(if (eq? arithmetic 'S)
-            `(PRIMop string-set! ,a ,b ,c)
-            `(if (and (string? ,a) (FIXNUM? ,b) (PRIMop string-in-bounds? ,a ,b) (char? ,c))
-                 (PRIMop string-set! ,a ,b ,c)
-                 (DEAD-END "string-set! type error"))))))
 
 (define-macro (Sstring-length s)
   `(string-length ,s))

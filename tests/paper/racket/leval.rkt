@@ -13,14 +13,6 @@
 ;*---------------------------------------------------------------------*/
 
 (require racket/mpair)
-(define cons mcons)
-(define pair? mpair?)
-(define list? mlist?)
-(define car mcar)
-(define cdr mcdr)
-(define set-car! set-mcar!)
-(define set-cdr! set-mcdr!)
-(define list mlist)
 
 (define-macro (mquote x)
   (cond 
@@ -65,7 +57,7 @@
 ;*---------------------------------------------------------------------*/
 (define (comp exp env tail?)
    (cond
-      ((not (pair? exp))
+      ((not (mpair? exp))
        (let ((atom exp))
 	  (cond
 	     ((symbol? atom)
@@ -101,10 +93,10 @@
 	  (comp-lambda formals
 	     (comp body (extend-env! formals env) #t)
 	     tail?)))
-      ((not (pair? (Smcar exp)))
+      ((not (mpair? (Smcar exp)))
        (let ((fun (Smcar exp))
 	     (args (Smcdr exp)))
-	  (let ((actuals (Smap2 (lambda (a) (comp a env #f)) args)))
+	  (let ((actuals (Smmap2 (lambda (a) (comp a env #f)) args)))
 	     (cond
 		((symbol? fun)
 		 (let ((proc (variable fun env)))
@@ -124,7 +116,7 @@
       (else
        (let ((fun (Smcar exp))
 	     (args (Smcdr exp)))
-	  (let ((actuals (Smap2 (lambda (a) (comp a env #f)) args))
+	  (let ((actuals (Smmap2 (lambda (a) (comp a env #f)) args))
 		(proc    (comp fun env #f)))
 	     (comp-application proc actuals tail?))))))
 
@@ -152,7 +144,7 @@
 ;*    global? ...                                                      */
 ;*---------------------------------------------------------------------*/
 (define (global? variable)
-   (pair? variable))
+   (mpair? variable))
 
 ;*---------------------------------------------------------------------*/
 ;*    dynamic? ...                                                     */
@@ -248,7 +240,7 @@
 ;*---------------------------------------------------------------------*/
 (define (comp-begin body env)
    (cond
-      ((and (pair? body) (and (null? (Smcdr body))))
+      ((and (mpair? body) (and (null? (Smcdr body))))
        ;; le cas degenere
        (let ((rest (comp (Smcar body) env #t)))
 	  (lambda (dynamic-env) (rest dynamic-env))))
@@ -258,9 +250,9 @@
 			 ((null? rest)
 			  (errow "ewal" "Illegal form" body))
 			 ((null? (Smcdr rest))
-			  (cons (comp (Smcar rest) env #t) '()))
+			  (mcons (comp (Smcar rest) env #t) '()))
 			 (else
-			  (cons (comp (Smcar rest) env #f)
+			  (mcons (comp (Smcar rest) env #f)
 			     (loop (Smcdr rest))))))))
 	  (lambda (dynamic-env) (let _loop_ ((body body))
 				   (if (null? (Smcdr body))
@@ -273,7 +265,7 @@
 ;*    init-the-global-environment! ...                                 */
 ;*---------------------------------------------------------------------*/
 (define (linit-the-global-environment!)
-   (if (pair? the-global-environment)
+   (if (mpair? the-global-environment)
        'done
        ;; je ne peux pas utiliser de constante car quand cette fonction
        ;; sera appelle, je ne suis pas qu'elles soient initialisee.
@@ -288,7 +280,7 @@
 (define (comp-define var val)
    (lambda (dynamic-env)
       (let ((cell (local-assq var the-global-environment)))
-	 (if (pair? cell)
+	 (if (mpair? cell)
 	     (update! cell val dynamic-env)
 	     (begin
 		(Sset-mcdr! the-global-environment
@@ -325,7 +317,7 @@
       (cond
 	 ((null? extend)
 	  old-env)
-	 ((not (pair? extend))
+	 ((not (mpair? extend))
 	  (mcons extend old-env))
 	 (else
 	  (mcons (Smcar extend) (_loop_ (Smcdr extend)))))))
@@ -340,7 +332,7 @@
 	  (cond
 	     ((SFX= -1 n)
 	      #t)
-	     ((not (pair? l))
+	     ((not (mpair? l))
 	      #f)
 	     (else
 	      (loop (SFX+ 1 n) (Smcdr l)))))
@@ -349,7 +341,7 @@
 	  (cond
 	     ((SFX= 0 n)
 	      (null? l))
-	     ((not (pair? l))
+	     ((not (mpair? l))
 	      #f)
 	     (else
 	      (loop (SFX- n 1) (Smcdr l)))))))
@@ -386,11 +378,11 @@
       ((pair -1 formals)
        (lambda (dynamic-env)
 	  (lambda (x . y)
-	     (body (mcons x (mcons y dynamic-env))))))
+	     (body (mcons x (mcons (list->mlist y) dynamic-env))))))
       ((pair -2 formals)
        (lambda (dynamic-env)
 	  (lambda (x y . z)
-	     (body (mcons x (mcons y (mcons z dynamic-env)))))))
+	     (body (mcons x (mcons y (mcons (list->mlist z) dynamic-env)))))))
       ((pair -3 formals)
        (lambda (dynamic-env)
 	  (lambda (x y z . t)
@@ -411,7 +403,7 @@
 				   (errow "ewal"
 				      "Too fee arguments provided"
 				      formals))
-				  ((not (pair? formals))
+				  ((not (mpair? formals))
 				   (mcons actuals dynamic-env))
 				  (else
 				   (mcons (Smcar actuals)
@@ -423,7 +415,7 @@
 ;*    comp-global-application ...                                      */
 ;*---------------------------------------------------------------------*/
 (define (comp-global-application proc actuals tail?)
-   (case (Slength actuals)
+   (case (Smlength actuals)
       ((0)
        (lambda (dynamic-env) ((Smcdr proc))))
       ((1)
@@ -442,13 +434,13 @@
 					  ((Smcadddr actuals) dynamic-env))))
       (else
        (lambda (dynamic-env)
-	  (apply (Smcdr proc) (Smap2 (lambda (v) (v dynamic-env)) actuals))))))
+	  (apply (Smcdr proc) (Smmap2 (lambda (v) (v dynamic-env)) actuals))))))
 
 ;*---------------------------------------------------------------------*/
 ;*    comp-compd-application ...                                       */
 ;*---------------------------------------------------------------------*/
 (define (comp-compd-application proc actuals tail?)
-   (case (Slength actuals)
+   (case (Smlength actuals)
       ((0)
        (lambda (dynamic-env) (proc)))
       ((1)
@@ -467,13 +459,13 @@
 				((Smcadddr actuals) dynamic-env))))
       (else
        (lambda (dynamic-env)
-	  (apply proc (Smap2 (lambda (v) (v dynamic-env)) actuals))))))
+	  (apply proc (Smmap2 (lambda (v) (v dynamic-env)) actuals))))))
    
 ;*---------------------------------------------------------------------*/
 ;*    comp-application ...                                             */
 ;*---------------------------------------------------------------------*/
 (define (comp-application proc actuals tail?)
-   (case (Slength actuals)
+   (case (Smlength actuals)
       ((0)
        (lambda (dynamic-env) ((proc dynamic-env))))
       ((1)
@@ -496,7 +488,7 @@
 			      ((Smcadddr actuals) dynamic-env))))
       (else
        (lambda (dynamic-env)
-	  (apply (proc dynamic-env) (Smap2 (lambda (v) (v dynamic-env))
+	  (apply (proc dynamic-env) (Smmap2 (lambda (v) (v dynamic-env))
 				       actuals))))))
 
 ;*---------------------------------------------------------------------*/
