@@ -81,8 +81,30 @@ This generates an output such as:
 
 ```
 cd bigloo
-BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O0 -fno-user-inlining -fsaw-bbv bbv.bgl /home/serrano/prgm/project/bbv-tests/tests/paper/todo/nucleic.scm
+BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm 
 ```
+
+To generate a json dump for one particular function:
+
+```
+cd bigloo
+BIGLOOBBVDUMPJSON=true BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm  -fsaw-bbv-fun pick-entrances
+```
+
+To profile the generate code:
+
+```
+cd bigloo
+BIGLOOSAWPROFILE=true BIGLOOBBVDUMPJSON=true BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm  -fsaw-bbv-fun pick-entrances
+./a.out > prof.json
+```
+
+To combine add profiling information to the json dump:
+
+```
+ ./addusages.mjs bbv-pick-entrances.bbv.json prof.json | js-beautify > bbv-pick-entrances.prof.json
+```
+
 
 ### To execute manually compiled benchmark
 
