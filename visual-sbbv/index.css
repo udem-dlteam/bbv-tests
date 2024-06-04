@@ -78,7 +78,7 @@ html {
     height: 100%;
 }
 
-#viz-element {
+.viz-graph-container {
     width: 100%;
     height: 100%;
 }
@@ -158,6 +158,7 @@ code button {
 }
 
 code button:hover {
+    position: relative;
     background-color: var(--light-hover);
 }
 

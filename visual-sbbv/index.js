@@ -3,7 +3,6 @@
 const resizer = document.getElementById('resizer');
 const controlPanel = document.getElementById('cfg-control-panel');
 const cfgPanel = document.getElementById('cfg-display-panel');
-const vizElement = document.getElementById('viz-element');
 const fileInput = document.getElementById('file-input');
 const showAllSwitchElement = document.getElementById("cfg-show-all-switch-input");
 const leftPanel = controlPanel;
@@ -32,15 +31,37 @@ function panelStopResize() {
 }
 
 // Viz Panel
+var activeNetworkId = "smallCFGElement";
+const networkElements = {
+    largeCFGNetwork: document.getElementById('full-cfg-element'),
+    smallCFGNetwork: document.getElementById('small-cfg-element'),
+    mergeHistoryNetwork: document.getElementById('merge-graph-element'),
+}
+const networks = Object.keys(networkElements).reduce((obj, key) => { obj[key] = null; return obj; }, {});
 
-cfgNetwork = null;
+function getActiveNetwork() {
+    return networks[activeNetworkId];
+}
+
+function getActiveNetworkElement() {
+    return networkElements[activeNetworkId];
+}
+
+function destroyNetworks() {
+    for (let key of Object.keys(networks)) {
+        if (networks[key]) networks[key].destroy();
+        networks[key] = null;
+    }
+    activeNetworkId = "smallCFGElement";
+}
 
 function getNetWorkUniqueId(block) {
     return `${block.bbs}-${block.id}`
 }
 
 function makeNodeGlow(nodeId) {
-    cfgNetwork.body.data.nodes.update({
+    const activeCFGNetwork = getActiveNetwork()
+    activeCFGNetwork.body.data.nodes.update({
         id: nodeId,
         shadow: {
             enabled: true,
@@ -52,7 +73,7 @@ function makeNodeGlow(nodeId) {
     })
 
     setTimeout(() => {
-        cfgNetwork.body.data.nodes.update({
+        activeCFGNetwork.body.data.nodes.update({
             id: nodeId,
             shadow: { enabled: false }
         })
@@ -60,9 +81,11 @@ function makeNodeGlow(nodeId) {
 }
 
 function centerOnBlockInNetwork(nodeId) {
-    if (!cfgNetwork) return;
+    const activeCFGNetwork = getActiveNetwork();
 
-    const nodePosition = cfgNetwork.getPositions([nodeId])[nodeId];
+    if (!activeCFGNetwork) return;
+
+    const nodePosition = activeCFGNetwork.getPositions([nodeId])[nodeId];
 
     if (nodePosition === undefined) {
         glowElement(document.getElementById("cfg-show-all-switch").querySelector(".slider"))
@@ -70,7 +93,7 @@ function centerOnBlockInNetwork(nodeId) {
     }
 
     // Move the view to center on the node
-    cfgNetwork.moveTo({
+    activeCFGNetwork.moveTo({
         position: nodePosition,
         scale: 1,  // You can adjust the scale as needed
         animation: {
@@ -83,9 +106,19 @@ function centerOnBlockInNetwork(nodeId) {
     makeNodeGlow(nodeId)
 }
 
-function refreshGraph(cfg) {
-    let showAll = showAllSwitchElement.checked;
-    if (cfgNetwork) cfgNetwork.destroy();
+function focusNetworkPanel(networkId) {
+    for (let [id, el] of Object.entries(networkElements)) {
+        if (networkId !== id) el.style.display = "none";
+    }
+    networkElements[networkId].style.display = "block";
+    activeNetworkId = networkId;
+}
+
+function refreshGraph(cfg, networkID, showAll) {
+    let element = networkElements[networkID]
+    focusNetworkPanel(networkID);
+
+    if (networks[networkID]) return;
 
     const isActive = (block) => block.usage > 0;
 
@@ -132,7 +165,7 @@ function refreshGraph(cfg) {
                     return {
                         from: getNetWorkUniqueId(from),
                         to: getNetWorkUniqueId(block),
-                        arrows: "to;middle",
+                        arrows: "to",
                         color: active ? "#a0a0a0" : "#c0d0e0",
                         dashes: !isStatic,
                         label: count,
@@ -171,31 +204,184 @@ function refreshGraph(cfg) {
             enabled: false
         }
     };
-    cfgNetwork = new vis.Network(vizElement, data, options);
+    let activeCFGNetwork = new vis.Network(element, data, options);
+    networks[networkID] = activeCFGNetwork;
 
     let lastFocus = null;
     let focusDirection = 'to';
 
-    cfgNetwork.on("click", function (params) {
+    activeCFGNetwork.on("click", function (params) {
         if (params.nodes.length > 0) {
             let nodeId = params.nodes[0];
-            let block = cfgNetwork.body.data.nodes.get(nodeId).block;
+            let block = activeCFGNetwork.body.data.nodes.get(nodeId).block;
             scrollToBlock(block);
         } else if (params.edges.length > 0) {
             let edgeId = params.edges[0];
-            let edge = cfgNetwork.body.data.edges.get(edgeId);
+            let edge = activeCFGNetwork.body.data.edges.get(edgeId);
 
-            let nextFocus = cfgNetwork.body.data.nodes.get(edge[focusDirection])
+            let nextFocus = activeCFGNetwork.body.data.nodes.get(edge[focusDirection])
 
             if (lastFocus?.id === nextFocus.id) {
                 focusDirection = focusDirection === "to" ? "from" : "to"
-                nextFocus = cfgNetwork.body.data.nodes.get(edge[focusDirection])
+                nextFocus = activeCFGNetwork.body.data.nodes.get(edge[focusDirection])
             }
             lastFocus = nextFocus
             scrollToBlock(nextFocus.block)
         }
     });
 
+    activeCFGNetwork.on("doubleClick", function (params) {
+        if (params.nodes.length > 0) {
+            let nodeId = params.nodes[0];
+            let originBlock = activeCFGNetwork.body.data.nodes.get(nodeId).block.originBlock;
+            showHistory(originBlock);
+        }
+    })
+}
+
+function showHistory(originBlock) {
+    console.log(originBlock.history);
+    let nodes = originBlock.history.map(
+        (event, index) => {
+            let eventKind = event.event;
+            let node;
+
+            if (eventKind === "create") {
+                node = {
+                    id: index,
+                    label: `#${event.id} Create:\n${event.context}`
+                }
+            } else if (eventKind === "merge") {
+                node = {
+                    id: index,
+                    label: `Merge to #${event.id}:\n${event.context}`
+                }
+            } else if (eventKind === "reachable") {
+                node = {
+                    id: index,
+                    label: `#${event.id} Reachable`
+                }
+            } else if (eventKind === "unreachable") {
+                node = {
+                    id: index,
+                    label: `#${event.id} Unreachable`
+                }
+            } else {
+                throw new Exception("event not implemented")
+            }
+
+            return {
+                ...node,
+                shape: "box",
+                font: {
+                    "face": "monospace",
+                    "align": "left"
+                },
+                color: {
+                    background:"#f7f7f7",
+                    border: "#9db4ca",
+                },
+                block: originBlock
+            }
+        }
+    );
+
+    let edgeOptions = {
+        arrows: "to",
+        color: "#a0a0a0",
+        selfReference: {
+            angle: 0,
+            size: 70,
+        },
+        smooth: {
+            enabled: true,
+            type: "cubicBezier",
+            forceDirection: "vertical",
+            roundness: 0.7,
+        }
+    }
+
+    // create an array with edges
+    const lastEventOf = {};
+    const isReachable = {}
+    const keep = {}
+    const walk = (blockId, eventIndex, makeUnreachable) => {
+        keep[eventIndex] = true;
+        lastEventOf[blockId] = eventIndex;
+        isReachable[blockId] = !makeUnreachable;
+    }
+    let edges = originBlock.history.flatMap(
+        (event, index) => {
+            let eventKind = event.event;
+            let edges;
+
+            if (eventKind === "create") {
+                edges = [];
+                walk(event.id, index)
+            } else if (eventKind === "merge") {
+                edges = event.merged.map(
+                    (from) => {
+                        isReachable[from] = false
+                        return {
+                            from: lastEventOf[from],
+                            to: index,
+                        }
+                    }
+                )
+                walk(event.id, index)
+            } else if (eventKind === "reachable") {
+                if (!isReachable[event.id]) {
+                    edges = [{
+                        from: lastEventOf[event.id],
+                        to: index,
+                    }]
+                    walk(event.id, index);
+                } else {
+                    edges = [];
+                }
+            } else if (eventKind === "unreachable") {
+                if (isReachable[event.id]) {
+                    edges = [{
+                        from: lastEventOf[event.id],
+                        to: index,
+                    }]
+                    walk(event.id, index, true)
+                } else {
+                    edges = [];
+                }
+            } else {
+                throw new Exception("event not implemented")
+            }
+
+            return edges.map((e) => ({ ...edgeOptions, ...e }))
+        }
+    );
+
+    nodes = nodes.filter((_, index) => keep[index])
+
+    // create a network
+    var data = {
+        nodes: new vis.DataSet(nodes),
+        edges: new vis.DataSet(edges),
+    };
+    
+    var options = {
+        layout: {
+            hierarchical: {
+                sortMethod: "directed",
+                treeSpacing:500,
+                direction: "UD",
+                shakeTowards: "leaves",
+                parentCentralization: false
+            },
+        }
+    };
+
+    let networkId = "mergeHistoryNetwork";
+    focusNetworkPanel(networkId)
+    let element = getActiveNetworkElement();
+    networks[networkId] = new vis.Network(element, data, options);
+    activeNetworkId = networkId;
 }
 
 // Control Flow Graph
@@ -258,11 +444,11 @@ class SpecializedCFG {
     }
 
     getSpecializedBlock(bbs, id) {
-        return this.#specializedBlocks?.[bbs][id]
+        return this.#specializedBlocks[bbs]?.[id]
     }
 
     getOriginBlock(bbs, id) {
-        return this.#originBlocks?.[bbs][id]
+        return this.#originBlocks[bbs]?.[id]
     }
 
     addBlock(block) {
@@ -307,6 +493,7 @@ class OriginBasicBlock {
         this.source = source
         this.cfg = cfg
         this.versions = []
+        this.history = []
     }
 
     totalUsage() {
@@ -390,6 +577,14 @@ function parseCFG({ compiler, specializedCFG }) {
     return cfg
 }
 
+function parseHistory({ history }, cfg) {
+    for (let event of history) {
+        let { origin, bbs } = event
+        let block = cfg.getOriginBlock(bbs, origin)
+        if (block) block.history.push(event); // block may not exist if bbs is dead code
+    }
+}
+
 // IO
 
 function getHtmlIdLocation(block) {
@@ -469,10 +664,11 @@ function linkBlockRef(originBlock, code) {
 
 function handleShowAllSwitch() {
     if (!SBBVControlFlowGraph) return;
-    refreshGraph(SBBVControlFlowGraph)
+    let showAll = showAllSwitchElement.checked;
+    refreshGraph(SBBVControlFlowGraph, showAll ? "largeCFGNetwork" : "smallCFGNetwork", showAll)
 }
 
-function refreshHTML(cfg) {
+function refreshControlPanel(cfg) {
     let newControlPanelHTML = ""
 
     const blocks = cfg.originBlocks;
@@ -527,11 +723,14 @@ function loadJSON(content) {
         return;
     }
     SBBVControlFlowGraph = parseCFG(json)
-    refreshHTML(SBBVControlFlowGraph)
-    refreshGraph(SBBVControlFlowGraph)
+    parseHistory(json, SBBVControlFlowGraph)
+    refreshControlPanel(SBBVControlFlowGraph)
+    refreshGraph(SBBVControlFlowGraph, "smallCFGNetwork", false)
 }
 
 function loadCFGFromFile(file) {
+    destroyNetworks();
+    showAllSwitchElement.checked = false;
     var reader = new FileReader()
     reader.onload = e => loadJSON(e.target.result)
     reader.readAsText(file)

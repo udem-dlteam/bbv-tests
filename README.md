@@ -229,13 +229,13 @@ The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It 
             "bbs": "exec-bench",
             "origin": 4,
             "from": 123,
-            "to": 124,
+            "id": 235,
         }
         {
             "event": "unreachable",
             "bbs": "exec-bench",
             "origin": 4,
-            "id": 236
+            "id": 124
         },
         {
             "event": "reachable",
@@ -305,6 +305,6 @@ But a fine-grained history would be:
     "bbs": "foo",
     "origin": 1,
     "from": 123,
-    "to": 456   # Replacement of 123 by 456
+    "id": 456   # Replacement of 123 by 456
 }
 ```
