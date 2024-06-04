@@ -81,6 +81,11 @@ function makeNodeGlow(nodeId) {
 }
 
 function centerOnBlockInNetwork(nodeId) {
+    if (activeNetworkId === "mergeHistoryNetwork") {
+        let networkToReturnTo = showAllSwitchElement.checked ? "largeCFGNetwork" : "smallCFGNetwork";
+        focusNetworkPanel(networkToReturnTo)
+    }
+
     const activeCFGNetwork = getActiveNetwork();
 
     if (!activeCFGNetwork) return;
@@ -239,52 +244,150 @@ function refreshGraph(cfg, networkID, showAll) {
     })
 }
 
-function showHistory(originBlock) {
-    console.log(originBlock.history);
-    let nodes = originBlock.history.map(
-        (event, index) => {
-            let eventKind = event.event;
-            let node;
+function buildHistory(originBlock) {
+    let history = originBlock.history;
+    let layers = [];
+    let currentLayer = [];
+    let edges = [];
 
-            if (eventKind === "create") {
-                node = {
-                    id: index,
-                    label: `#${event.id} Create:\n${event.context}`
-                }
-            } else if (eventKind === "merge") {
-                node = {
-                    id: index,
-                    label: `Merge to #${event.id}:\n${event.context}`
-                }
-            } else if (eventKind === "reachable") {
-                node = {
-                    id: index,
-                    label: `#${event.id} Reachable`
-                }
-            } else if (eventKind === "unreachable") {
-                node = {
-                    id: index,
-                    label: `#${event.id} Unreachable`
-                }
-            } else {
-                throw new Exception("event not implemented")
-            }
-
-            return {
-                ...node,
-                shape: "box",
-                font: {
-                    "face": "monospace",
-                    "align": "left"
-                },
-                color: {
-                    background:"#f7f7f7",
-                    border: "#9db4ca",
-                },
-                block: originBlock
+    function isLive(specializedBlockId) {
+        for (let layer of layers.concat([currentLayer]).reverse()) {
+            for (let node of layer) {
+                if (node.keep === specializedBlockId) return true;
+                if (node.kill.includes(specializedBlockId)) return false;
             }
         }
-    );
+        return false;
+    }
+
+    function finalizeCurrentLayer() {
+        layers.push(currentLayer);
+        currentLayer = [];
+    }
+
+    function propagateFromPreviousLayers(drop, unreachable) {
+        if (layers.length < 1) return;
+        for (node of layers[layers.length - 1]) {
+            if (unreachable.includes(node.keep)) {
+                let unreachableNodeId = newId();
+                edges.push({
+                    from: node.id,
+                    to: unreachableNodeId,
+                })
+                currentLayer.push({
+                    id: unreachableNodeId,
+                    label: `Unreachable #${node.keep}`,
+                    keep: null,
+                    kill: [node.keep],
+                })
+            } else if (node.keep && !drop.includes(node.keep)) {
+                let nodeId = newId();
+                edges.push({
+                    from: node.id,
+                    to: nodeId
+                })
+                currentLayer.push({
+                    id: nodeId,
+                    label: `Keep #${node.keep}`,
+                    keep: node.keep,
+                    kill: [],
+                })
+            }
+        }
+    }
+
+    function positionOfLastReferenceTo(specializedBlockId) {
+        for (let layerIndex = layers.length - 1; layerIndex >= 0; layerIndex--) {
+            let layer = layers[layerIndex];
+            for (let nodeIndex = 0; nodeIndex < layer.length; nodeIndex++) {
+                let node = layer[nodeIndex];
+                if (node.keep === specializedBlockId || node.kill.includes(specializedBlockId)) {
+                    return { layerIndex, nodeIndex }
+                }
+            }
+        }
+
+        return { layerIndex: null, nodeIndex: null }
+    }
+
+    function lastReferenceTo(specializedBlockId) {
+        let { layerIndex, nodeIndex } = positionOfLastReferenceTo(specializedBlockId);
+        return layers[layerIndex][nodeIndex];
+    }
+
+    const idOfLastReferenceTo = (specializedBlockId) => lastReferenceTo(specializedBlockId).id;
+
+    let _id = 0;
+    const newId = () => _id++;
+    history.forEach((event) => {
+        console.log(event)
+        switch (event.event) {
+            case "create":
+                currentLayer.push({
+                    id: newId(),
+                    label: `#${event.id} Create:\n${event.context}`,
+                    keep: event.id,
+                    kill: [],
+                })
+                break;
+            case "merge":
+                let mergeNodeId = newId();
+                finalizeCurrentLayer();
+                for (let mergedId of event.merged) {
+                    edges.push({
+                        from: idOfLastReferenceTo(mergedId),
+                        to: mergeNodeId,
+                    })
+                }
+                propagateFromPreviousLayers(event.merged, [])
+                currentLayer.push({
+                    id: mergeNodeId,
+                    label: `Merge ${event.merged.map(x => `#${x}`).join(", ")} → #${event.id}:\n${event.context}`,
+                    keep: event.id,
+                    kill: event.merged.filter(id => id !== event.id),
+                });
+                finalizeCurrentLayer();
+                propagateFromPreviousLayers([], []);
+                break;
+            case "unreachable":
+                if (isLive(event.id)) {
+                    finalizeCurrentLayer();
+                    propagateFromPreviousLayers([], [event.id])
+                };
+                break;
+            case "reachable":
+                if (!isLive(event.id)) {
+                    let reachableId = newId();
+                    edges.push({
+                        from: idOfLastReferenceTo(event.id),
+                        to: reachableId,
+                    })
+                    currentLayer.push({
+                        id: reachableId,
+                        label: `Reacahble #${event.id}`,
+                        keep: event.id,
+                        kill: [],
+                    })
+                };
+                break;
+            default:
+                throw new Error("unknow event kind");
+        }
+    })
+
+    return {
+        edges,
+        nodes: layers.flatMap((layer, index) => {
+            return layer.map((node) => ({
+                id: node.id,
+                label: node.label,
+                layer: index,
+            }))
+        })}
+}
+
+function showHistory(originBlock) {
+    let { nodes, edges } = buildHistory(originBlock);
 
     let edgeOptions = {
         arrows: "to",
@@ -296,68 +399,22 @@ function showHistory(originBlock) {
         smooth: {
             enabled: true,
             type: "cubicBezier",
-            forceDirection: "vertical",
+            forceDirection: "horizontal",
             roundness: 0.7,
         }
     }
 
-    // create an array with edges
-    const lastEventOf = {};
-    const isReachable = {}
-    const keep = {}
-    const walk = (blockId, eventIndex, makeUnreachable) => {
-        keep[eventIndex] = true;
-        lastEventOf[blockId] = eventIndex;
-        isReachable[blockId] = !makeUnreachable;
-    }
-    let edges = originBlock.history.flatMap(
-        (event, index) => {
-            let eventKind = event.event;
-            let edges;
-
-            if (eventKind === "create") {
-                edges = [];
-                walk(event.id, index)
-            } else if (eventKind === "merge") {
-                edges = event.merged.map(
-                    (from) => {
-                        isReachable[from] = false
-                        return {
-                            from: lastEventOf[from],
-                            to: index,
-                        }
-                    }
-                )
-                walk(event.id, index)
-            } else if (eventKind === "reachable") {
-                if (!isReachable[event.id]) {
-                    edges = [{
-                        from: lastEventOf[event.id],
-                        to: index,
-                    }]
-                    walk(event.id, index);
-                } else {
-                    edges = [];
-                }
-            } else if (eventKind === "unreachable") {
-                if (isReachable[event.id]) {
-                    edges = [{
-                        from: lastEventOf[event.id],
-                        to: index,
-                    }]
-                    walk(event.id, index, true)
-                } else {
-                    edges = [];
-                }
-            } else {
-                throw new Exception("event not implemented")
-            }
-
-            return edges.map((e) => ({ ...edgeOptions, ...e }))
+    let nodeOptions = {
+        shape: "box",
+        font: {
+            "face": "monospace",
+            "align": "left"
+        },
+        color: {
+            background: "#f7f7f7",
+            border: "#9db4ca",
         }
-    );
-
-    nodes = nodes.filter((_, index) => keep[index])
+    }
 
     // create a network
     var data = {
@@ -366,13 +423,30 @@ function showHistory(originBlock) {
     };
     
     var options = {
+        edges: edgeOptions,
+        nodes: nodeOptions,
         layout: {
             hierarchical: {
+                enabled: true,
+                levelSeparation: 400,
+                blockShifting: true,
+                edgeMinimization: true,
                 sortMethod: "directed",
-                treeSpacing:500,
-                direction: "UD",
+                direction: "LR",
                 shakeTowards: "leaves",
                 parentCentralization: false
+            },
+        },
+        physics: {
+            enabled: true,
+            solver: 'barnesHut',
+            hierarchicalRepulsion: {
+                centralGravity: 1.1,
+                springLength: 100,
+                springConstant: 0.01,
+                nodeDistance: 50,
+                damping: 0.2,
+                avoidOverlap: 0.9
             },
         }
     };
@@ -381,7 +455,6 @@ function showHistory(originBlock) {
     focusNetworkPanel(networkId)
     let element = getActiveNetworkElement();
     networks[networkId] = new vis.Network(element, data, options);
-    activeNetworkId = networkId;
 }
 
 // Control Flow Graph
@@ -636,9 +709,9 @@ function openCard(cardElement) {
     if (body.style.display !== 'block') body.style.display = 'block';
 }
 
-function linkBlockRef(originBlock, code) {
+function linkBlockRef(originBlock, code, refStyle) {
     let cfg = originBlock.cfg
-    let compiler = cfg.compiler
+    let compiler = refStyle || cfg.compiler
     let pattern
 
     if (compiler === "gambit") {
@@ -646,7 +719,7 @@ function linkBlockRef(originBlock, code) {
     } else if (compiler === "bigloo") {
         pattern = /\(go\s+(\d+)\)/g
     } else {
-        throw new Exception("unknown compiler", compiler)
+        throw new Error("unknown compiler", compiler)
     }
 
     return code.replace(pattern, (match, number) => {
@@ -656,9 +729,11 @@ function linkBlockRef(originBlock, code) {
         let specializedId = getHtmlIdLocation(specializedBlock)
         let originId = getHtmlIdLocation(specializedBlock.originBlock)
         let tooltip = `usage: ${specializedBlock.usage}`
-        let cls = specializedBlock.usage === 0 ? "class='low-importance-button'" : ""
+        let classes = ["bb-ref-button"]
+        if (specializedBlock.usage === 0) classes.push("low-importance-button")
+        
         let nodeId = getNetWorkUniqueId(specializedBlock);
-        return `<button ${cls} data-tooltip="${tooltip}" onclick="scrollToBlockByIds('${originId}', '${specializedId}', '${nodeId}')">${match}</button>`;
+        return `<button class="${classes.join(" ")}" data-tooltip="${tooltip}" onclick="scrollToBlockByIds('${originId}', '${specializedId}', '${nodeId}')">${match}</button>`;
     })
 }
 
@@ -694,7 +769,7 @@ function refreshControlPanel(cfg) {
                 ${versions.map((b) => {
             return `
                         <span id="${getHtmlIdLocation(b)}" class="origin-block-card-body-row">
-                            <h4>Block #${b.id} (usage: ${b.usage})</h4>
+                            <h4>Block ${linkBlockRef(b, "#" + b.id, "gambit")} (usage: ${b.usage})</h4>
                             <h5>Context</h5>
                             <code>${b.context}</code>
                             <h5>Code</h5>

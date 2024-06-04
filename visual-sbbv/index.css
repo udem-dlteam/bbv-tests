@@ -142,7 +142,7 @@ code {
     white-space: pre;
 }
 
-code button {
+.bb-ref-button {
     cursor: pointer;
     font: inherit;
     border-style: none;
@@ -157,7 +157,7 @@ code button {
     opacity: 0.5;
 }
 
-code button:hover {
+.bb-ref-button:hover {
     position: relative;
     background-color: var(--light-hover);
 }
