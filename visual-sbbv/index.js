@@ -245,10 +245,36 @@ function refreshGraph(cfg, networkID, showAll) {
 }
 
 function buildHistory(originBlock) {
-    let history = originBlock.history;
+    let history = filterRedundantRechability(originBlock.history);
     let layers = [];
     let currentLayer = [];
     let edges = [];
+
+    function filterRedundantRechability(history) {
+        live = {}
+        return history.filter((event) => {
+            console.log(event);
+            switch (event.event) {
+                case "create":
+                    live[event.id] = true;
+                    return true;
+                case "merge":
+                    live[event.id] = true;
+                    event.merged.forEach(id => live[id] = false);
+                    return true;
+                case "reachable":
+                    let keepReachable = !live[event.id];
+                    live[event.id] = true;
+                    return keepReachable;
+                case "unreachable":
+                    let keepUnreachable = live[event.id];
+                    live[event.id] = false;
+                    return keepUnreachable;
+                default:
+                    return true;
+            }
+        })
+    }
 
     function isLive(specializedBlockId) {
         for (let layer of layers.concat([currentLayer]).reverse()) {
@@ -319,6 +345,7 @@ function buildHistory(originBlock) {
 
     let _id = 0;
     const newId = () => _id++;
+    console.log("=== build history tree ===")
     history.forEach((event) => {
         console.log(event)
         switch (event.event) {
@@ -353,7 +380,8 @@ function buildHistory(originBlock) {
                 if (isLive(event.id)) {
                     finalizeCurrentLayer();
                     propagateFromPreviousLayers([], [event.id])
-                };
+                    finalizeCurrentLayer();
+                }
                 break;
             case "reachable":
                 if (!isLive(event.id)) {
@@ -364,11 +392,11 @@ function buildHistory(originBlock) {
                     })
                     currentLayer.push({
                         id: reachableId,
-                        label: `Reacahble #${event.id}`,
+                        label: `Reachable #${event.id}`,
                         keep: event.id,
                         kill: [],
                     })
-                };
+                }
                 break;
             default:
                 throw new Error("unknow event kind");
@@ -395,12 +423,6 @@ function showHistory(originBlock) {
         selfReference: {
             angle: 0,
             size: 70,
-        },
-        smooth: {
-            enabled: true,
-            type: "cubicBezier",
-            forceDirection: "horizontal",
-            roundness: 0.7,
         }
     }
 
