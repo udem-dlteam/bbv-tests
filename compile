@@ -22,6 +22,7 @@ INPUT_FILE=             # file to compile
 OPTIM_LEVEL=0           # optimization level
 SAFE_ARITHMETIC=1       # safe/unsafe arithmetic
 PRIMITIVE_COUNT=0       # enables primitive (0 to disable)
+DUMP_JSON_TRACE=0       # dump BBV trace in json
 SHOW_EXPANSION=0        # show macro expansion
 GENERATE_CFG=0          # enable cfg generation
 VIEW_CFG=0              # open cfg in pdf viewer
@@ -34,7 +35,7 @@ SYSTEM=                 # system (gambit or bigloo)
 CUSTOM_OUTPUT_FILE=     # user's output file
 
 # Parse parameters
-while getopts "f:S:D:o:V:B:O:UPGWIEchv" opt; do
+while getopts "f:S:D:o:V:B:O:UPJGWIEchv" opt; do
   case $opt in
     f)
       INPUT_FILE=$(readlink -f $OPTARG)
@@ -93,6 +94,9 @@ while getopts "f:S:D:o:V:B:O:UPGWIEchv" opt; do
     P)
       PRIMITIVE_COUNT=1
       ;;
+    J)
+      DUMP_JSON_TRACE=1
+      ;;
     G)
       GENERATE_CFG=1
       ;;
@@ -123,6 +127,7 @@ while getopts "f:S:D:o:V:B:O:UPGWIEchv" opt; do
       echo "  -O <level>        Set optimization level (1, 2, 3)"
       echo "  -U                Use unsafe arithmetic"
       echo "  -P                Count primitive usage"
+      echo "  -J                Dump BBV algorithm trace in json"
       echo "  -G                Generate CFG"
       echo "  -W                View CFG in pdf viewer"
       echo "  -I                Use igsc (gambit only)"
@@ -284,13 +289,18 @@ case "$SYSTEM" in
       EXPANSION_FLAG="-expansion"
     fi
 
+    DUMP_JSON_FLAG=""
+    if [ "$DUMP_JSON_TRACE" = "1" ]; then
+      DUMP_JSON_FLAG="-bbv-json-trace"
+    fi
+
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
       PRELUDE="$PRELUDE
                (##include \"$SCRIPT_DIR/gambit/lib.scm\")"
       POSTLUDE="(##include \"$SCRIPT_DIR/gambit/main.scm\")"
       FLAGS="$FLAGS -c" # only interested in primitive count, do not call gcc
       (cd $INPUT_FILE_DIRNAME && \
-       $GAMBITCOMP  $EXPANSION_FLAG -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS -gvm-interpret $INPUT_FILE)
+       $GAMBITCOMP  $EXPANSION_FLAG -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS -gvm-interpret $DUMP_JSON_FLAG $INPUT_FILE)
     else
       # Compilation
       (cd $INPUT_FILE_DIRNAME && \
