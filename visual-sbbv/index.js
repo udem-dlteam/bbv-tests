@@ -250,10 +250,16 @@ function buildHistory(originBlock) {
     let currentLayer = [];
     let edges = [];
 
+    let order = 1;
+    function addToCurrentLayer(node, noOrderLabel) {
+        let orderText = noOrderLabel ? "" : `(${order}) `;
+        currentLayer.push({ ...node, label: `${orderText}${node.label}`, level: layers.length})
+        order += 1;
+    }
+
     function filterRedundantRechability(history) {
         live = {}
         return history.filter((event) => {
-            console.log(event);
             switch (event.event) {
                 case "create":
                     live[event.id] = true;
@@ -286,40 +292,52 @@ function buildHistory(originBlock) {
         return false;
     }
 
-    function finalizeCurrentLayer() {
+    function pushCurrentLayer() {
         layers.push(currentLayer);
         currentLayer = [];
     }
 
-    function propagateFromPreviousLayers(drop, unreachable) {
-        if (layers.length < 1) return;
-        for (node of layers[layers.length - 1]) {
-            if (unreachable.includes(node.keep)) {
-                let unreachableNodeId = newId();
-                edges.push({
-                    from: node.id,
-                    to: unreachableNodeId,
-                })
-                currentLayer.push({
-                    id: unreachableNodeId,
-                    label: `Unreachable #${node.keep}`,
-                    keep: null,
-                    kill: [node.keep],
-                })
-            } else if (node.keep && !drop.includes(node.keep)) {
-                let nodeId = newId();
-                edges.push({
-                    from: node.id,
-                    to: nodeId
-                })
-                currentLayer.push({
-                    id: nodeId,
-                    label: `Keep #${node.keep}`,
-                    keep: node.keep,
-                    kill: [],
-                })
+    function finalizeCurrentLayer() {
+        if (currentLayer.length === 0) return;
+        if (layers.length === 0) {
+            pushCurrentLayer();
+            return;
+        }
+
+        // Attempt to compress the current layer in the last one if there is no conflict
+        let lastLayer = layers[layers.length - 1];
+        let keeps = lastLayer.flatMap(node => node.keep !== undefined ? [node.keep] : []);
+        let kills = lastLayer.flatMap(node => node.kill);
+        let refs = kills.concat(keeps);
+
+        for (let node of currentLayer) {
+            if (refs.includes(node.keep) || node.kill.some(id => refs.includes(id))) {
+                pushCurrentLayer();
+                return;
             }
         }
+        for (let node of currentLayer) {
+            lastLayer.push(node);
+        }
+        currentLayer = [];
+    }
+
+    function finalizeHistory() {
+        finalizeCurrentLayer();
+        for (let specializedBlock of originBlock.versions) {
+            let finalNodeId = newId();
+            edges.push({
+                from: idOfLastReferenceTo(specializedBlock.id),
+                to: finalNodeId,
+            })
+            addToCurrentLayer({
+                id: finalNodeId,
+                label: `Final #${specializedBlock.id}\n${specializedBlock.context}`,
+                keep: specializedBlock.id,
+                kill: [],
+            }, true)
+        }
+        if (currentLayer.length > 0) pushCurrentLayer();
     }
 
     function positionOfLastReferenceTo(specializedBlockId) {
@@ -345,12 +363,11 @@ function buildHistory(originBlock) {
 
     let _id = 0;
     const newId = () => _id++;
-    console.log("=== build history tree ===")
     history.forEach((event) => {
-        console.log(event)
+        console.log(layers.length, event.event, event.id, event, currentLayer, layers)
         switch (event.event) {
             case "create":
-                currentLayer.push({
+                addToCurrentLayer({
                     id: newId(),
                     label: `#${event.id} Create:\n${event.context}`,
                     keep: event.id,
@@ -366,20 +383,27 @@ function buildHistory(originBlock) {
                         to: mergeNodeId,
                     })
                 }
-                propagateFromPreviousLayers(event.merged, [])
-                currentLayer.push({
+                addToCurrentLayer({
                     id: mergeNodeId,
-                    label: `Merge ${event.merged.map(x => `#${x}`).join(", ")} → #${event.id}:\n${event.context}`,
+                    label: `Merge #${event.id} ← ${event.merged.map(x => `#${x}`).join(", ")}:\n${event.context}`,
                     keep: event.id,
                     kill: event.merged.filter(id => id !== event.id),
                 });
-                finalizeCurrentLayer();
-                propagateFromPreviousLayers([], []);
                 break;
             case "unreachable":
                 if (isLive(event.id)) {
                     finalizeCurrentLayer();
-                    propagateFromPreviousLayers([], [event.id])
+                    let unreachableNodeId = newId();
+                    edges.push({
+                        from: idOfLastReferenceTo(event.id),
+                        to: unreachableNodeId,
+                    })
+                    addToCurrentLayer({
+                        id: unreachableNodeId,
+                        label: `Unreachable #${event.id}`,
+                        keep: null,
+                        kill: [event.id],
+                    })
                     finalizeCurrentLayer();
                 }
                 break;
@@ -390,7 +414,7 @@ function buildHistory(originBlock) {
                         from: idOfLastReferenceTo(event.id),
                         to: reachableId,
                     })
-                    currentLayer.push({
+                    addToCurrentLayer({
                         id: reachableId,
                         label: `Reachable #${event.id}`,
                         keep: event.id,
@@ -403,13 +427,15 @@ function buildHistory(originBlock) {
         }
     })
 
+    finalizeHistory();
+
     return {
         edges,
         nodes: layers.flatMap((layer, index) => {
             return layer.map((node) => ({
                 id: node.id,
                 label: node.label,
-                layer: index,
+                level: index,
             }))
         })}
 }
@@ -451,7 +477,7 @@ function showHistory(originBlock) {
             hierarchical: {
                 enabled: true,
                 levelSeparation: 400,
-                blockShifting: true,
+                blockShifting: false,
                 edgeMinimization: true,
                 sortMethod: "directed",
                 direction: "LR",
