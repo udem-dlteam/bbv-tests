@@ -364,7 +364,6 @@ function buildHistory(originBlock) {
     let _id = 0;
     const newId = () => _id++;
     history.forEach((event) => {
-        console.log(layers.length, event.event, event.id, event, currentLayer, layers)
         switch (event.event) {
             case "create":
                 addToCurrentLayer({
