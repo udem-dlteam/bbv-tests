@@ -177,7 +177,10 @@ Where each line indicate whether the benchmark script was able to compile, count
 
 ## Visualization tools
 
-The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It reads a JSON of the form:
+The `visual-sbbv` folder contains a webapp to visualize the result of SBBV, open `visual-sbbv/index.html` in the browser (I tested Firefox only).
+
+
+It reads a JSON of the form:
 
 ```json
 {
