@@ -245,7 +245,7 @@ function refreshGraph(cfg, networkID, showAll) {
 }
 
 function buildHistory(originBlock) {
-    let history = filterRedundantRechability(originBlock.history);
+    let history = filterRedundantReachability(originBlock.history);
     let layers = [];
     let currentLayer = [];
     let edges = [];
@@ -257,7 +257,7 @@ function buildHistory(originBlock) {
         order += 1;
     }
 
-    function filterRedundantRechability(history) {
+    function filterRedundantReachability(history) {
         live = {}
         return history.filter((event) => {
             switch (event.event) {
@@ -265,6 +265,10 @@ function buildHistory(originBlock) {
                     live[event.id] = true;
                     return true;
                 case "merge":
+                    live[event.id] = true;
+                    event.merged.forEach(id => live[id] = false);
+                    return true;
+                case "mergeCreate":
                     live[event.id] = true;
                     event.merged.forEach(id => live[id] = false);
                     return true;
@@ -373,6 +377,7 @@ function buildHistory(originBlock) {
                     kill: [],
                 })
                 break;
+            case "mergeCreate":
             case "merge":
                 let mergeNodeId = newId();
                 finalizeCurrentLayer();
