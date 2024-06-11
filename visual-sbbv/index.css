@@ -5,6 +5,8 @@
     --medium-background: #d6e4f2;
     --light-background: #f7f7f7;
 
+    --light-background-depth: #e4e4e4;
+
     --dark-border: #000080;
     --medium-border: #9db4ca;
     --light-border: #ffffff;
@@ -91,11 +93,6 @@ html {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-.origin-block-card h4 {
-    margin-top: 1em;
-    margin-bottom: 1em;
-}
-
 .origin-block-card-header {
     cursor: pointer;
     display: flex;
@@ -114,7 +111,7 @@ html {
     border-left: 1px solid #999;
     flex-grow: 1;
     display: grid;
-    grid-template-columns: repeat(20, 1fr);
+    grid-template-columns: repeat(10, 1fr);
     gap: 10px;
 }
 
@@ -134,7 +131,13 @@ html {
 }
 
 .origin-block-card-body-row {
-    padding: 5px;
+    padding: 15px;
+    border-radius: 5px;
+    border: 1px solid var(--medium-border);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    margin: 5px 0 5px
 }
 
 code {

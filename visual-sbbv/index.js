@@ -790,6 +790,21 @@ function handleShowAllSwitch() {
     refreshGraph(SBBVControlFlowGraph, showAll ? "largeCFGNetwork" : "smallCFGNetwork", showAll)
 }
 
+function abbreviateNumber(num) {
+    if (num < 1000) {
+        return num.toString();
+    }
+    else if (num < 1000000) {
+        return (num / 1000).toFixed(0) + 'k';
+    }
+    else if (num < 1000000000) {
+        return (num / 1000000).toFixed(0) + 'M';
+    }
+    else {
+        return '1G+';
+    }
+}
+
 function refreshControlPanel(cfg) {
     let newControlPanelHTML = ""
 
@@ -807,16 +822,16 @@ function refreshControlPanel(cfg) {
                     ${block.bbs}#${block.id}
                 </span>
                 <span class="origin-block-card-subtitles">
-                    ${versions.map((b) => `<span class="origin-block-card-subtitle">${b.usage}</span>`).join("")}
+                    ${versions.map((b) => `<span class="origin-block-card-subtitle">${linkBlockRef(b, "#" + b.id, "gambit")}: ${abbreviateNumber(b.usage)}</span>`).join("")}
                 </span>
             </div>
             <div class="origin-block-card-body">
-                <h4>source</h4>
-                <code>${escapeHtml(block.source)}</code>
+                ${block.loc ? "<code>" + block.loc + "</code>" : ""}
+                ${block.source ? "<h4>source</h4><code>" + escapeHtml(block.source) + "</code>" : ""}
                 ${versions.map((b) => {
             return `
                         <span id="${getHtmlIdLocation(b)}" class="origin-block-card-body-row">
-                            <h4>Block ${linkBlockRef(b, "#" + b.id, "gambit")} (usage: ${b.usage})</h4>
+                            <h4>Block ${linkBlockRef(b, "#" + b.id, "gambit")} (usage: ${abbreviateNumber(b.usage)})</h4>
                             <h5>Context</h5>
                             <code>${b.context}</code>
                             <h5>Code</h5>
