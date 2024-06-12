@@ -166,10 +166,12 @@ code {
 .bb-ref-button:hover {
     position: relative;
     background-color: var(--light-hover);
+    z-index: 100;
 }
 
 [data-tooltip]:hover {
     opacity: revert;
+    z-index: 100;
 }
 
 [data-tooltip]:hover::after {

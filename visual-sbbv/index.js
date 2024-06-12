@@ -745,6 +745,14 @@ class SpecializedBasicBlock {
         return this.originBlock.bbs
     }
 
+    get predecessors() {
+        return this.#predecessors.map((p) => this.cfg.getSpecializedBlock(this.bbs, p))
+    }
+
+    get successors() {
+        return this.#successors.map((p) => this.cfg.getSpecializedBlock(this.bbs, p))
+    }
+
     get references() {
         let refs = {}
         let bbs = this.bbs
@@ -931,11 +939,15 @@ function refreshControlPanel(cfg) {
                 ${versions.map((b) => {
             return `
                         <span id="${getHtmlIdLocation(b)}" class="origin-block-card-body-row">
-                            <h4>Block ${linkBlockRef(b, "#" + b.id, "gambit")} (usage: ${abbreviateNumber(b.usage)})</h4>
+                            <h4>Block ${linkBlockRef(block, "#" + b.id, "gambit")} (usage: ${abbreviateNumber(b.usage)})</h4>
                             <h5>Context</h5>
                             <code>${b.context}</code>
+                            <h5>Predecessors</h5>
+                            ${b.predecessors.length > 0 ? linkBlockRef(block, b.predecessors.map((p) => "#" + p.id).join(", "), "gambit") : "-"}
+                            <h5>Successors</h5>
+                            ${b.successors.length > 0 ? linkBlockRef(block, b.successors.map((p) => "#" + p.id).join(", "), "gambit") : "-"}
                             <h5>Code</h5>
-                            <code>${b.details ? linkBlockRef(b, escapeHtml(b.details)) : linkBlockRef(b, escapeHtml(b.context))}</code>
+                            <code>${b.details ? linkBlockRef(block, escapeHtml(b.details)) : linkBlockRef(b, escapeHtml(b.context))}</code>
                         </span>`
         }).join("")}
             </div>
