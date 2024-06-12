@@ -713,6 +713,10 @@ class OriginBasicBlock {
         }
         return sum
     }
+
+    get loc() {
+        return this.versions[0].loc
+    }
 }
 
 class SpecializedBasicBlock {
