@@ -91,11 +91,20 @@ cd bigloo
 BIGLOOBBVDUMPJSON=true BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm  -fsaw-bbv-fun pick-entrances
 ```
 
-To profile the generate code:
+To generate a json dump and a profile the generate code:
 
 ```
 cd bigloo
 BIGLOOSAWPROFILE=true BIGLOOBBVDUMPJSON=true BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm  -fsaw-bbv-fun pick-entrances
+./a.out > prof.json
+```
+
+Logs are easier to understand if basic blocks are not cleanup after the BBV optimization. 
+So, it might help to compile with:
+
+```
+cd bigloo
+BIGLOOBBVCLEANUP=false BIGLOOSAWPROFILE=true BIGLOOBBVDUMPJSON=true BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm  -fsaw-bbv-fun pick-entrances
 ./a.out > prof.json
 ```
 

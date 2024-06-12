@@ -4,7 +4,7 @@
 /*    -------------------------------------------------------------    */
 /*    Author      :  Manuel Serrano                                    */
 /*    Creation    :  Thu May 30 09:27:20 2024                          */
-/*    Last change :  Thu May 30 09:42:39 2024 (serrano)                */
+/*    Last change :  Wed Jun 12 07:23:19 2024 (serrano)                */
 /*    Copyright   :  2024 Manuel Serrano                               */
 /*    -------------------------------------------------------------    */
 /*    Merge a "static CFG json dump" and a "dynamic profiling count".  */
@@ -43,10 +43,13 @@ function main(argv) {
    const fun = cfg.specializedCFG[0].bbs;
    const bbs = [];
 
-   cfg.specializedCFG.forEach(b => bbs[b.id] = b);
+   cfg.specializedCFG =
+      cfg.specializedCFG.filter(b => b ? (bbs[b.id] = b, true) : false);
 
+   cfg.history = cfg.history.filter(x => x);
+   
    dyn.forEach(b => {
-      if (b?.fun === fun) {
+      if (b && b?.fun === fun) {
 	 const bb = bbs[b.id];
 
 	 if (bb) {
