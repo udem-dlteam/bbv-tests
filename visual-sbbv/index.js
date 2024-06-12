@@ -90,7 +90,7 @@ function highlightBlock(block) {
     highlightBlockCard(block);
     highlightInCFGNetwork('largeCFGNetwork', block);
     highlightInCFGNetwork('smallCFGNetwork', block);
-    highlightInMergeHistory(block);
+    highlightInMergeHistory(block.id);
 }
 
 function highlightBlockCard(block) {
@@ -110,7 +110,7 @@ function highlightBlockCard(block) {
     })
 }
 
-function highlightInMergeHistory(block) {
+function highlightInMergeHistory(blockId) {
     let network = networks.mergeHistoryNetwork;
     if (!network) return;
 
@@ -128,7 +128,7 @@ function highlightInMergeHistory(block) {
             }
         },
         {
-            filter: (node) => node.refs.includes(block.id)
+            filter: (node) => node.refs.includes(blockId)
         }
     )
 
@@ -525,8 +525,13 @@ function buildHistory(originBlock) {
         })}
 }
 
+function showHistoryFromId(bbs, id) {
+    showHistory({ id, bbs })
+}
+
 function showHistory(specializedBlock) {
-    let originBlock = specializedBlock.originBlock;
+    let { id, bbs } = specializedBlock;
+    let originBlock = SBBVControlFlowGraph.getOriginBlockOfHistoricVersion(bbs, id)
 
     let { nodes, edges } = buildHistory(originBlock);
 
@@ -591,7 +596,7 @@ function showHistory(specializedBlock) {
     let element = getActiveNetworkElement();
     networks[networkId] = new vis.Network(element, data, options);
 
-    highlightInMergeHistory(specializedBlock);
+    highlightInMergeHistory(id);
 }
 
 // Control Flow Graph
@@ -601,11 +606,15 @@ SBBVControlFlowGraph = null;
 class SpecializedCFG {
     #specializedBlocks
     #originBlocks
+    #historyBlocksToOrigin
+    #historyBlocksOfOrigin
 
     constructor(compiler) {
         this.compiler = compiler
         this.#specializedBlocks = {}
         this.#originBlocks = {}
+        this.#historyBlocksToOrigin = {}
+        this.#historyBlocksOfOrigin = {}
     }
 
     cleanupDeadBBS() {
@@ -661,6 +670,14 @@ class SpecializedCFG {
         return this.#originBlocks[bbs]?.[id]
     }
 
+    getOriginBlockOfHistoricVersion(bbs, id) {
+        return this.getOriginBlock(bbs, this.#historyBlocksToOrigin[bbs][id])
+    }
+
+    getHistoricVersionsOfOriginBlock(block) {
+        return [...this.#historyBlocksOfOrigin[block.bbs][block.id]]
+    }
+
     addBlock(block) {
         let { id, bbs } = block;
         let originBlock = this.#getOrSetOriginBlock(block);
@@ -693,6 +710,21 @@ class SpecializedCFG {
             }
         }
         return blocks
+    }
+
+    loadHistory(history) {
+        let toOriginMapping = this.#historyBlocksToOrigin
+        let fromOriginMapping = this.#historyBlocksOfOrigin
+        for (let event of history) {
+            let { origin, bbs, id } = event
+
+            if (!toOriginMapping[bbs]) toOriginMapping[bbs] = {};
+            if (!fromOriginMapping[bbs]) fromOriginMapping[bbs] = {};
+            if (!fromOriginMapping[bbs][origin]) fromOriginMapping[bbs][origin] = new Set();
+
+            toOriginMapping[bbs][id] = origin;
+            fromOriginMapping[bbs][origin].add(id);
+        }
     }
 }
 
@@ -801,6 +833,7 @@ function parseCFG({ compiler, specializedCFG }) {
 }
 
 function parseHistory({ history }, cfg) {
+    cfg.loadHistory(history);
     for (let event of history) {
         let { origin, bbs } = event
         let block = cfg.getOriginBlock(bbs, origin)
@@ -947,9 +980,16 @@ function refreshControlPanel(cfg) {
                             <h5>Successors</h5>
                             ${b.successors.length > 0 ? linkBlockRef(block, b.successors.map((p) => "#" + p.id).join(", "), "gambit") : "-"}
                             <h5>Code</h5>
-                            <code>${b.details ? linkBlockRef(block, escapeHtml(b.details)) : linkBlockRef(b, escapeHtml(b.context))}</code>
+                            <code>${b.details ? linkBlockRef(block, escapeHtml(b.details)) : linkBlockRef(block, escapeHtml(b.context))}</code>
                         </span>`
         }).join("")}
+            <h4>History</h4>
+            ${cfg.getHistoricVersionsOfOriginBlock(block).map((id) => {
+                let classes = ["bb-ref-button", "history-ref-button"]
+                if (!cfg.getSpecializedBlock(block.bbs, id)) classes.push("low-importance-button")
+                return `<button class='${classes.join(" ") }'
+                                onclick="showHistoryFromId('${block.bbs}', ${id})">#${id}</button>`
+            }).join(" ")}
             </div>
         </div>
         `

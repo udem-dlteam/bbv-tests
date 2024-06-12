@@ -159,6 +159,11 @@ code {
     margin-top: 1px;
 }
 
+.history-ref-button {
+    display: inline;
+    padding: 1px !important;
+}
+
 .low-importance-button {
     opacity: 0.5;
 }
