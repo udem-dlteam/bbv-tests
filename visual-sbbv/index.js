@@ -30,6 +30,29 @@ function panelStopResize() {
     document.removeEventListener('mouseup', panelStopResize);
 }
 
+class UndoStack {
+    constructor() {
+        this.stack = [];
+    }
+
+    push(action) {
+        this.stack.push(action);
+    }
+
+    undo() {
+        let last = this.stack.pop();
+        if (last) {
+            last();
+            return true;
+        }
+        return false;
+    }
+
+    undoAll() {
+        while (this.undo());
+    }
+}
+
 // Viz Panel
 var activeNetworkId = "smallCFGElement";
 const networkElements = {
@@ -59,9 +82,65 @@ function getNetWorkUniqueId(block) {
     return `${block.bbs}-${block.id}`
 }
 
-function makeNodeGlow(nodeId) {
-    const activeCFGNetwork = getActiveNetwork()
-    activeCFGNetwork.body.data.nodes.update({
+var highlightUndos = new UndoStack();
+
+function highlightBlock(block) {
+    highlightUndos.undoAll();
+
+    highlightBlockCard(block);
+    highlightInCFGNetwork('largeCFGNetwork', block);
+    highlightInCFGNetwork('smallCFGNetwork', block);
+    highlightInMergeHistory(block);
+}
+
+function highlightBlockCard(block) {
+    let elementId = getHtmlIdLocation(block);
+
+    let element = document.getElementById(elementId);
+
+    if (!element) return;
+
+    element.classList.add('glow');
+
+    let elementRef = new WeakRef(element);
+    highlightUndos.push(() => {
+        let element = elementRef.deref();
+        if (!element) return;
+        element.classList.remove('glow');
+    })
+}
+
+function highlightInMergeHistory(block) {
+    let network = networks.mergeHistoryNetwork;
+    if (!network) return;
+
+    let updates = network.body.data.nodes.map(
+        (node) => {
+            return {
+                id: node.id,
+                shadow: {
+                    enabled: true,
+                    color: 'red', // Customize the glow color
+                    size: 30,
+                    x: 0,
+                    y: 0
+                }
+            }
+        },
+        {
+            filter: (node) => node.refs.includes(block.id)
+        }
+    )
+
+    network.body.data.nodes.update(updates)
+}
+
+function highlightInCFGNetwork(networkId, block) {
+    let network = networks[networkId];
+    if (!network) return;
+    let nodeId = getNetWorkUniqueId(block);
+
+    network.body.data.nodes.update({
         id: nodeId,
         shadow: {
             enabled: true,
@@ -72,12 +151,14 @@ function makeNodeGlow(nodeId) {
         }
     })
 
-    setTimeout(() => {
-        activeCFGNetwork.body.data.nodes.update({
+    const networkRef = new WeakRef(network);
+    highlightUndos.push(() => {
+        if (!networkRef.deref()) return;
+        networkRef.deref().body.data.nodes.update({
             id: nodeId,
             shadow: { enabled: false }
         })
-    }, 2000)
+    })
 }
 
 function centerOnBlockInNetwork(nodeId) {
@@ -93,7 +174,7 @@ function centerOnBlockInNetwork(nodeId) {
     const nodePosition = activeCFGNetwork.getPositions([nodeId])[nodeId];
 
     if (nodePosition === undefined) {
-        glowElement(document.getElementById("cfg-show-all-switch").querySelector(".slider"))
+        // glowElement(document.getElementById("cfg-show-all-switch").querySelector(".slider"))
         return
     }
 
@@ -107,8 +188,6 @@ function centerOnBlockInNetwork(nodeId) {
             easingFunction: "easeInOutQuad"
         }
     });
-
-    makeNodeGlow(nodeId)
 }
 
 function focusNetworkPanel(networkId) {
@@ -238,8 +317,8 @@ function refreshGraph(cfg, networkID, showAll) {
     activeCFGNetwork.on("doubleClick", function (params) {
         if (params.nodes.length > 0) {
             let nodeId = params.nodes[0];
-            let originBlock = activeCFGNetwork.body.data.nodes.get(nodeId).block.originBlock;
-            showHistory(originBlock);
+            let specializedBlock = activeCFGNetwork.body.data.nodes.get(nodeId).block;
+            showHistory(specializedBlock);
         }
     })
 }
@@ -301,9 +380,14 @@ function buildHistory(originBlock) {
         currentLayer = [];
     }
 
-    function finalizeCurrentLayer() {
+    function finalizeCurrentLayer(forcePush) {
         if (currentLayer.length === 0) return;
         if (layers.length === 0) {
+            pushCurrentLayer();
+            return;
+        }
+
+        if (forcePush) {
             pushCurrentLayer();
             return;
         }
@@ -327,7 +411,7 @@ function buildHistory(originBlock) {
     }
 
     function finalizeHistory() {
-        finalizeCurrentLayer();
+        finalizeCurrentLayer(true);
         for (let specializedBlock of originBlock.versions) {
             let finalNodeId = newId();
             edges.push({
@@ -437,14 +521,16 @@ function buildHistory(originBlock) {
         edges,
         nodes: layers.flatMap((layer, index) => {
             return layer.map((node) => ({
-                id: node.id,
-                label: node.label,
                 level: index,
+                refs: node.kill.concat(node.keep ? [node.keep] : []),
+                ...node,
             }))
         })}
 }
 
-function showHistory(originBlock) {
+function showHistory(specializedBlock) {
+    let originBlock = specializedBlock.originBlock;
+
     let { nodes, edges } = buildHistory(originBlock);
 
     let edgeOptions = {
@@ -496,7 +582,7 @@ function showHistory(originBlock) {
                 centralGravity: 1.1,
                 springLength: 100,
                 springConstant: 0.01,
-                nodeDistance: 50,
+                nodeDistance: originBlock.cfg.compiler === "gambit" ? 50 : 100,
                 damping: 0.2,
                 avoidOverlap: 0.9
             },
@@ -507,6 +593,8 @@ function showHistory(originBlock) {
     focusNetworkPanel(networkId)
     let element = getActiveNetworkElement();
     networks[networkId] = new vis.Network(element, data, options);
+
+    highlightInMergeHistory(specializedBlock);
 }
 
 // Control Flow Graph
@@ -721,25 +809,19 @@ function getHtmlIdLocation(block) {
     throw new Error("not a block", block)
 }
 
-function scrollToBlock(specializedBlock) {
-    let specializedId = getHtmlIdLocation(specializedBlock)
-    let originId = getHtmlIdLocation(specializedBlock.originBlock)
-    let nodeId = getNetWorkUniqueId(specializedBlock);
-    scrollToBlockByIds(originId, specializedId, nodeId);
+function scrollToBlockById(bbs, specializedBlockId) {
+    scrollToBlock(SBBVControlFlowGraph.getSpecializedBlock(bbs, specializedBlockId))
 }
 
-function glowElement(element) {
-    element.classList.add('glowing');
-    setTimeout(() => element.classList.remove('glowing'), 2000);
-}
+function scrollToBlock(block) {
+    let originHTMLId = getHtmlIdLocation(block.originBlock)
+    let nodeNetworkId = getNetWorkUniqueId(block);
 
-function scrollToBlockByIds(originBlockId, specializedBlockId, nodeId) {
-    let card = document.getElementById(originBlockId);
+    let card = document.getElementById(originHTMLId);
     openCard(card);
-    let section = document.getElementById(specializedBlockId);
     card.scrollIntoView({ behavior: "smooth", block: "center", inline: 'nearest' });
-    glowElement(section);
-    centerOnBlockInNetwork(nodeId);
+    centerOnBlockInNetwork(nodeNetworkId);
+    highlightBlock(block);
 }
 
 function escapeHtml(unsafe) {
@@ -778,14 +860,11 @@ function linkBlockRef(originBlock, code, refStyle) {
         let specializedBlock = cfg.getSpecializedBlock(originBlock.bbs, parseInt(number))
         if (!specializedBlock) return match; // may have mismatched a non-label
 
-        let specializedId = getHtmlIdLocation(specializedBlock)
-        let originId = getHtmlIdLocation(specializedBlock.originBlock)
         let tooltip = `usage: ${specializedBlock.usage}`
         let classes = ["bb-ref-button"]
         if (specializedBlock.usage === 0) classes.push("low-importance-button")
         
-        let nodeId = getNetWorkUniqueId(specializedBlock);
-        return `<button class="${classes.join(" ")}" data-tooltip="${tooltip}" onclick="scrollToBlockByIds('${originId}', '${specializedId}', '${nodeId}')">${match}</button>`;
+        return `<button class="${classes.join(" ")}" data-tooltip="${tooltip}" onclick="scrollToBlockById('${specializedBlock.bbs}', '${specializedBlock.id}')">${match}</button>`;
     })
 }
 

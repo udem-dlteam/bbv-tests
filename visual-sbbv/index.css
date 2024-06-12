@@ -182,28 +182,10 @@ code {
     background-color: var(--light-hover);
 }
 
-@keyframes glow {
-    0% {
-        -webkit-box-shadow: 0 0 5 var(--emphasis);
-        -moz-box-shadow: 0 0 5 var(--emphasis);
-        box-shadow: 0 0 5px var(--emphasis);
-    }
-
-    50% {
-        -webkit-box-shadow: 0 0 30px var(--emphasis);
-        -moz-box-shadow: 0 0 30px var(--emphasis);
-        box-shadow: 0 0 30px var(--emphasis);
-    }
-
-    100% {
-        -webkit-box-shadow: 0 0 5 var(--emphasis);
-        -moz-box-shadow: 0 0 5px var(--emphasis);
-        box-shadow: 0 0 5px var(--emphasis);
-    }
-}
-
-.glowing {
-    animation: glow 2s ease-out;
+.glow {
+    -webkit-box-shadow: 0 0 30px var(--emphasis);
+    -moz-box-shadow: 0 0 30px var(--emphasis);
+    box-shadow: 0 0 30px var(--emphasis);
 }
 
 #cfg-show-all-switch {
