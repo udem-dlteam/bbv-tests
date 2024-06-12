@@ -453,7 +453,7 @@ function buildHistory(originBlock) {
             case "create":
                 addToCurrentLayer({
                     id: newId(),
-                    label: `#${event.id} Create:\n${event.context}`,
+                    label: `#${event.id} Create from #${event.from}:\n${event.context}`,
                     keep: event.id,
                     kill: [],
                 })
