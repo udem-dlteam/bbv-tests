@@ -343,11 +343,8 @@ function buildHistory(originBlock) {
                 case "create":
                     live[event.id] = true;
                     return true;
-                case "merge":
-                    live[event.id] = true;
-                    event.merged.forEach(id => live[id] = false);
-                    return true;
                 case "mergeCreate":
+                case "merge":
                     live[event.id] = true;
                     event.merged.forEach(id => live[id] = false);
                     return true;
@@ -566,7 +563,7 @@ function showHistory(specializedBlock) {
         layout: {
             hierarchical: {
                 enabled: true,
-                levelSeparation: 400,
+                levelSeparation: originBlock.cfg.compiler === "gambit" ? 400 : 800,
                 blockShifting: false,
                 edgeMinimization: true,
                 sortMethod: "directed",
@@ -582,7 +579,7 @@ function showHistory(specializedBlock) {
                 centralGravity: 1.1,
                 springLength: 100,
                 springConstant: 0.01,
-                nodeDistance: originBlock.cfg.compiler === "gambit" ? 50 : 100,
+                nodeDistance: 50,
                 damping: 0.2,
                 avoidOverlap: 0.9
             },
