@@ -726,7 +726,7 @@ class SpecializedBasicBlock {
     #references
     #ret
 
-    constructor({ id, originBlock, context, details, usage, predecessors, successors, ret, references, jumps, cfg }) {
+    constructor({ id, originBlock, context, loc, details, usage, predecessors, successors, ret, references, jumps, cfg }) {
         this.id = id
         this.originBlock = originBlock
         this.context = context
@@ -738,6 +738,7 @@ class SpecializedBasicBlock {
         this.#jumps = jumps || [];
         this.#ret = ret || []
         this.cfg = cfg
+        this.loc = loc
     }
 
     get bbs() {
