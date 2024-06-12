@@ -778,11 +778,11 @@ class SpecializedBasicBlock {
     }
 
     get predecessors() {
-        return this.#predecessors.map((p) => this.cfg.getSpecializedBlock(this.bbs, p))
+        return this.#predecessors.map((p) => this.cfg.getSpecializedBlock(this.bbs, p)).filter(x => x)
     }
 
     get successors() {
-        return this.#successors.map((p) => this.cfg.getSpecializedBlock(this.bbs, p))
+        return this.#successors.map((p) => this.cfg.getSpecializedBlock(this.bbs, p)).filter(x => x)
     }
 
     get references() {
@@ -970,7 +970,7 @@ function refreshControlPanel(cfg) {
                 ${block.loc ? "<code>" + block.loc + "</code>" : ""}
                 ${block.source ? "<h4>source</h4><code>" + escapeHtml(block.source) + "</code>" : ""}
                 ${versions.map((b) => {
-            return `
+                    return `
                         <span id="${getHtmlIdLocation(b)}" class="origin-block-card-body-row">
                             <h4>Block ${linkBlockRef(block, "#" + b.id, "gambit")} (usage: ${abbreviateNumber(b.usage)})</h4>
                             <h5>Context</h5>
