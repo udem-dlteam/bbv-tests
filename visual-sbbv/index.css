@@ -41,6 +41,10 @@ html {
     color: var(--light-font);
 }
 
+.navbar-button {
+    padding: 0 10px 0;
+}
+
 .cfg-main {
     display: flex;
     margin: 0;

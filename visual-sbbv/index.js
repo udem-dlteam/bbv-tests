@@ -840,6 +840,20 @@ function openCard(cardElement) {
     if (body.style.display !== 'block') body.style.display = 'block';
 }
 
+function closeCardBody(body) {
+    if (body.style.display === 'block') body.style.display = 'none';
+}
+
+function closeCard(cardElement) {
+    const body = cardElement.querySelector('.origin-block-card-body');
+    closeCardBody(body);
+}
+
+function closeAllCards() {
+    const bodies = document.querySelectorAll('.origin-block-card-body');
+    bodies.forEach(closeCardBody)
+}
+
 function linkBlockRef(originBlock, code, refStyle) {
     let cfg = originBlock.cfg
     let compiler = refStyle || cfg.compiler
