@@ -325,15 +325,22 @@ function refreshGraph(cfg, networkID, showAll) {
 
 function buildHistory(originBlock) {
     let history = filterRedundantReachability(originBlock.history);
-    let layers = [];
     let currentLayer = [];
+    let layers = [currentLayer]
     let edges = [];
 
     let order = 1;
-    function addToCurrentLayer(node, noOrderLabel) {
+    function addNode(node, froms, noOrderLabel) {
+        if (!froms) froms = [];
+        else if (froms.constructor !== Array) froms = [froms];
+
+        node = { ...node, id: newId() }
+
         let orderText = noOrderLabel ? "" : `(${order}) `;
-        currentLayer.push({ ...node, label: `${orderText}${node.label}`, level: layers.length})
         order += 1;
+        froms.forEach(from => edges.push({ from, to: node.id }));
+        if (currentLayer.find(node => froms.includes(node.id))) addLayer();
+        currentLayer.push({ ...node, label: `${orderText}${node.label}`, level: layers.length})
     }
 
     function filterRedundantReachability(history) {
@@ -372,57 +379,22 @@ function buildHistory(originBlock) {
         return false;
     }
 
-    function pushCurrentLayer() {
-        layers.push(currentLayer);
-        currentLayer = [];
-    }
-
-    function finalizeCurrentLayer(forcePush) {
+    function addLayer() {
         if (currentLayer.length === 0) return;
-        if (layers.length === 0) {
-            pushCurrentLayer();
-            return;
-        }
-
-        if (forcePush) {
-            pushCurrentLayer();
-            return;
-        }
-
-        // Attempt to compress the current layer in the last one if there is no conflict
-        let lastLayer = layers[layers.length - 1];
-        let keeps = lastLayer.flatMap(node => node.keep !== undefined ? [node.keep] : []);
-        let kills = lastLayer.flatMap(node => node.kill);
-        let refs = kills.concat(keeps);
-
-        for (let node of currentLayer) {
-            if (refs.includes(node.keep) || node.kill.some(id => refs.includes(id))) {
-                pushCurrentLayer();
-                return;
-            }
-        }
-        for (let node of currentLayer) {
-            lastLayer.push(node);
-        }
         currentLayer = [];
+        layers.push(currentLayer);
     }
 
     function finalizeHistory() {
-        finalizeCurrentLayer(true);
+        addLayer();
         for (let specializedBlock of originBlock.versions) {
-            let finalNodeId = newId();
-            edges.push({
-                from: idOfLastReferenceTo(specializedBlock.id),
-                to: finalNodeId,
-            })
-            addToCurrentLayer({
-                id: finalNodeId,
+            addNode({
                 label: `Final #${specializedBlock.id}\n${specializedBlock.context}`,
                 keep: specializedBlock.id,
                 kill: [],
-            }, true)
+            }, idOfLastReferenceTo(specializedBlock.id), true)
         }
-        if (currentLayer.length > 0) pushCurrentLayer();
+        addLayer();
     }
 
     function positionOfLastReferenceTo(specializedBlockId) {
@@ -451,8 +423,7 @@ function buildHistory(originBlock) {
     history.forEach((event) => {
         switch (event.event) {
             case "create":
-                addToCurrentLayer({
-                    id: newId(),
+                addNode({
                     label: `#${event.id} Create from #${event.from}:\n${event.context}`,
                     keep: event.id,
                     kill: [],
@@ -460,51 +431,28 @@ function buildHistory(originBlock) {
                 break;
             case "mergeCreate":
             case "merge":
-                let mergeNodeId = newId();
-                finalizeCurrentLayer();
-                for (let mergedId of event.merged) {
-                    edges.push({
-                        from: idOfLastReferenceTo(mergedId),
-                        to: mergeNodeId,
-                    })
-                }
-                addToCurrentLayer({
-                    id: mergeNodeId,
+                addNode({
                     label: `Merge #${event.id} ← ${event.merged.map(x => `#${x}`).join(", ")}:\n${event.context}`,
                     keep: event.id,
                     kill: event.merged.filter(id => id !== event.id),
-                });
+                }, event.merged.map(idOfLastReferenceTo));
                 break;
             case "unreachable":
                 if (isLive(event.id)) {
-                    finalizeCurrentLayer();
-                    let unreachableNodeId = newId();
-                    edges.push({
-                        from: idOfLastReferenceTo(event.id),
-                        to: unreachableNodeId,
-                    })
-                    addToCurrentLayer({
-                        id: unreachableNodeId,
+                    addNode({
                         label: `Unreachable #${event.id}`,
                         keep: null,
                         kill: [event.id],
-                    })
-                    finalizeCurrentLayer();
+                    }, idOfLastReferenceTo(event.id))
                 }
                 break;
             case "reachable":
                 if (!isLive(event.id)) {
-                    let reachableId = newId();
-                    edges.push({
-                        from: idOfLastReferenceTo(event.id),
-                        to: reachableId,
-                    })
-                    addToCurrentLayer({
-                        id: reachableId,
+                    addNode({
                         label: `Reachable #${event.id}`,
                         keep: event.id,
                         kill: [],
-                    })
+                    }, idOfLastReferenceTo(event.id))
                 }
                 break;
             default:
