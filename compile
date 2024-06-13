@@ -293,6 +293,7 @@ case "$SYSTEM" in
     DUMP_JSON_FLAG=""
     if [ "$DUMP_JSON_TRACE" = "1" ]; then
       DUMP_JSON_FLAG="-bbv-json-trace"
+      PRIMITIVE_COUNT=1
     fi
 
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
@@ -310,6 +311,10 @@ case "$SYSTEM" in
       $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
       /usr/bin/time -f "$C_COMPILE_TIME_MARKER %e" $GAMBITCOMP -exe $CC_FLAGS -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
       rm $OUTPUT_FILE_C
+    fi
+
+    if [ "$DUMP_JSON_TRACE" = "1" ]; then
+      cp $INPUT_FILE_DIRNAME/visual-sbbv.json OUTPUT_FILE_JSON
     fi
 
     if [ "$GENERATE_CFG" = "1" ]; then
