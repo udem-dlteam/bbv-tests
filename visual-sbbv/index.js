@@ -212,7 +212,7 @@ function refreshGraph(cfg, networkID, showAll) {
             if (!showAll && !isActive(block)) return  [];
             return {
                 id: getNetWorkUniqueId(block),
-                title: `bbs: ${block.bbs}, usage: ${block.usage}`,
+                title: `origin: ${block.originBlock.id}, bbs: ${block.bbs}, usage: ${block.usage}`,
                 label: block.details,
                 shape: "box",
                 font: {
