@@ -331,7 +331,7 @@ function buildHistory(originBlock) {
 
     let order = 1;
     function addNode(node, froms, noOrderLabel) {
-        if (!froms) froms = [];
+        if (froms === undefined) froms = [];
         else if (froms.constructor !== Array) froms = [froms];
 
         node = { ...node, id: newId() }
@@ -461,6 +461,17 @@ function buildHistory(originBlock) {
     })
 
     finalizeHistory();
+
+    console.log({
+        edges,
+        nodes: layers.flatMap((layer, index) => {
+            return layer.map((node) => ({
+                level: index,
+                refs: node.kill.concat(node.keep ? [node.keep] : []),
+                ...node,
+            }))
+        })
+    })
 
     return {
         edges,
