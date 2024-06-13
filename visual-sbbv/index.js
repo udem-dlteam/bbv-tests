@@ -352,8 +352,9 @@ function buildHistory(originBlock) {
                     return true;
                 case "mergeCreate":
                 case "merge":
-                    live[event.id] = true;
+                    event.choices = Object.keys(live).filter(k => live[k]).map(x => parseInt(x))
                     event.merged.forEach(id => live[id] = false);
+                    live[event.id] = true;
                     return true;
                 case "reachable":
                     let keepReachable = !live[event.id];
@@ -431,10 +432,12 @@ function buildHistory(originBlock) {
                 break;
             case "mergeCreate":
             case "merge":
+                let mergeChoices = event.choices.map(idOfLastReferenceTo)
                 addNode({
                     label: `Merge #${event.id} ← ${event.merged.map(x => `#${x}`).join(", ")}:\n${event.context}`,
                     keep: event.id,
                     kill: event.merged.filter(id => id !== event.id),
+                    mergeChoices,
                 }, event.merged.map(idOfLastReferenceTo));
                 break;
             case "unreachable":
@@ -461,17 +464,6 @@ function buildHistory(originBlock) {
     })
 
     finalizeHistory();
-
-    console.log({
-        edges,
-        nodes: layers.flatMap((layer, index) => {
-            return layer.map((node) => ({
-                level: index,
-                refs: node.kill.concat(node.keep ? [node.keep] : []),
-                ...node,
-            }))
-        })
-    })
 
     return {
         edges,
@@ -537,7 +529,7 @@ function showHistory(specializedBlock) {
             },
         },
         physics: {
-            enabled: true,
+            enabled: false,
             solver: 'barnesHut',
             hierarchicalRepulsion: {
                 centralGravity: 1.1,
@@ -547,13 +539,43 @@ function showHistory(specializedBlock) {
                 damping: 0.2,
                 avoidOverlap: 0.9
             },
-        }
+        },
+        interaction: { hover: true }
     };
 
     let networkId = "mergeHistoryNetwork";
     focusNetworkPanel(networkId)
     let element = getActiveNetworkElement();
-    networks[networkId] = new vis.Network(element, data, options);
+    let mergeNetwork = new vis.Network(element, data, options);
+    networks[networkId] = mergeNetwork;
+
+    mergeNetwork.on("hoverNode", function (params) {
+        let nodes = mergeNetwork.body.data.nodes;
+        var hoveredNode = nodes.get(params.node)
+        var choicesNodes = hoveredNode.mergeChoices;
+
+        if (!choicesNodes) return;
+
+        // Highlight choice nodes
+        nodes.update(choicesNodes.map(id => ({
+            id,
+            color: { background: 'yellow' }
+        })));
+    });
+
+    mergeNetwork.on("blurNode", function (params) {
+        let nodes = mergeNetwork.body.data.nodes;
+        var hoveredNode = nodes.get(params.node)
+        var choicesNodes = hoveredNode.mergeChoices;
+
+        if (!choicesNodes) return;
+
+        // Highlight choice nodes
+        nodes.update(choicesNodes.map(id => ({
+            id,
+            color: { background: 'white' }
+        })));
+    });
 
     highlightInMergeHistory(id);
 }
