@@ -314,7 +314,7 @@ case "$SYSTEM" in
     fi
 
     if [ "$DUMP_JSON_TRACE" = "1" ]; then
-      cp $INPUT_FILE_DIRNAME/visual-sbbv.json OUTPUT_FILE_JSON
+      cp $INPUT_FILE_DIRNAME/visual-sbbv.json $OUTPUT_FILE_JSON
     fi
 
     if [ "$GENERATE_CFG" = "1" ]; then
