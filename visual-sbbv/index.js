@@ -330,11 +330,11 @@ function buildHistory(originBlock) {
     let edges = [];
 
     let order = 1;
-    function addNode(node, froms, noOrderLabel) {
+    function addNode(node, { id }, froms, noOrderLabel) {
         if (froms === undefined) froms = [];
         else if (froms.constructor !== Array) froms = [froms];
 
-        node = { ...node, id: newId() }
+        node = { ...node, blockId: id, id: newId() }
 
         let orderText = noOrderLabel ? "" : `(${order}) `;
         order += 1;
@@ -393,7 +393,7 @@ function buildHistory(originBlock) {
                 label: `Final #${specializedBlock.id}\n${specializedBlock.context}`,
                 keep: specializedBlock.id,
                 kill: [],
-            }, idOfLastReferenceTo(specializedBlock.id), true)
+            }, specializedBlock, idOfLastReferenceTo(specializedBlock.id), true)
         }
         addLayer();
     }
@@ -428,7 +428,7 @@ function buildHistory(originBlock) {
                     label: `#${event.id} Create from #${event.from}:\n${event.context}`,
                     keep: event.id,
                     kill: [],
-                })
+                }, event)
                 break;
             case "mergeCreate":
             case "merge":
@@ -437,8 +437,9 @@ function buildHistory(originBlock) {
                     label: `Merge #${event.id} ← ${event.merged.map(x => `#${x}`).join(", ")}:\n${event.context}`,
                     keep: event.id,
                     kill: event.merged.filter(id => id !== event.id),
+                    merged: event.merged,
                     mergeChoices,
-                }, event.merged.map(idOfLastReferenceTo));
+                }, event, event.merged.map(idOfLastReferenceTo));
                 break;
             case "unreachable":
                 if (isLive(event.id)) {
@@ -446,7 +447,7 @@ function buildHistory(originBlock) {
                         label: `Unreachable #${event.id}`,
                         keep: null,
                         kill: [event.id],
-                    }, idOfLastReferenceTo(event.id))
+                    }, event, idOfLastReferenceTo(event.id))
                 }
                 break;
             case "reachable":
@@ -455,7 +456,7 @@ function buildHistory(originBlock) {
                         label: `Reachable #${event.id}`,
                         keep: event.id,
                         kill: [],
-                    }, idOfLastReferenceTo(event.id))
+                    }, event, idOfLastReferenceTo(event.id))
                 }
                 break;
             default:
@@ -557,10 +558,13 @@ function showHistory(specializedBlock) {
         if (!choicesNodes) return;
 
         // Highlight choice nodes
-        nodes.update(choicesNodes.map(id => ({
-            id,
-            color: { background: 'yellow' }
-        })));
+        nodes.update(choicesNodes.map(id => {
+            let nodes = mergeNetwork.body.data.nodes.get(id)
+            return {
+                id,
+                color: { background: hoveredNode.merged.includes(nodes.blockId) ? 'lime' : 'yellow' }
+            }
+        }));
     });
 
     mergeNetwork.on("blurNode", function (params) {
