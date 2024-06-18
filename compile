@@ -17,6 +17,14 @@ EXECUTABLE_NAME_MARKER="***executable:"
 SCHEME_COMPILE_TIME_MARKER="***scheme-compile-time:"
 C_COMPILE_TIME_MARKER="***c-compile-time:"
 
+WITH_SCHEME_COMPTIME=(/usr/bin/time -f "$SCHEME_COMPILE_TIME_MARKER %e")
+WITH_C_COMPTIME=(/usr/bin/time -f "$C_COMPILE_TIME_MARKER %e")
+
+if [ "$(uname)" == "Darwin" ]; then
+  WITH_SCHEME_COMPTIME=()
+  WITH_C_COMPTIME=()
+fi
+
 # Default parameters
 INPUT_FILE=             # file to compile
 OPTIM_LEVEL=0           # optimization level
@@ -201,6 +209,7 @@ OUTPUT_FILE_BASE="$INPUT_FILE_NO_EXT.${SYSTEM}.V${VERSION_LIMIT}.O${OPTIM_LEVEL}
 OUTPUT_FILE_C="$INPUT_FILE_NO_EXT.c"
 OUTPUT_FILE_EXE="$OUTPUT_FILE_BASE.exe"
 OUTPUT_FILE_CFG_DOT="$OUTPUT_FILE_BASE.cfg"
+OUTPUT_FILE_JSON="$OUTPUT_FILE_BASE.json"
 
 if [ "$CUSTOM_OUTPUT_FILE" = "" ]; then
   OUTPUT_FILE_EXE="$OUTPUT_FILE_BASE.exe"
@@ -292,6 +301,7 @@ case "$SYSTEM" in
     DUMP_JSON_FLAG=""
     if [ "$DUMP_JSON_TRACE" = "1" ]; then
       DUMP_JSON_FLAG="-bbv-json-trace"
+      PRIMITIVE_COUNT=1
     fi
 
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
@@ -304,11 +314,15 @@ case "$SYSTEM" in
     else
       # Compilation
       (cd $INPUT_FILE_DIRNAME && \
-       /usr/bin/time -f "$SCHEME_COMPILE_TIME_MARKER %e" $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE)
+       "${WITH_SCHEME_COMPTIME[@]}" $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE)
       $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
       $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
-      /usr/bin/time -f "$C_COMPILE_TIME_MARKER %e" $GAMBITCOMP -exe $CC_FLAGS -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
+      "${WITH_C_COMPTIME[@]}" $GAMBITCOMP -exe $CC_FLAGS -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
       rm $OUTPUT_FILE_C
+    fi
+
+    if [ "$DUMP_JSON_TRACE" = "1" ]; then
+      cp $INPUT_FILE_DIRNAME/visual-sbbv.json $OUTPUT_FILE_JSON
     fi
 
     if [ "$GENERATE_CFG" = "1" ]; then
@@ -366,17 +380,33 @@ case "$SYSTEM" in
       BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT
     fi
 
+    BIGLOOBBVCLEANUP=
+    BIGLOOSAWPROFILE=
+    BIGLOOBBVDUMPJSON=
+    if [ "$DUMP_JSON_TRACE" = "1" ]; then
+      BIGLOOBBVCLEANUP=false
+      BIGLOOSAWPROFILE=true
+      BIGLOOBBVDUMPJSON=true
+    fi
+
     # Compilation
     (cd $SCRIPT_DIR/bigloo && \
      BIGLOOBBVVLENGTH=$BIGLOOBBVVLENGTH \
      BIGLOOBBVVERSIONLIMIT=$BIGLOOBBVVERSIONLIMIT \
-     /usr/bin/time -f "$SCHEME_COMPILE_TIME_MARKER %e" $BIGLOOCOMP $BIGLOO_OPTIONS bbv.bgl $INPUT_FILE && \
-     /usr/bin/time -f "$C_COMPILE_TIME_MARKER %e" sh -c "($C_COMPILER $BIGLOO_C_OPTIONS bbv.c && \
+     BIGLOOBBVCLEANUP=$BIGLOOBBVCLEANUP \
+     BIGLOOSAWPROFILE=$BIGLOOSAWPROFILE \
+     BIGLOOBBVDUMPJSON=$BIGLOOBBVDUMPJSON \
+     "${WITH_SCHEME_COMPTIME[@]}" $BIGLOOCOMP $BIGLOO_OPTIONS bbv.bgl $INPUT_FILE && \
+     "${WITH_C_COMPTIME[@]}" sh -c "($C_COMPILER $BIGLOO_C_OPTIONS bbv.c && \
                                                           $C_COMPILER bbv.o $BIGLOO_LD_OPTIONS)" && \
      rm bbv.c)
 
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
       $OUTPUT_FILE_EXE
+    fi
+
+    if [ "$DUMP_JSON_TRACE" = "1" ]; then
+      $OUTPUT_FILE_EXE > $OUTPUT_FILE_JSON
     fi
 
     if [ -f $OUTPUT_FILE_BASE-program.bbv.cfg ]; then

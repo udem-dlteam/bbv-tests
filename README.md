@@ -91,7 +91,7 @@ cd bigloo
 BIGLOOBBVDUMPJSON=true BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm  -fsaw-bbv-fun pick-entrances
 ```
 
-To profile the generate code:
+To generate a json dump and a profile the generate code:
 
 ```
 cd bigloo
@@ -99,12 +99,34 @@ BIGLOOSAWPROFILE=true BIGLOOBBVDUMPJSON=true BIGLOOBBVVLENGTH=true BIGLOOBBVVERS
 ./a.out > prof.json
 ```
 
+Logs are easier to understand if basic blocks are not cleanup after the BBV optimization. 
+So, it might help to compile with:
+
+```
+cd bigloo
+BIGLOOBBVCLEANUP=false BIGLOOSAWPROFILE=true BIGLOOBBVDUMPJSON=true BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm  -fsaw-bbv-fun pick-entrances
+./a.out > prof.json
+```
+
 To combine add profiling information to the json dump:
 
 ```
- ./addusages.mjs bbv-pick-entrances.bbv.json prof.json | js-beautify > bbv-pick-entrances.prof.json
+./addusages.mjs bbv-pick-entrances.bbv.json prof.json | js-beautify > bbv-pick-entrances.prof.json
 ```
 
+To generate a dot graph file
+
+```
+cd bigloo
+BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm  -fsaw-bbv-fun pick-entrances -t2
+```
+
+and finally to produce a PDF file
+
+```
+cd bigloo
+bglcfg 'bbv-pick-entrances.bbv.cfg' > 'bbv-pick-entrances.bbv.dot' && dot 'bbv-pick-entrances.bbv.dot' -Tpdf > 'bbv-pick-entrances.bbv.pdf'
+```
 
 ### To execute manually compiled benchmark
 
@@ -177,7 +199,10 @@ Where each line indicate whether the benchmark script was able to compile, count
 
 ## Visualization tools
 
-The `visual--sbbv` folder contains a webapp to visualize the result of SBBV. It reads a JSON of the form:
+The `visual-sbbv` folder contains a webapp to visualize the result of SBBV, open `visual-sbbv/index.html` in the browser (I tested Firefox only).
+
+
+It reads a JSON of the form:
 
 ```json
 {

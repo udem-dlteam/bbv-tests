@@ -30,6 +30,29 @@ function panelStopResize() {
     document.removeEventListener('mouseup', panelStopResize);
 }
 
+class UndoStack {
+    constructor() {
+        this.stack = [];
+    }
+
+    push(action) {
+        this.stack.push(action);
+    }
+
+    undo() {
+        let last = this.stack.pop();
+        if (last) {
+            last();
+            return true;
+        }
+        return false;
+    }
+
+    undoAll() {
+        while (this.undo());
+    }
+}
+
 // Viz Panel
 var activeNetworkId = "smallCFGElement";
 const networkElements = {
@@ -59,9 +82,65 @@ function getNetWorkUniqueId(block) {
     return `${block.bbs}-${block.id}`
 }
 
-function makeNodeGlow(nodeId) {
-    const activeCFGNetwork = getActiveNetwork()
-    activeCFGNetwork.body.data.nodes.update({
+var highlightUndos = new UndoStack();
+
+function highlightBlock(block) {
+    highlightUndos.undoAll();
+
+    highlightBlockCard(block);
+    highlightInCFGNetwork('largeCFGNetwork', block);
+    highlightInCFGNetwork('smallCFGNetwork', block);
+    highlightInMergeHistory(block.id);
+}
+
+function highlightBlockCard(block) {
+    let elementId = getHtmlIdLocation(block);
+
+    let element = document.getElementById(elementId);
+
+    if (!element) return;
+
+    element.classList.add('glow');
+
+    let elementRef = new WeakRef(element);
+    highlightUndos.push(() => {
+        let element = elementRef.deref();
+        if (!element) return;
+        element.classList.remove('glow');
+    })
+}
+
+function highlightInMergeHistory(blockId) {
+    let network = networks.mergeHistoryNetwork;
+    if (!network) return;
+
+    let updates = network.body.data.nodes.map(
+        (node) => {
+            return {
+                id: node.id,
+                shadow: {
+                    enabled: true,
+                    color: 'red', // Customize the glow color
+                    size: 30,
+                    x: 0,
+                    y: 0
+                }
+            }
+        },
+        {
+            filter: (node) => node.refs.includes(blockId)
+        }
+    )
+
+    network.body.data.nodes.update(updates)
+}
+
+function highlightInCFGNetwork(networkId, block) {
+    let network = networks[networkId];
+    if (!network) return;
+    let nodeId = getNetWorkUniqueId(block);
+
+    network.body.data.nodes.update({
         id: nodeId,
         shadow: {
             enabled: true,
@@ -72,12 +151,14 @@ function makeNodeGlow(nodeId) {
         }
     })
 
-    setTimeout(() => {
-        activeCFGNetwork.body.data.nodes.update({
+    const networkRef = new WeakRef(network);
+    highlightUndos.push(() => {
+        if (!networkRef.deref()) return;
+        networkRef.deref().body.data.nodes.update({
             id: nodeId,
             shadow: { enabled: false }
         })
-    }, 2000)
+    })
 }
 
 function centerOnBlockInNetwork(nodeId) {
@@ -93,7 +174,7 @@ function centerOnBlockInNetwork(nodeId) {
     const nodePosition = activeCFGNetwork.getPositions([nodeId])[nodeId];
 
     if (nodePosition === undefined) {
-        glowElement(document.getElementById("cfg-show-all-switch").querySelector(".slider"))
+        // glowElement(document.getElementById("cfg-show-all-switch").querySelector(".slider"))
         return
     }
 
@@ -107,8 +188,6 @@ function centerOnBlockInNetwork(nodeId) {
             easingFunction: "easeInOutQuad"
         }
     });
-
-    makeNodeGlow(nodeId)
 }
 
 function focusNetworkPanel(networkId) {
@@ -133,7 +212,7 @@ function refreshGraph(cfg, networkID, showAll) {
             if (!showAll && !isActive(block)) return  [];
             return {
                 id: getNetWorkUniqueId(block),
-                title: `bbs: ${block.bbs}, usage: ${block.usage}`,
+                title: `origin: ${block.originBlock.id}, bbs: ${block.bbs}, usage: ${block.usage}`,
                 label: block.details,
                 shape: "box",
                 font: {
@@ -238,29 +317,44 @@ function refreshGraph(cfg, networkID, showAll) {
     activeCFGNetwork.on("doubleClick", function (params) {
         if (params.nodes.length > 0) {
             let nodeId = params.nodes[0];
-            let originBlock = activeCFGNetwork.body.data.nodes.get(nodeId).block.originBlock;
-            showHistory(originBlock);
+            let specializedBlock = activeCFGNetwork.body.data.nodes.get(nodeId).block;
+            showHistory(specializedBlock);
         }
     })
 }
 
 function buildHistory(originBlock) {
-    let history = filterRedundantRechability(originBlock.history);
-    let layers = [];
+    let history = filterRedundantReachability(originBlock.history);
     let currentLayer = [];
+    let layers = [currentLayer]
     let edges = [];
 
-    function filterRedundantRechability(history) {
+    let order = 1;
+    function addNode(node, { id }, froms, noOrderLabel) {
+        if (froms === undefined) froms = [];
+        else if (froms.constructor !== Array) froms = [froms];
+
+        node = { ...node, blockId: id, id: newId() }
+
+        let orderText = noOrderLabel ? "" : `(${order}) `;
+        order += 1;
+        froms.forEach(from => edges.push({ from, to: node.id }));
+        if (currentLayer.find(node => froms.includes(node.id))) addLayer();
+        currentLayer.push({ ...node, label: `${orderText}${node.label}`, level: layers.length})
+    }
+
+    function filterRedundantReachability(history) {
         live = {}
         return history.filter((event) => {
-            console.log(event);
             switch (event.event) {
                 case "create":
                     live[event.id] = true;
                     return true;
+                case "mergeCreate":
                 case "merge":
-                    live[event.id] = true;
+                    event.choices = Object.keys(live).filter(k => live[k]).map(x => parseInt(x))
                     event.merged.forEach(id => live[id] = false);
+                    live[event.id] = true;
                     return true;
                 case "reachable":
                     let keepReachable = !live[event.id];
@@ -286,40 +380,22 @@ function buildHistory(originBlock) {
         return false;
     }
 
-    function finalizeCurrentLayer() {
-        layers.push(currentLayer);
+    function addLayer() {
+        if (currentLayer.length === 0) return;
         currentLayer = [];
+        layers.push(currentLayer);
     }
 
-    function propagateFromPreviousLayers(drop, unreachable) {
-        if (layers.length < 1) return;
-        for (node of layers[layers.length - 1]) {
-            if (unreachable.includes(node.keep)) {
-                let unreachableNodeId = newId();
-                edges.push({
-                    from: node.id,
-                    to: unreachableNodeId,
-                })
-                currentLayer.push({
-                    id: unreachableNodeId,
-                    label: `Unreachable #${node.keep}`,
-                    keep: null,
-                    kill: [node.keep],
-                })
-            } else if (node.keep && !drop.includes(node.keep)) {
-                let nodeId = newId();
-                edges.push({
-                    from: node.id,
-                    to: nodeId
-                })
-                currentLayer.push({
-                    id: nodeId,
-                    label: `Keep #${node.keep}`,
-                    keep: node.keep,
-                    kill: [],
-                })
-            }
+    function finalizeHistory() {
+        addLayer();
+        for (let specializedBlock of originBlock.versions) {
+            addNode({
+                label: `Final #${specializedBlock.id}\n${specializedBlock.context}`,
+                keep: specializedBlock.id,
+                kill: [],
+            }, specializedBlock, idOfLastReferenceTo(specializedBlock.id), true)
         }
+        addLayer();
     }
 
     function positionOfLastReferenceTo(specializedBlockId) {
@@ -345,57 +421,42 @@ function buildHistory(originBlock) {
 
     let _id = 0;
     const newId = () => _id++;
-    console.log("=== build history tree ===")
     history.forEach((event) => {
-        console.log(event)
         switch (event.event) {
             case "create":
-                currentLayer.push({
-                    id: newId(),
-                    label: `#${event.id} Create:\n${event.context}`,
+                addNode({
+                    label: `#${event.id} Create from #${event.from}:\n${event.context}`,
                     keep: event.id,
                     kill: [],
-                })
+                }, event)
                 break;
+            case "mergeCreate":
             case "merge":
-                let mergeNodeId = newId();
-                finalizeCurrentLayer();
-                for (let mergedId of event.merged) {
-                    edges.push({
-                        from: idOfLastReferenceTo(mergedId),
-                        to: mergeNodeId,
-                    })
-                }
-                propagateFromPreviousLayers(event.merged, [])
-                currentLayer.push({
-                    id: mergeNodeId,
-                    label: `Merge ${event.merged.map(x => `#${x}`).join(", ")} → #${event.id}:\n${event.context}`,
+                let mergeChoices = event.choices.map(idOfLastReferenceTo)
+                addNode({
+                    label: `Merge #${event.id} ← ${event.merged.map(x => `#${x}`).join(", ")}:\n${event.context}`,
                     keep: event.id,
                     kill: event.merged.filter(id => id !== event.id),
-                });
-                finalizeCurrentLayer();
-                propagateFromPreviousLayers([], []);
+                    merged: event.merged,
+                    mergeChoices,
+                }, event, event.merged.map(idOfLastReferenceTo));
                 break;
             case "unreachable":
                 if (isLive(event.id)) {
-                    finalizeCurrentLayer();
-                    propagateFromPreviousLayers([], [event.id])
-                    finalizeCurrentLayer();
+                    addNode({
+                        label: `Unreachable #${event.id}`,
+                        keep: null,
+                        kill: [event.id],
+                    }, event, idOfLastReferenceTo(event.id))
                 }
                 break;
             case "reachable":
                 if (!isLive(event.id)) {
-                    let reachableId = newId();
-                    edges.push({
-                        from: idOfLastReferenceTo(event.id),
-                        to: reachableId,
-                    })
-                    currentLayer.push({
-                        id: reachableId,
+                    addNode({
                         label: `Reachable #${event.id}`,
                         keep: event.id,
                         kill: [],
-                    })
+                    }, event, idOfLastReferenceTo(event.id))
                 }
                 break;
             default:
@@ -403,18 +464,27 @@ function buildHistory(originBlock) {
         }
     })
 
+    finalizeHistory();
+
     return {
         edges,
         nodes: layers.flatMap((layer, index) => {
             return layer.map((node) => ({
-                id: node.id,
-                label: node.label,
-                layer: index,
+                level: index,
+                refs: node.kill.concat(node.keep ? [node.keep] : []),
+                ...node,
             }))
         })}
 }
 
-function showHistory(originBlock) {
+function showHistoryFromId(bbs, id) {
+    showHistory({ id, bbs })
+}
+
+function showHistory(specializedBlock) {
+    let { id, bbs } = specializedBlock;
+    let originBlock = SBBVControlFlowGraph.getOriginBlockOfHistoricVersion(bbs, id)
+
     let { nodes, edges } = buildHistory(originBlock);
 
     let edgeOptions = {
@@ -450,8 +520,8 @@ function showHistory(originBlock) {
         layout: {
             hierarchical: {
                 enabled: true,
-                levelSeparation: 400,
-                blockShifting: true,
+                levelSeparation: originBlock.cfg.compiler === "gambit" ? 400 : 800,
+                blockShifting: false,
                 edgeMinimization: true,
                 sortMethod: "directed",
                 direction: "LR",
@@ -460,7 +530,7 @@ function showHistory(originBlock) {
             },
         },
         physics: {
-            enabled: true,
+            enabled: false,
             solver: 'barnesHut',
             hierarchicalRepulsion: {
                 centralGravity: 1.1,
@@ -470,13 +540,48 @@ function showHistory(originBlock) {
                 damping: 0.2,
                 avoidOverlap: 0.9
             },
-        }
+        },
+        interaction: { hover: true }
     };
 
     let networkId = "mergeHistoryNetwork";
     focusNetworkPanel(networkId)
     let element = getActiveNetworkElement();
-    networks[networkId] = new vis.Network(element, data, options);
+    let mergeNetwork = new vis.Network(element, data, options);
+    networks[networkId] = mergeNetwork;
+
+    mergeNetwork.on("hoverNode", function (params) {
+        let nodes = mergeNetwork.body.data.nodes;
+        var hoveredNode = nodes.get(params.node)
+        var choicesNodes = hoveredNode.mergeChoices;
+
+        if (!choicesNodes) return;
+
+        // Highlight choice nodes
+        nodes.update(choicesNodes.map(id => {
+            let nodes = mergeNetwork.body.data.nodes.get(id)
+            return {
+                id,
+                color: { background: hoveredNode.merged.includes(nodes.blockId) ? 'lime' : 'yellow' }
+            }
+        }));
+    });
+
+    mergeNetwork.on("blurNode", function (params) {
+        let nodes = mergeNetwork.body.data.nodes;
+        var hoveredNode = nodes.get(params.node)
+        var choicesNodes = hoveredNode.mergeChoices;
+
+        if (!choicesNodes) return;
+
+        // Highlight choice nodes
+        nodes.update(choicesNodes.map(id => ({
+            id,
+            color: { background: 'white' }
+        })));
+    });
+
+    highlightInMergeHistory(id);
 }
 
 // Control Flow Graph
@@ -486,11 +591,15 @@ SBBVControlFlowGraph = null;
 class SpecializedCFG {
     #specializedBlocks
     #originBlocks
+    #historyBlocksToOrigin
+    #historyBlocksOfOrigin
 
     constructor(compiler) {
         this.compiler = compiler
         this.#specializedBlocks = {}
         this.#originBlocks = {}
+        this.#historyBlocksToOrigin = {}
+        this.#historyBlocksOfOrigin = {}
     }
 
     cleanupDeadBBS() {
@@ -546,6 +655,14 @@ class SpecializedCFG {
         return this.#originBlocks[bbs]?.[id]
     }
 
+    getOriginBlockOfHistoricVersion(bbs, id) {
+        return this.getOriginBlock(bbs, this.#historyBlocksToOrigin[bbs][id])
+    }
+
+    getHistoricVersionsOfOriginBlock(block) {
+        return [...this.#historyBlocksOfOrigin[block.bbs][block.id]]
+    }
+
     addBlock(block) {
         let { id, bbs } = block;
         let originBlock = this.#getOrSetOriginBlock(block);
@@ -579,6 +696,21 @@ class SpecializedCFG {
         }
         return blocks
     }
+
+    loadHistory(history) {
+        let toOriginMapping = this.#historyBlocksToOrigin
+        let fromOriginMapping = this.#historyBlocksOfOrigin
+        for (let event of history) {
+            let { origin, bbs, id } = event
+
+            if (!toOriginMapping[bbs]) toOriginMapping[bbs] = {};
+            if (!fromOriginMapping[bbs]) fromOriginMapping[bbs] = {};
+            if (!fromOriginMapping[bbs][origin]) fromOriginMapping[bbs][origin] = new Set();
+
+            toOriginMapping[bbs][id] = origin;
+            fromOriginMapping[bbs][origin].add(id);
+        }
+    }
 }
 
 class OriginBasicBlock {
@@ -598,6 +730,10 @@ class OriginBasicBlock {
         }
         return sum
     }
+
+    get loc() {
+        return this.versions[0].loc
+    }
 }
 
 class SpecializedBasicBlock {
@@ -607,7 +743,7 @@ class SpecializedBasicBlock {
     #references
     #ret
 
-    constructor({ id, originBlock, context, details, usage, predecessors, successors, ret, references, jumps, cfg }) {
+    constructor({ id, originBlock, context, loc, details, usage, predecessors, successors, ret, references, jumps, cfg }) {
         this.id = id
         this.originBlock = originBlock
         this.context = context
@@ -619,10 +755,19 @@ class SpecializedBasicBlock {
         this.#jumps = jumps || [];
         this.#ret = ret || []
         this.cfg = cfg
+        this.loc = loc
     }
 
     get bbs() {
         return this.originBlock.bbs
+    }
+
+    get predecessors() {
+        return this.#predecessors.map((p) => this.cfg.getSpecializedBlock(this.bbs, p)).filter(x => x)
+    }
+
+    get successors() {
+        return this.#successors.map((p) => this.cfg.getSpecializedBlock(this.bbs, p)).filter(x => x)
     }
 
     get references() {
@@ -673,6 +818,7 @@ function parseCFG({ compiler, specializedCFG }) {
 }
 
 function parseHistory({ history }, cfg) {
+    cfg.loadHistory(history);
     for (let event of history) {
         let { origin, bbs } = event
         let block = cfg.getOriginBlock(bbs, origin)
@@ -691,25 +837,19 @@ function getHtmlIdLocation(block) {
     throw new Error("not a block", block)
 }
 
-function scrollToBlock(specializedBlock) {
-    let specializedId = getHtmlIdLocation(specializedBlock)
-    let originId = getHtmlIdLocation(specializedBlock.originBlock)
-    let nodeId = getNetWorkUniqueId(specializedBlock);
-    scrollToBlockByIds(originId, specializedId, nodeId);
+function scrollToBlockById(bbs, specializedBlockId) {
+    scrollToBlock(SBBVControlFlowGraph.getSpecializedBlock(bbs, specializedBlockId))
 }
 
-function glowElement(element) {
-    element.classList.add('glowing');
-    setTimeout(() => element.classList.remove('glowing'), 2000);
-}
+function scrollToBlock(block) {
+    let originHTMLId = getHtmlIdLocation(block.originBlock)
+    let nodeNetworkId = getNetWorkUniqueId(block);
 
-function scrollToBlockByIds(originBlockId, specializedBlockId, nodeId) {
-    let card = document.getElementById(originBlockId);
+    let card = document.getElementById(originHTMLId);
     openCard(card);
-    let section = document.getElementById(specializedBlockId);
     card.scrollIntoView({ behavior: "smooth", block: "center", inline: 'nearest' });
-    glowElement(section);
-    centerOnBlockInNetwork(nodeId);
+    centerOnBlockInNetwork(nodeNetworkId);
+    highlightBlock(block);
 }
 
 function escapeHtml(unsafe) {
@@ -731,6 +871,20 @@ function openCard(cardElement) {
     if (body.style.display !== 'block') body.style.display = 'block';
 }
 
+function closeCardBody(body) {
+    if (body.style.display === 'block') body.style.display = 'none';
+}
+
+function closeCard(cardElement) {
+    const body = cardElement.querySelector('.origin-block-card-body');
+    closeCardBody(body);
+}
+
+function closeAllCards() {
+    const bodies = document.querySelectorAll('.origin-block-card-body');
+    bodies.forEach(closeCardBody)
+}
+
 function linkBlockRef(originBlock, code, refStyle) {
     let cfg = originBlock.cfg
     let compiler = refStyle || cfg.compiler
@@ -748,14 +902,11 @@ function linkBlockRef(originBlock, code, refStyle) {
         let specializedBlock = cfg.getSpecializedBlock(originBlock.bbs, parseInt(number))
         if (!specializedBlock) return match; // may have mismatched a non-label
 
-        let specializedId = getHtmlIdLocation(specializedBlock)
-        let originId = getHtmlIdLocation(specializedBlock.originBlock)
         let tooltip = `usage: ${specializedBlock.usage}`
         let classes = ["bb-ref-button"]
         if (specializedBlock.usage === 0) classes.push("low-importance-button")
         
-        let nodeId = getNetWorkUniqueId(specializedBlock);
-        return `<button class="${classes.join(" ")}" data-tooltip="${tooltip}" onclick="scrollToBlockByIds('${originId}', '${specializedId}', '${nodeId}')">${match}</button>`;
+        return `<button class="${classes.join(" ")}" data-tooltip="${tooltip}" onclick="scrollToBlockById('${specializedBlock.bbs}', '${specializedBlock.id}')">${match}</button>`;
     })
 }
 
@@ -763,6 +914,21 @@ function handleShowAllSwitch() {
     if (!SBBVControlFlowGraph) return;
     let showAll = showAllSwitchElement.checked;
     refreshGraph(SBBVControlFlowGraph, showAll ? "largeCFGNetwork" : "smallCFGNetwork", showAll)
+}
+
+function abbreviateNumber(num) {
+    if (num < 1000) {
+        return num.toString();
+    }
+    else if (num < 1000000) {
+        return (num / 1000).toFixed(0) + 'k';
+    }
+    else if (num < 1000000000) {
+        return (num / 1000000).toFixed(0) + 'M';
+    }
+    else {
+        return '1G+';
+    }
 }
 
 function refreshControlPanel(cfg) {
@@ -782,22 +948,33 @@ function refreshControlPanel(cfg) {
                     ${block.bbs}#${block.id}
                 </span>
                 <span class="origin-block-card-subtitles">
-                    ${versions.map((b) => `<span class="origin-block-card-subtitle">${b.usage}</span>`).join("")}
+                    ${versions.map((b) => `<span class="origin-block-card-subtitle">${linkBlockRef(b, "#" + b.id, "gambit")}: ${abbreviateNumber(b.usage)}</span>`).join("")}
                 </span>
             </div>
             <div class="origin-block-card-body">
-                <h4>source</h4>
-                <code>${escapeHtml(block.source)}</code>
+                ${block.loc ? "<code>" + block.loc + "</code>" : ""}
+                ${block.source ? "<h4>source</h4><code>" + escapeHtml(block.source) + "</code>" : ""}
                 ${versions.map((b) => {
-            return `
+                    return `
                         <span id="${getHtmlIdLocation(b)}" class="origin-block-card-body-row">
-                            <h4>Block ${linkBlockRef(b, "#" + b.id, "gambit")} (usage: ${b.usage})</h4>
+                            <h4>Block ${linkBlockRef(block, "#" + b.id, "gambit")} (usage: ${abbreviateNumber(b.usage)})</h4>
                             <h5>Context</h5>
                             <code>${b.context}</code>
+                            <h5>Predecessors</h5>
+                            ${b.predecessors.length > 0 ? linkBlockRef(block, b.predecessors.map((p) => "#" + p.id).join(", "), "gambit") : "-"}
+                            <h5>Successors</h5>
+                            ${b.successors.length > 0 ? linkBlockRef(block, b.successors.map((p) => "#" + p.id).join(", "), "gambit") : "-"}
                             <h5>Code</h5>
-                            <code>${b.details ? linkBlockRef(b, escapeHtml(b.details)) : linkBlockRef(b, escapeHtml(b.context))}</code>
+                            <code>${b.details ? linkBlockRef(block, escapeHtml(b.details)) : linkBlockRef(block, escapeHtml(b.context))}</code>
                         </span>`
         }).join("")}
+            <h4>History</h4>
+            ${cfg.getHistoricVersionsOfOriginBlock(block).map((id) => {
+                let classes = ["bb-ref-button", "history-ref-button"]
+                if (!cfg.getSpecializedBlock(block.bbs, id)) classes.push("low-importance-button")
+                return `<button class='${classes.join(" ") }'
+                                onclick="showHistoryFromId('${block.bbs}', ${id})">#${id}</button>`
+            }).join(" ")}
             </div>
         </div>
         `
