@@ -21,6 +21,7 @@ usage()
   echo "  -pop <population_size>    Select population size (default=10)"
   echo "  -s <nb_of_survivors>      Select number of survivors (default=3)"
   echo "  -g <nb_of_generations>    Select number of generations (default=100)"
+  echo "  -i <gene1> <gene2>...     Add an initial genome (number of genes must match genome length)"
   echo "  -p                        Evaluate in parallel (default is sequential)"
   echo "  -h                        Help"
 }
@@ -42,6 +43,7 @@ MUTATION_PERCENTAGE=20
 PARALLEL=no
 
 EVALUATION_SCRIPT=
+NB_INITIAL_GENOMES=0
 
 # Parse parameters
 while [ $# -ge 1 ] ; do
@@ -126,6 +128,17 @@ while [ $# -ge 1 ] ; do
       fi
       NB_GENERATIONS=$2
       shift
+      ;;
+    -i|--i)
+      genome=
+      : $((_i = 0))
+      while [ $_i -lt $GENOME_LENGTH ] ; do
+        shift
+        genome="$genome $1"
+        : $((_i += 1))
+      done
+      eval "_GENOME$NB_INITIAL_GENOMES=\"$genome\""
+      : $((NB_INITIAL_GENOMES += 1))
       ;;
     -p|--p)
       PARALLEL=yes
@@ -221,12 +234,11 @@ random_genome()
 
 random_population()
 {
-  : $((_j = 0))
+  : $((_j = NB_INITIAL_GENOMES))
   while [ $_j -lt $POPULATION_SIZE ] ; do
     random_genome $1
     rand _r $1
     eval "_GENOME$_j=\"$genome\""
-    : $((_SCORE$_j = 999999999))
     : $((_j += 1))
   done
 }
@@ -295,7 +307,16 @@ breed_population()
     : $((_x = _r % POPULATION_SURVIVORS))
     rand _r $1
     : $((_y = (_x + 1 + _r % (POPULATION_SURVIVORS-1)) % POPULATION_SURVIVORS))
-    eval "cross_genomes $1 \"\$_GENOME$_x\" \"\$_GENOME$_y\""
+    while : ; do
+      eval "cross_genomes $1 \"\$_GENOME$_x\" \"\$_GENOME$_y\""
+      : $((_j = 0))
+      while [ $_j -lt $_i ] ; do
+        eval "_g=\"\$_GENOME$_j\""
+        if [ "$_g" = "$genome" ] ; then break; fi
+        : $((_j += 1))
+      done
+      if [ $_j = $_i ] ; then break; fi
+    done
     eval "_GENOME$_i=\"$genome\""
     : $((_SCORE$_i = 999999999))
     : $((_i += 1))
@@ -350,6 +371,7 @@ evaluate_population 0 0
 sort_population
 
 generation=0
+
 while [ $generation -lt $NB_GENERATIONS ] ; do
   show_population
   breed_population 0
