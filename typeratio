@@ -81,5 +81,5 @@ print(sum(int(x) for n, x in r if n in TYPECHECK_NAMES))"
 
 echo "Count: $RESULT"
 
-ratio=`python -c "print(($RESULT - $RESULT_UNSAFE) / ($RESULT_BASE - $RESULT_UNSAFE))"`
+ratio=`echo "($RESULT - $RESULT_UNSAFE) / ($RESULT_BASE - $RESULT_UNSAFE)" | bc -l`
 echo "Ratio: $ratio"
