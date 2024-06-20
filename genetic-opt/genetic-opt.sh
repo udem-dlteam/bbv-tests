@@ -17,10 +17,11 @@ usage()
   echo "  -hi <gene_hi_value>       Select gene hi value (default=+100)"
   echo "  -mlo <gene_mut_lo_value>  Select gene mutation lo value (default=-10)"
   echo "  -mhi <gene_mut_hi_value>  Select gene mutation hi value (default=+10)"
-  echo "  -m <mutation_percent>     Select mutation percentage (default=10)"
-  echo "  -p <population_size>      Select population size (default=10)"
+  echo "  -mut <mutation_percent>   Select mutation percentage (default=10)"
+  echo "  -pop <population_size>    Select population size (default=10)"
   echo "  -s <nb_of_survivors>      Select number of survivors (default=3)"
   echo "  -g <nb_of_generations>    Select number of generations (default=100)"
+  echo "  -p                        Evaluate in parallel (default is sequential)"
   echo "  -h                        Help"
 }
 
@@ -37,6 +38,8 @@ POPULATION_SURVIVORS=3
 NB_GENERATIONS=100
 
 MUTATION_PERCENTAGE=20
+
+PARALLEL=no
 
 EVALUATION_SCRIPT=
 
@@ -88,18 +91,18 @@ while [ $# -ge 1 ] ; do
       GENOME_MUTATION_HI_VALUE=$2
       shift
       ;;
-    -m|--m)
+    -mut|--mut)
       if [ $# -lt 2 ] ; then
-        echo "*** option needs an integer parameter: -m <mutation_percentage>"
+        echo "*** option needs an integer parameter: -mut <mutation_percentage>"
         usage
         exit 1
       fi
       MUTATION_PERCENTAGE=$2
       shift
       ;;
-    -p|--p)
+    -pop|--pop)
       if [ $# -lt 2 ] ; then
-        echo "*** option needs an integer parameter: -p <population_size>"
+        echo "*** option needs an integer parameter: -pop <population_size>"
         usage
         exit 1
       fi
@@ -123,6 +126,9 @@ while [ $# -ge 1 ] ; do
       fi
       NB_GENERATIONS=$2
       shift
+      ;;
+    -p|--p)
+      PARALLEL=yes
       ;;
     -h|--h)
       usage
@@ -220,8 +226,7 @@ random_population()
     random_genome $1
     rand _r $1
     eval "_GENOME$_j=\"$genome\""
-    evaluate_genome _s $1 "$genome"
-    : $((_SCORE$_j = _s))
+    : $((_SCORE$_j = 999999999))
     : $((_j += 1))
   done
 }
@@ -292,10 +297,42 @@ breed_population()
     : $((_y = (_x + 1 + _r % (POPULATION_SURVIVORS-1)) % POPULATION_SURVIVORS))
     eval "cross_genomes $1 \"\$_GENOME$_x\" \"\$_GENOME$_y\""
     eval "_GENOME$_i=\"$genome\""
-    evaluate_genome _s $1 "$genome"
+    : $((_SCORE$_i = 999999999))
+    : $((_i += 1))
+  done
+}
+
+evaluate_population()
+{
+  genomes=
+  : $((_i = $2))
+  while [ $_i -lt $POPULATION_SIZE ] ; do
+    eval "genomes=\"\$genomes \\\"\$_GENOME$_i\\\"\""
     : $((_SCORE$_i = _s))
     : $((_i += 1))
   done
+  eval "evaluate_population_aux $genomes"
+  : $((_i = $2))
+  for _s in `cat genetic-opt.evaluations` ; do
+    : $((_SCORE$_i = _s))
+    : $((_i += 1))
+  done
+  if [ $_i != $POPULATION_SIZE ] ; then
+    echo "*** inconsistent number of evaluations"
+    exit 1
+  fi
+}
+
+evaluate_population_aux()
+{
+  if [ $PARALLEL = "yes" ] ; then
+    parallel -k "$EVALUATION_SCRIPT {}" ::: "$@" > genetic-opt.evaluations
+  else
+    rm -f genetic-opt.evaluations
+    for genome in "$@" ; do
+      eval "$EVALUATION_SCRIPT $genome" >> genetic-opt.evaluations
+    done
+  fi
 }
 
 show_population()
@@ -309,12 +346,14 @@ show_population()
 }
 
 random_population 0
+evaluate_population 0 0
 sort_population
 
 generation=0
 while [ $generation -lt $NB_GENERATIONS ] ; do
   show_population
   breed_population 0
+  evaluate_population 0 $POPULATION_SURVIVORS
   sort_population
   : $((generation += 1))
 done
