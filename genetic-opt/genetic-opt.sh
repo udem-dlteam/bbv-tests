@@ -15,8 +15,8 @@ usage()
   echo "  -l <genome_length>        Select genome length (default=1)"
   echo "  -lo <gene_lo_value>       Select gene lo value (default=-100)"
   echo "  -hi <gene_hi_value>       Select gene hi value (default=+100)"
-  echo "  -mlo <gene_mut_lo_value>  Select gene mutation lo value (default=-10)"
-  echo "  -mhi <gene_mut_hi_value>  Select gene mutation hi value (default=+10)"
+  echo "  -mlo <gene_mut_lo_value>  Select gene mutation lo value (default=-50)"
+  echo "  -mhi <gene_mut_hi_value>  Select gene mutation hi value (default=+50)"
   echo "  -mut <mutation_percent>   Select mutation percentage (default=10)"
   echo "  -pop <population_size>    Select population size (default=10)"
   echo "  -s <nb_of_survivors>      Select number of survivors (default=3)"
@@ -30,8 +30,8 @@ usage()
 GENOME_LENGTH=1
 GENOME_RANGE_LO=-100
 GENOME_RANGE_HI=+100
-GENOME_MUTATION_LO=-10
-GENOME_MUTATION_HI=+10
+GENOME_MUTATION_LO=-50
+GENOME_MUTATION_HI=+50
 
 POPULATION_SIZE=10
 POPULATION_SURVIVORS=3
@@ -221,6 +221,16 @@ random_in_range_inclusive()
   : $(($1 = (_r % _n) + $3))
 }
 
+random_in_range_inclusive_normal()
+{
+  random_in_range_inclusive _r1 $2 $3 $4
+  random_in_range_inclusive _r2 $2 $3 $4
+  random_in_range_inclusive _r3 $2 $3 $4
+  random_in_range_inclusive _r4 $2 $3 $4
+  random_in_range_inclusive _r5 $2 $3 $4
+  : $(($1 = (_r1 + _r2 + _r3 + _r4 + _r5) / 5))
+}
+
 random_genome()
 {
   genome=
@@ -280,7 +290,7 @@ cross_genomes()
     fi
     rand _r $1
     if [ $((_r % 1000)) -lt $((10*MUTATION_PERCENTAGE)) ] ; then
-      random_in_range_inclusive _mut $1 $GENOME_MUTATION_LO $GENOME_MUTATION_HI
+      random_in_range_inclusive_normal _mut $1 $GENOME_MUTATION_LO $GENOME_MUTATION_HI
       : $((_val = _t$_k + _mut))
       if [ $_val -lt $GENOME_RANGE_LO ] ; then
         _val=$GENOME_RANGE_LO
