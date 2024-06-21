@@ -1,0 +1,85 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if [ $# -lt 3 ]; then
+    echo "Usage: $0 COMPILER VERSION_LIMIT FILENAME"
+    exit 1
+fi
+
+COMPILER=$1
+VLIMIT=$2
+FILENAME=$3
+shift; shift; shift;
+
+SCRIPT_DIR="$0"
+if [ "${SCRIPT_DIR#/}" = "$SCRIPT_DIR" ]; then
+  SCRIPT_DIR="$(pwd)/$SCRIPT_DIR"
+fi
+SCRIPT_DIR="${SCRIPT_DIR%/*}"
+SCRIPT_DIR="${SCRIPT_DIR%/.}"
+
+COMPILER_SCRIPT="$SCRIPT_DIR/compile"
+
+COMPILER_OUTPUT=`${COMPILER_SCRIPT} -S ${COMPILER} -V ${VLIMIT} -O3 -f ${FILENAME} -P $@ 2>&1`
+
+UNSAFE_COMPILER_OUTPUT=`${COMPILER_SCRIPT} -S ${COMPILER} -V 0 -U -O3 -f ${FILENAME} -P $@ 2>&1`
+
+BASE_COMPILER_OUTPUT=`${COMPILER_SCRIPT} -S gambit -V 0 -f ${FILENAME} -P -D ../bbv-gambit $@ 2>&1`
+
+TYPECHECKS_NAMES='
+TYPECHECK_NAMES = (
+        # Gambit             # Bigloo
+        # Typechecks
+        #"#gvm:jump/safe"
+        "##fixnum?",
+        "##flonum?",
+        "##vector?",
+        "##pair?",         
+        "##procedure?",
+        "##bignum?",
+        "##boolean?",
+        "##string?",
+        "##symbol?",
+        "##char?",
+        "##null?",
+        # Overflow checks
+        "##fx+?",            "add/ov",
+        "##fx-?",            "sub/ov",
+        "##fx*?",            "mul/ov",
+        "##fxabs?",
+        "##fxarithmetic-shift-left?",
+        "##fxarithmetic-shift-right?",
+        "##fxarithmetic-shift?",
+        "##fxsquare?",
+        "##fxwraparithmetic-shift-left?",
+        "##fxwraparithmetic-shift?",
+        "##fxwraplogical-shift-right?",)
+TYPECHECK_NAMES = TYPECHECK_NAMES + tuple(n.replace("##", "") for n in TYPECHECK_NAMES) + \
+                                    tuple(n.replace("##", "$") for n in TYPECHECK_NAMES)'
+
+RESULT=`
+python -c "import re
+${TYPECHECKS_NAMES}
+r = re.findall(\"\((\S+) (\d+)\)\", \"\"\"${COMPILER_OUTPUT}\"\"\")
+print(sum(int(x) for n, x in r if n in TYPECHECK_NAMES))"
+`
+
+RESULT_BASE=`
+python -c "import re
+${TYPECHECKS_NAMES}
+r = re.findall(\"\((\S+) (\d+)\)\", \"\"\"${BASE_COMPILER_OUTPUT}\"\"\")
+print(sum(int(x) for n, x in r if n in TYPECHECK_NAMES))"
+`
+
+RESULT_UNSAFE=`
+python -c "import re
+${TYPECHECKS_NAMES}
+r = re.findall(\"\((\S+) (\d+)\)\", \"\"\"${UNSAFE_COMPILER_OUTPUT}\"\"\")
+print(sum(int(x) for n, x in r if n in TYPECHECK_NAMES))"
+`
+
+echo "Count: $RESULT"
+
+ratio=`echo "($RESULT - $RESULT_UNSAFE) / ($RESULT_BASE - $RESULT_UNSAFE)" | bc -l`
+echo "Ratio: $ratio"
