@@ -1,59 +1,34 @@
 #!/bin/bash
 
-#benchmarks="micro/ack.scm micro/fib.scm micro/bague.scm micro/fibfp.scm micro/nqueens.scm micro/primes.scm micro/tak.scm"
-benchmarks="micro/ack.scm"
-adn=$@
-
-base() {
-  bench=$1
-  cmd=$2
-  cd bigloo
-   
-  TMPDIR=`mktemp -d`
-  TMPFILE=`mktemp -p $TMPDIR`
-
-  cmd="bigloo -srfi arithmeticG -w -unsafe -saw -O3 bbv.bgl ../tests/paper/$bench -copt -DSAW_BBV_STATS=1 -o $TMPFILE.out"
-  >&2 echo $cmd
-  
-  sh -c "$cmd" || exit 1
-  result=`$TMPFILE.out 2>&1 | tail +2 | bigloo -eval "(let ((l (port->sexp-list (current-input-port)))) (print (apply + (filter-map (lambda (x) (if (memq (car x) '(ifne add/ov sub/o mul/ov)) (cadr x))) l))) (exit 0))"`
-
-  rm -rf $TMPDIR
-  cd ..
-  echo "$result"
-}
-  
-bbv() {
-  bench=$1
-  cd bigloo
-   
-  TMPDIR=`mktemp -d`
-  TMPFILE=`mktemp -p $TMPDIR`
-
-  cmd="BIGLOOBBVSTRATEGY=\"adn\" BIGLOOBBVADN=\"$adn\" BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/$bench -copt -DSAW_BBV_STATS=1 -o $TMPFILE.out"
-  >&2 echo $cmd
-  
-  sh -c "$cmd" || exit 1
-  result=`$TMPFILE.out 2>&1 | tail +2 | bigloo -eval "(let ((l (port->sexp-list (current-input-port)))) (print (apply + (filter-map (lambda (x) (if (memq (car x) '(ifne add/ov sub/o mul/ov)) (cadr x))) l))) (exit 0))"`
-
-  rm -rf $TMPDIR
-  cd ..
-  echo $result
-}
+benchmarks="micro/ack.scm micro/fib.scm micro/bague.scm micro/fibfp.scm micro/nqueens.scm micro/primes.scm micro/tak.scm"
+#benchmarks="micro/ack.scm micro/fib.scm"
+ADN=$@
+stat="`dirname $0`/bigloo-adn-stat.sh"
+jobs=
 
 res=0
-for p in $benchmarks; do
-  >&2 echo -n "$p "
-  baseCount=$(base $p)
-  bbvCount=$(bbv $p)
-  tmp=`echo "$bbvCount/$baseCount" | bc -l`
-  >&2 echo "$tmp"
-  res=`echo "$res + $tmp" | bc -l`
-done
 
-ires=`echo "$res*1000" | bc -l | sed s'/[.][0-9]*//'`
-echo $ires
+if [ "$jobs" = "1" ]; then
+  for p in $benchmarks; do
+    >&2 echo -n "$p "
+    tmp=`$stat $p $adn`
+    >&2 echo "$tmp"
+    res=`echo "$res + $tmp" | bc -l`
+  done
+else
+  if [ "$jobs " = " " ]; then
+    nbprocs=`cat /proc/cpuinfo | grep processor | wc -l`
+    jobs=`echo "$nbprocs/2" | bc`
+  fi
 
-#parallel run ::: $benchmarks
+  export ADN
+  scores=`parallel -j $jobs $stat ::: $benchmarks`
 
-# genetic-opt/genetic-opt.sh -l 8 -p genetic-opt/bigloo-adn.sh
+  while IFS= read -r score; do
+    res=`echo "$res + $score" | bc`
+  done <<< "$scores"
+fi
+
+echo $res
+
+# genetic-opt/genetic-opt.sh -l 12 genetic-opt/bigloo-adn.sh 2> /tmp/LOG.genetic

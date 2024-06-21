@@ -84,6 +84,25 @@ cd bigloo
 BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm 
 ```
 
+To add dynamic type check count, add the following compilation option
+
+```
+-copt -DSAW_BBV_STATS=1
+```
+
+To sum all the counter:
+
+```
+./a.out |& tail +2 | bigloo -eval "(begin (print (apply + (map cadr (port->sexp-list (current-input-port))))) (exit 0))" 
+```
+
+For instance:
+
+```
+BIGLOOBBVSTRATEGY="adn" BIGLOOBBVADN="1 0.5 1.2 3.4 5.6 6.7" BIGLOOBBVVLENGTH=true BIGLOOBBVVERSIONLIMIT=4 /home/serrano/prgm/project/bigloo/bigloo/bin/bigloo -srfi arithmeticG -w -unsafe -saw -O3 -fsaw-bbv bbv.bgl ../tests/paper/macro/maze.scm -copt -DSAW_BBV_STATS=1
+./a.out |& tail +2 | bigloo -eval "(begin (print (apply + (map cadr (port->sexp-list (current-input-port))))) (exit 0))" 
+```
+
 To generate a json dump for one particular function:
 
 ```
