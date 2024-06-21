@@ -354,7 +354,7 @@ case "$SYSTEM" in
     BIGLOOBBVVLENGTH=false
     BIGLOOBBVVERSIONLIMIT=
     BIGLOOBBVSTRATEGY=
-
+    
     if [ "$OPTIM_LEVEL" = "0" ]; then
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -O0 -fno-user-inlining"
     else
@@ -378,8 +378,8 @@ case "$SYSTEM" in
     else
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -fsaw-bbv"
       BIGLOOBBVVLENGTH=true
-      BIGLOOBBVSTRATEGY=nearobj # ecoop 2024 strategy
       BIGLOOBBVVERSIONLIMIT=$VERSION_LIMIT
+      BIGLOOBBVSTRATEGY=nearobj # ecoop 2024 strategy
     fi
 
     BIGLOOBBVCLEANUP=

@@ -14,12 +14,12 @@ limit=$1
 # BBV runs
 for file in ${scm_files[@]}; do
   # Bigloo
-  python ./benchmark.py $verbosity benchmark ${file} -O --bigloo -l ${limit} -r ${reps} -t ${timeout}
+  python ./benchmark.py $verbosity benchmark ${file} -O --bigloo $HOME/prgm/project/bigloo/bigloo -l ${limit} -r ${reps} -t ${timeout}
 done
 
 for file in ${scm_files[@]}; do
   # Unsafe runs
-  python ./benchmark.py $verbosity benchmark ${file} -O -u --bigloo -l 0 -r ${reps} -t ${timeout}
+  python ./benchmark.py $verbosity benchmark ${file} -O -u --bigloo  $HOME/prgm/project/bigloo/bigloo -l 0 -r ${reps} -t ${timeout}
 done
 
 deactivate
