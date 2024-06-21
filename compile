@@ -353,6 +353,7 @@ case "$SYSTEM" in
 
     BIGLOOBBVVLENGTH=false
     BIGLOOBBVVERSIONLIMIT=
+    BIGLOOBBVSTRATEGY=
 
     if [ "$OPTIM_LEVEL" = "0" ]; then
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -O0 -fno-user-inlining"
