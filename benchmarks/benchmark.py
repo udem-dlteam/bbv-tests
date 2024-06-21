@@ -170,6 +170,8 @@ TYPECHECK_NAMES = (
         "##symbol?",
         "##char?",
         "##null?",
+        "##string-in-bounds?",
+        "##vector-in-bounds?",
         # Overflow checks
         "##fx+?",            "add/ov",
         "##fx-?",            "sub/ov",
