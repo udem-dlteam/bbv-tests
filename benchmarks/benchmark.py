@@ -155,37 +155,21 @@ class Benchmark(db.Entity):
     timestamp = Required(int)
     runs = Set('Run')
 
-TYPECHECK_NAMES = (
-        # Gambit             # Bigloo
-        # Typechecks
-        #"#gvm:jump/safe"
-        "##fixnum?",
-        '##flonum?',
-        "##vector?",
-        "##pair?",         
-        "##procedure?",
-        "##bignum?",
-        "##boolean?",
-        "##string?",
-        "##symbol?",
-        "##char?",
-        "##null?",
-        "##string-in-bounds?",
-        "##vector-in-bounds?",
-        # Overflow checks
-        "##fx+?",            "add/ov",
-        "##fx-?",            "sub/ov",
-        "##fx*?",            "mul/ov",
-        "##fxabs?",
-        "##fxarithmetic-shift-left?",
-        "##fxarithmetic-shift-right?",
-        "##fxarithmetic-shift?",
-        "##fxsquare?",
-        "##fxwraparithmetic-shift-left?",
-        "##fxwraparithmetic-shift?",
-        "##fxwraplogical-shift-right?",)
-TYPECHECK_NAMES = TYPECHECK_NAMES + tuple(n.replace("##", "") for n in TYPECHECK_NAMES) + \
-                                    tuple(n.replace("##", "$") for n in TYPECHECK_NAMES)
+# Gambit: ifjump + 2 * (vector-in-bounds + string-in-bounds) + vector-length + string-length
+GAMBIT_TYPECHECK_WEIGHTS = {
+    '#gvm:ifjump': 1,
+    '##vector-in-bounds': 2,
+    '##string-in-bounds': 2,
+    '##vector-length': 1,
+    '##string-length': 1,
+}
+
+# Bigloo: ifne + vector-length + string-length
+BIGLOO_TYPECHECK_WEIGHTS = {
+    'ifne': 1,
+    'vector-length': 1,
+    'string-length': 1,
+}
 
 class PrimitiveCount(db.Entity):
     name = Required(str)
@@ -194,7 +178,19 @@ class PrimitiveCount(db.Entity):
 
     @property
     def is_typecheck(self):
-        return self.name in TYPECHECK_NAMES
+        return self.typecheck_weight > 0
+
+    @property
+    def typecheck_weight(self):
+        compiler = self.run.compiler.name
+        name = self.name
+
+        if compiler == "gambit":
+            return GAMBIT_TYPECHECK_WEIGHTS.get(name, 0)
+        elif compiler == "bigloo":
+            return BIGLOO_TYPECHECK_WEIGHTS.get(name, 0)
+        else:
+            raise ValueError(f"no typecheck weight for {compiler}")
 
 class PerfEvent(db.Entity):
     event = Required(str)
@@ -858,7 +854,7 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
 
         for prim, value in primitive_count.items():
             p = PrimitiveCount(name=prim, value=value, run=run)
-            typechecks += p.is_typecheck * value
+            typechecks += p.typecheck_weight * value
 
         logger.debug(f"number of typechecks: {typechecks}")
         StaticMeasure(name="typechecks", value=typechecks, run=run)
@@ -1322,8 +1318,10 @@ def stdev_time(run):
     return 0 if len(results) == 1 else statistics.stdev(results)
 
 def sum_checks(run):
-    primitive_counts = select(e for e in PrimitiveCount if e.run == run)
-    results = [p.value for p in primitive_counts if p.is_typecheck]
+    primitive_counts = list(select(e for e in PrimitiveCount if e.run == run))
+    for p in primitive_counts:
+        print(p.name, p.value, p.typecheck_weight)
+    results = [p.value * p.typecheck_weight for p in primitive_counts]
     return sum(results)
 
 @nan_on(ValueError)
