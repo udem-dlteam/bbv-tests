@@ -1319,8 +1319,6 @@ def stdev_time(run):
 
 def sum_checks(run):
     primitive_counts = list(select(e for e in PrimitiveCount if e.run == run))
-    for p in primitive_counts:
-        print(p.name, p.value, p.typecheck_weight)
     results = [p.value * p.typecheck_weight for p in primitive_counts]
     return sum(results)
 
