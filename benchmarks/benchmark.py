@@ -1291,8 +1291,8 @@ def average_base_time(run):
     return average_time(base_run)
 
 def average_time_select_results(run, trim_outliers=True):
-    results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
-    if trim_outliers and len(results) >= 3:
+    results = list(select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run))
+    if trim_outliers and len(results) >= 10:
         offset = len(results) // 10
         results = sorted(results)
         results = results[offset:-offset]
