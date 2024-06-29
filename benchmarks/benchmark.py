@@ -183,7 +183,9 @@ class PrimitiveCount(db.Entity):
     @property
     def typecheck_weight(self):
         compiler = self.run.compiler.name
-        name = self.name
+
+        # remove some artifact of Gambit symbol printing, TODO: fix in Gambit
+        name = self.name.replace('"', '').replace("'", '').replace("|", "")
 
         if compiler == "gambit":
             return GAMBIT_TYPECHECK_WEIGHTS.get(name, 0)
@@ -1289,8 +1291,8 @@ def average_base_time(run):
     return average_time(base_run)
 
 def average_time_select_results(run, trim_outliers=True):
-    results = select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run)
-    if trim_outliers and len(results) >= 3:
+    results = list(select(e.value for e in PerfEvent if e.event == PerfResultParser.time_event and e.run == run))
+    if trim_outliers and len(results) >= 10:
         offset = len(results) // 10
         results = sorted(results)
         results = results[offset:-offset]
@@ -1813,23 +1815,35 @@ def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, ou
     # Execution time
     max_var_coeff = [0, 0] # micro, macro
     too_low_time = {}
+    logged_stdev_error = False
     def wrapped_average_time(run):
         nonlocal max_var_coeff
+        nonlocal logged_stdev_error
         results = average_time_select_results(run)
 
         macro = is_macro(run.benchmark.name)
 
+        try:
+            average = statistics.mean(results)
+        except statistics.StatisticsError as e:
+            logger.error(f"{e} IN {run.benchmark.name}")
+            return math.nan
+
+        try:
         # Compute error
-        dev = statistics.stdev(results)
-        average = statistics.mean(results)
-        var_coeff = dev / average
+            dev = statistics.stdev(results)
+            var_coeff = dev / average
 
-        if average < 5:
-            too_low_time[run.benchmark.name] = min(too_low_time.get(run.benchmark.name, 999), average)
+            if average < 5:
+                too_low_time[run.benchmark.name] = min(too_low_time.get(run.benchmark.name, 999), average)
 
-        if var_coeff > max_var_coeff[macro]:
-            # print('new max:', run.benchmark.name, run.compiler.name, f"V={run.version_limit}", dev, '/', average, '=', var_coeff)
-            max_var_coeff[macro] = var_coeff
+            if var_coeff > max_var_coeff[macro]:
+                # print('new max:', run.benchmark.name, run.compiler.name, f"V={run.version_limit}", dev, '/', average, '=', var_coeff)
+                max_var_coeff[macro] = var_coeff
+        except statistics.StatisticsError as e:
+            if not logged_stdev_error:
+                logger.error(e)
+                logged_stdev_error = True
 
         return average
 
