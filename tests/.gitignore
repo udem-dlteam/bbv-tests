@@ -1,6 +1,7 @@
 *.exe
 *.cfg
 *.pdf
+*.json
 *.o
 *.o[0-9]*
 *.gvm
