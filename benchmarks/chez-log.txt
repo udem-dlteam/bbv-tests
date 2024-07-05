@@ -1,0 +1,370 @@
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/leval.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/leval.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/leval.chez.V0.O3.safe.exe  repeat: 1 n: 120 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/leval.chez.V0.O3.safe.exe  repeat: 1 n: 120 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/leval.chez.V0.O3.safe.exe  repeat: 1 n: 120 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/leval.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/earley.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/earley.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/earley.chez.V0.O3.safe.exe  repeat: 1 n: 15000 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/earley.chez.V0.O3.safe.exe  repeat: 1 n: 15000 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/earley.chez.V0.O3.safe.exe  repeat: 1 n: 15000 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/earley.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/nucleic.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/nucleic.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/nucleic.chez.V0.O3.safe.exe  repeat: 3 n: 100 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/nucleic.chez.V0.O3.safe.exe  repeat: 3 n: 100 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/nucleic.chez.V0.O3.safe.exe  repeat: 3 n: 100 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/nucleic.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/slatex.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/slatex.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/slatex.chez.V0.O3.safe.exe  repeat: 1 n: 20000 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/slatex.chez.V0.O3.safe.exe  repeat: 1 n: 20000 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/slatex.chez.V0.O3.safe.exe  repeat: 1 n: 20000 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/slatex.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/dynamic.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/dynamic.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/dynamic.chez.V0.O3.safe.exe  repeat: 1 n: 800 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/dynamic.chez.V0.O3.safe.exe  repeat: 1 n: 800 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/dynamic.chez.V0.O3.safe.exe  repeat: 1 n: 800 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/dynamic.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/boyer.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/boyer.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/boyer.chez.V0.O3.safe.exe  repeat: 1 n: 1000 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/boyer.chez.V0.O3.safe.exe  repeat: 1 n: 1000 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/boyer.chez.V0.O3.safe.exe  repeat: 1 n: 1000 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/boyer.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/compiler.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/compiler.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/compiler.chez.V0.O3.safe.exe  repeat: 1 n: 10000 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 255
+Process did not run as expected, return code: 255
+Traceback (most recent call last):
+  File "/part/01/omelancon/bbv-tests/benchmarks/./benchmark.py", line 2301, in <module>
+    run_and_save_benchmark(compiler=args.compiler,
+  File "<string>", line 2, in run_and_save_benchmark
+  File "/part/01/omelancon/bbv-tests/benchmarks/venv/lib/python3.11/site-packages/pony/orm/core.py", line 519, in new_func
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/part/01/omelancon/bbv-tests/benchmarks/./benchmark.py", line 844, in run_and_save_benchmark
+    perf_results, scheme_stats = run_benchmark(executable, arguments, timeout=timeout, env=env)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/part/01/omelancon/bbv-tests/benchmarks/./benchmark.py", line 560, in run_benchmark
+    time_output = run_command(time_command, timeout, extend_env=env)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/part/01/omelancon/bbv-tests/benchmarks/./benchmark.py", line 295, in run_command
+    raise CommandError(f"Process return code {return_code}")
+CommandError: Process return code 255
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/maze.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/maze.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/maze.chez.V0.O3.safe.exe  repeat: 1 n: 150000 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/maze.chez.V0.O3.safe.exe  repeat: 1 n: 150000 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/maze.chez.V0.O3.safe.exe  repeat: 1 n: 150000 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/maze.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/scheme.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/scheme.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/scheme.chez.V0.O3.safe.exe  repeat: 1 n: 1000000 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/scheme.chez.V0.O3.safe.exe  repeat: 1 n: 1000000 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/scheme.chez.V0.O3.safe.exe  repeat: 1 n: 1000000 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/scheme.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/conform.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/conform.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/conform.chez.V0.O3.safe.exe  repeat: 1 n: 4000 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/conform.chez.V0.O3.safe.exe  repeat: 1 n: 4000 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/conform.chez.V0.O3.safe.exe  repeat: 1 n: 4000 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/conform.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/almabench.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/almabench.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/almabench.chez.V0.O3.safe.exe  repeat: 7 K: 36525 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/almabench.chez.V0.O3.safe.exe  repeat: 7 K: 36525 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/almabench.chez.V0.O3.safe.exe  repeat: 7 K: 36525 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/almabench.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/macro/peval.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/macro/peval.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/peval.chez.V0.O3.safe.exe  repeat: 1 n: 15000 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/peval.chez.V0.O3.safe.exe  repeat: 1 n: 15000 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/macro/peval.chez.V0.O3.safe.exe  repeat: 1 n: 15000 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/macro/peval.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/micro/fib.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/micro/fib.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/fib.chez.V0.O3.safe.exe  repeat: 20 n: 39 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/fib.chez.V0.O3.safe.exe  repeat: 20 n: 39 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/fib.chez.V0.O3.safe.exe  repeat: 20 n: 39 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/micro/fib.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/micro/tak.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/micro/tak.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/tak.chez.V0.O3.safe.exe  repeat: 80000 x: 18 y: 12 z: 6 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/tak.chez.V0.O3.safe.exe  repeat: 80000 x: 18 y: 12 z: 6 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/tak.chez.V0.O3.safe.exe  repeat: 80000 x: 18 y: 12 z: 6 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/micro/tak.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/micro/bague.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/micro/bague.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/bague.chez.V0.O3.safe.exe  repeat: 6 nombre-de-pierres: 28 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/bague.chez.V0.O3.safe.exe  repeat: 6 nombre-de-pierres: 28 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/bague.chez.V0.O3.safe.exe  repeat: 6 nombre-de-pierres: 28 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/micro/bague.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/micro/fibfp.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/micro/fibfp.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/fibfp.chez.V0.O3.safe.exe  repeat: 5 n: 39.0 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/fibfp.chez.V0.O3.safe.exe  repeat: 5 n: 39.0 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/fibfp.chez.V0.O3.safe.exe  repeat: 5 n: 39.0 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/micro/fibfp.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/micro/nqueens.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/micro/nqueens.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/nqueens.chez.V0.O3.safe.exe  repeat: 15 n: 13 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/nqueens.chez.V0.O3.safe.exe  repeat: 15 n: 13 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/nqueens.chez.V0.O3.safe.exe  repeat: 15 n: 13 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/micro/nqueens.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/micro/primes.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/micro/primes.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/primes.chez.V0.O3.safe.exe  repeat: 2000000 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/primes.chez.V0.O3.safe.exe  repeat: 2000000 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/primes.chez.V0.O3.safe.exe  repeat: 2000000 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/micro/primes.chez.V0.O3.safe.exe'
+- benchmark: /part/01/omelancon/bbv-tests/tests/paper/micro/ack.scm
+- version limit: 0
+- safe arithmetic: True
+no run exists for this benchmark, execute it
+../compile -S chez  -V 0  -O3  -f /part/01/omelancon/bbv-tests/tests/paper/micro/ack.scm
+(with timeout: 3600.0s)
+Return code: 0
+***primitive-call-counter not found in compiler output
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/ack.chez.V0.O3.safe.exe  repeat: 500 m: 3 n: 9 align-stack: 0
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/ack.chez.V0.O3.safe.exe  repeat: 500 m: 3 n: 9 align-stack: 3
+(with timeout: 3600.0s)
+Return code: 0
+perf stat /part/01/omelancon/bbv-tests/tests/paper/micro/ack.chez.V0.O3.safe.exe  repeat: 500 m: 3 n: 9 align-stack: 6
+(with timeout: 3600.0s)
+Return code: 0
+unknown compiler, cannot retrieve size
+could not resolve size of '/part/01/omelancon/bbv-tests/tests/paper/micro/ack.chez.V0.O3.safe.exe'
