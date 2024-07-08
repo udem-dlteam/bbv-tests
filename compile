@@ -20,7 +20,7 @@ C_COMPILE_TIME_MARKER="***c-compile-time:"
 WITH_SCHEME_COMPTIME=(/usr/bin/time -f "$SCHEME_COMPILE_TIME_MARKER %e")
 WITH_C_COMPTIME=(/usr/bin/time -f "$C_COMPILE_TIME_MARKER %e")
 
-if [ "$(uname)" == "Darwin" ]; then
+if [ "$(uname)" = "Darwin" ]; then
   WITH_SCHEME_COMPTIME=()
   WITH_C_COMPTIME=()
 fi
