@@ -306,7 +306,7 @@ case "$SYSTEM" in
 
     PRIMITIVE_COUNT_OPTIONS=""
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
-      PRIMITIVE_COUNT_OPTIONS="(##include \"$SCRIPT_DIR/gambit/bbv-count.scm\")"
+      PRELUDE="(##include \"$SCRIPT_DIR/gambit/bbv-count.scm\") $PRELUDE"
     fi
 
     # Compilation
