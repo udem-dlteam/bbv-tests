@@ -153,19 +153,38 @@
 
 (define-macro (BBVop op x . rest)
   (if (pair? rest)
-      (let ((y (car rest))
-            (a (gensym))
-            (b (gensym))
-            (c (gensym)))
-        `(let ((,a ,x) (,b ,y))
-          (cond
-            ((and (FIXNUM? ,a) (FIXNUM? ,b))
-              (let ((,c (PRIMop ,(symbol-append 'fx op '?) ,a ,b)))
-                (if ,c ,c (PRIMop ,op ,a ,b))))
-            ((and (FLONUM? ,a) (FLONUM? ,b))
-              (FLop ,op ,a ,b))
-            (else
-              (PRIMop ,op ,a ,b)))))
+      (let ((y (car rest)))
+        (cond
+         ((and macros-constant-folding (flonum? x))
+          (let ((b (gensym)))
+            `(let ((,b ,y))
+               (cond
+                ((FLONUM? ,b)
+                 (FLop ,op ,x ,b))
+                (else
+                 (PRIMop ,op ,x ,b))))))
+         ((and macros-constant-folding (flonum? y))
+          (let ((a (gensym)))
+            `(let ((,a ,x))
+               (cond
+                ((FLONUM? ,a)
+                 (FLop ,op ,a ,y))
+                (else
+                 (PRIMop ,op ,a ,y))))))
+         (else
+          (let ((a (gensym))
+                (b (gensym))
+                (c (gensym)))
+            `(let ((,a ,x)
+                   (,b ,y))
+               (cond
+                ((and (FIXNUM? ,a) (FIXNUM? ,b))
+                 (let ((,c (PRIMop ,(symbol-append 'fx op '?) ,a ,b)))
+                   (if ,c ,c (PRIMop ,op ,a ,b))))
+                ((and (FLONUM? ,a) (FLONUM? ,b))
+                 (FLop ,op ,a ,b))
+                (else
+                 (PRIMop ,op ,a ,b))))))))
       (let ((a (gensym))
             (c (gensym)))
         `(let ((,a ,x))

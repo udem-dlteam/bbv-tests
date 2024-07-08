@@ -252,9 +252,11 @@ case "$SYSTEM" in
     if [ "$OPTIM_LEVEL" = "0" ]; then
       INLINING_LIMIT=0
       OPTIM_DECLARATIONS="(not constant-fold) (not inline) (not lambda-lift)"
+      MACROS_CONSTANT_FOLDING="#f"
     else
       OPTIM_DECLARATIONS=""
       INLINING_LIMIT=370
+      MACROS_CONSTANT_FOLDING="#t"
     fi
 
     if [ "$VERSION_LIMIT" = "custom" ]; then
@@ -282,6 +284,7 @@ case "$SYSTEM" in
                (inlining-limit $INLINING_LIMIT))
              (define-macro (%%%)
                (eval '(define arithmetic '$ARITHMETIC))
+               (eval '(define macros-constant-folding '$MACROS_CONSTANT_FOLDING))
                #f)
              (%%%)
              (##include \"$SCRIPT_DIR/gambit/bbv.scm\")
@@ -304,14 +307,13 @@ case "$SYSTEM" in
       PRIMITIVE_COUNT=1
     fi
 
-    PRIMITIVE_COUNT_OPTIONS=""
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
       PRELUDE="(##include \"$SCRIPT_DIR/gambit/bbv-count.scm\") $PRELUDE"
     fi
 
     # Compilation
     (cd $INPUT_FILE_DIRNAME && \
-      "${WITH_SCHEME_COMPTIME[@]}" $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRIMITIVE_COUNT_OPTIONS $PRELUDE" $FLAGS -c $INPUT_FILE)
+      "${WITH_SCHEME_COMPTIME[@]}" $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE)
     $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
     $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
     "${WITH_C_COMPTIME[@]}" $GAMBITCOMP -exe $CC_FLAGS -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
@@ -343,6 +345,8 @@ case "$SYSTEM" in
       UNSAFE_FLAG=""
     fi
 
+
+
     BIGLOO_OPTIONS="-srfi arithmetic$ARITHMETIC -w $UNSAFE_FLAG -saw -cgen -o bbv.c"
     BIGLOO_C_OPTIONS="-Wno-unused-value -Wno-parentheses-equality -Wno-parentheses \
                       -Wno-invalid-source-encoding -Wno-return-type -Wno-trigraphs \
@@ -358,7 +362,7 @@ case "$SYSTEM" in
     if [ "$OPTIM_LEVEL" = "0" ]; then
       BIGLOO_OPTIONS="$BIGLOO_OPTIONS -O0 -fno-user-inlining"
     else
-      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -Obench"
+      BIGLOO_OPTIONS="-srfi macros-constant-folding $BIGLOO_OPTIONS -Obench"
       BIGLOO_C_OPTIONS="-O3 $BIGLOO_C_OPTIONS"
       BIGLOO_LD_OPTIONS="-O3 $BIGLOO_LD_OPTIONS"
     fi

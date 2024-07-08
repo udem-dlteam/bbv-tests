@@ -16,12 +16,16 @@
 
 (define-macro (define-macro-arithmetic proto body)
    `(define-macro ,proto
-       (define arithmetic
-	  (cond-expand
-	     (arithmeticG 'G)
-	     (arithmeticS 'S)
-	     (else 'G)))
-       ,body))
+      (define arithmetic
+        (cond-expand
+          (arithmeticG 'G)
+          (arithmeticS 'S)
+          (else 'G)))
+      (define macros-constant-folding
+        (cond-expand
+          (macros-constant-folding #t)
+          (else #f)))
+      ,body))
 
 (define-macro-arithmetic (FLop op . args)
    (case op
@@ -219,17 +223,35 @@
 (define-macro-arithmetic (FIXNUM? x) `(PRIMop fixnum? ,x))
 
 (define-macro-arithmetic (BBVop op x y)
-  (let ((a (gensym))
-        (b (gensym)))
-    `(let ((,a ,x)
-           (,b ,y))
-      (cond
-        ((and (FIXNUM? ,a) (FIXNUM? ,b))
-          (,(if (eq? op '/) '/fx (symbol-append op 'fx/ov)) ,a ,b))
-        ((and (FLONUM? ,a) (FLONUM? ,b))
-          (FLop ,op ,a ,b))
-        (else
-          (PRIMop ,op ,a ,b))))))
+  (cond
+    ((and macros-constant-folding (flonum? x))
+      (let ((b (gensym)))
+        `(let ((,b ,y))
+          (cond
+            ((FLONUM? ,b)
+            (FLop ,op ,x ,b))
+            (else
+            (PRIMop ,op ,x ,b))))))
+    ((and macros-constant-folding (flonum? y))
+      (let ((a (gensym)))
+        `(let ((,a ,x))
+          (cond
+            ((FLONUM? ,a)
+            (FLop ,op ,a ,y))
+            (else
+            (PRIMop ,op ,a ,y))))))
+    (else
+      (let ((a (gensym))
+            (b (gensym)))
+        `(let ((,a ,x)
+              (,b ,y))
+          (cond
+            ((and (FIXNUM? ,a) (FIXNUM? ,b))
+            (,(if (eq? op '/) '/fx (symbol-append op 'fx/ov)) ,a ,b))
+            ((and (FLONUM? ,a) (FLONUM? ,b))
+            (FLop ,op ,a ,b))
+            (else
+            (PRIMop ,op ,a ,b))))))))
 
 (define-macro-arithmetic (BBVcmp op x y)
   (let ((a (gensym))
