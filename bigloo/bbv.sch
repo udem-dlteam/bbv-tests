@@ -219,35 +219,17 @@
 (define-macro-arithmetic (FIXNUM? x) `(PRIMop fixnum? ,x))
 
 (define-macro-arithmetic (BBVop op x y)
-  (cond
-   ((flonum? x)
-    (let ((b (gensym)))
-      `(let ((,b ,y))
-         (cond
-          ((FLONUM? ,b)
-           (FLop ,op ,x ,b))
-          (else
-           (PRIMop ,op ,x ,b))))))
-   ((flonum? y)
-    (let ((a (gensym)))
-      `(let ((,a ,x))
-         (cond
-          ((FLONUM? ,a)
-           (FLop ,op ,a ,y))
-          (else
-           (PRIMop ,op ,a ,y))))))
-   (else
-    (let ((a (gensym))
-          (b (gensym)))
-      `(let ((,a ,x)
-             (,b ,y))
-         (cond
-          ((and (FIXNUM? ,a) (FIXNUM? ,b))
-           (,(if (eq? op '/) '/fx (symbol-append op 'fx/ov)) ,a ,b))
-          ((and (FLONUM? ,a) (FLONUM? ,b))
-           (FLop ,op ,a ,b))
-          (else
-           (PRIMop ,op ,a ,b))))))))
+  (let ((a (gensym))
+        (b (gensym)))
+    `(let ((,a ,x)
+           (,b ,y))
+      (cond
+        ((and (FIXNUM? ,a) (FIXNUM? ,b))
+          (,(if (eq? op '/) '/fx (symbol-append op 'fx/ov)) ,a ,b))
+        ((and (FLONUM? ,a) (FLONUM? ,b))
+          (FLop ,op ,a ,b))
+        (else
+          (PRIMop ,op ,a ,b))))))
 
 (define-macro-arithmetic (BBVcmp op x y)
   (let ((a (gensym))
