@@ -9,8 +9,9 @@ static int64_t ___vector_length_count = 0;
 static int64_t ___string_length_count = 0;
 static void ___exiting() {
   #include <inttypes.h>
+  printf("***primitive-call-counter");
   printf("%s\n", __FILE__);
-  printf("(gvm:jumpif %" PRId64 ")\n", ___jumpif_count);
+  printf("(#gvm:ifjump %" PRId64 ")\n", ___jumpif_count);
   printf("(##string-in-bounds %" PRId64 ")\n", ___string_in_bounds_count);
   printf("(##vector-in-bounds %" PRId64 ")\n", ___vector_in_bounds_count);
   printf("(##vector-length %" PRId64 ")\n", ___vector_length_count);

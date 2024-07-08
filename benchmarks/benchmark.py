@@ -158,6 +158,7 @@ class Benchmark(db.Entity):
 # Gambit: ifjump + 2 * (vector-in-bounds + string-in-bounds) + vector-length + string-length
 GAMBIT_TYPECHECK_WEIGHTS = {
     '#gvm:ifjump': 1,
+    'gvm:jumpif': 1,
     '##vector-in-bounds': 2,
     '##string-in-bounds': 2,
     '##vector-length': 1,
@@ -333,8 +334,12 @@ class PrimitivesCountParser:
         else:
             counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
 
+        self.primitives = {}
+
         counts = re.findall("\(([^ ]+) (\d+)\)", counter_section)
-        self.primitives = {k: int(v) for k, v in counts}
+        ## Use accumulator for cases where the compiler returns per-file counts
+        for k, v in counts:
+            self.primitives[k] = self.primitives.get(k, 0) + int(v)
 
         self.size_in_gvm_instructions = self.primitives.pop(self.SIZE_IN_GVM_INSTRUCTIONS, None)
 
