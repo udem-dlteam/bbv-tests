@@ -304,21 +304,21 @@ case "$SYSTEM" in
       PRIMITIVE_COUNT=1
     fi
 
+    PRIMITIVE_COUNT_OPTIONS=""
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
-      PRELUDE="$PRELUDE
-               (##include \"$SCRIPT_DIR/gambit/lib.scm\")"
-      POSTLUDE="(##include \"$SCRIPT_DIR/gambit/main.scm\")"
-      FLAGS="$FLAGS -c" # only interested in primitive count, do not call gcc
-      (cd $INPUT_FILE_DIRNAME && \
-       $GAMBITCOMP  $EXPANSION_FLAG -prelude "$PRELUDE" -postlude "$POSTLUDE" $FLAGS -gvm-interpret $DUMP_JSON_FLAG $INPUT_FILE)
-    else
-      # Compilation
-      (cd $INPUT_FILE_DIRNAME && \
-       "${WITH_SCHEME_COMPTIME[@]}" $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE)
-      $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
-      $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
-      "${WITH_C_COMPTIME[@]}" $GAMBITCOMP -exe $CC_FLAGS -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
-      rm $OUTPUT_FILE_C
+      PRIMITIVE_COUNT_OPTIONS="(##include \"$SCRIPT_DIR/gambit/bbv-count.scm\")"
+    fi
+
+    # Compilation
+    (cd $INPUT_FILE_DIRNAME && \
+      "${WITH_SCHEME_COMPTIME[@]}" $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRIMITIVE_COUNT_OPTIONS $PRELUDE" $FLAGS -c $INPUT_FILE)
+    $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
+    $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
+    "${WITH_C_COMPTIME[@]}" $GAMBITCOMP -exe $CC_FLAGS -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
+    rm $OUTPUT_FILE_C
+
+    if [ "$PRIMITIVE_COUNT" = "1" ]; then
+      $OUTPUT_FILE_EXE
     fi
 
     if [ "$DUMP_JSON_TRACE" = "1" ]; then
@@ -363,7 +363,6 @@ case "$SYSTEM" in
       BIGLOO_LD_OPTIONS="-O3 $BIGLOO_LD_OPTIONS"
     fi
     if [ "$PRIMITIVE_COUNT" = "1" ]; then
-      BIGLOO_OPTIONS="$BIGLOO_OPTIONS -srfi bbvcountprimitive"
       BIGLOO_C_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_C_OPTIONS"
       BIGLOO_LD_OPTIONS="-DSAW_BBV_STATS=1 $BIGLOO_LD_OPTIONS"
     fi
