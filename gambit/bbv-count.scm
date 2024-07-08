@@ -2,13 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 static int64_t ___jumpif_count = 0;
 static int64_t ___string_in_bounds_count = 0;
 static int64_t ___vector_in_bounds_count = 0;
 static int64_t ___vector_length_count = 0;
 static int64_t ___string_length_count = 0;
 static void ___exiting() {
-  #include <inttypes.h>
   printf("***primitive-call-counter");
   printf("%s\n", __FILE__);
   printf("(#gvm:ifjump %" PRId64 ")\n", ___jumpif_count);
