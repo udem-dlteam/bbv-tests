@@ -332,13 +332,14 @@ class PrimitivesCountParser:
             logger.error(f"{cls.DEFAULT_PRIMITIVE_COUNTER_MARKER} not found in compiler output")
             counter_section = ""
         else:
-            counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER)[1]
+            counter_section = compiler_output.split(self.DEFAULT_PRIMITIVE_COUNTER_MARKER, maxsplit=1)[1]
 
         self.primitives = {}
 
         counts = re.findall("\(([^ ]+) (\d+)\)", counter_section)
         ## Use accumulator for cases where the compiler returns per-file counts
         for k, v in counts:
+            logger.debug(f"Primitive counter: add {k} {v}")
             self.primitives[k] = self.primitives.get(k, 0) + int(v)
 
         self.size_in_gvm_instructions = self.primitives.pop(self.SIZE_IN_GVM_INSTRUCTIONS, None)
