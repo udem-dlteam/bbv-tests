@@ -1,21 +1,19 @@
 (##c-declare #<<EOF
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <inttypes.h>
-static int64_t ___jumpif_count = 0;
-static int64_t ___string_in_bounds_count = 0;
-static int64_t ___vector_in_bounds_count = 0;
-static int64_t ___vector_length_count = 0;
-static int64_t ___string_length_count = 0;
+static long ___jumpif_count = 0;
+static long ___string_in_bounds_count = 0;
+static long ___vector_in_bounds_count = 0;
+static long ___vector_length_count = 0;
+static long ___string_length_count = 0;
 static void ___exiting() {
   printf("***primitive-call-counter\n");
   printf("%s\n", __FILE__);
-  printf("(#gvm:ifjump %" PRId64 ")\n", ___jumpif_count);
-  printf("(##string-in-bounds %" PRId64 ")\n", ___string_in_bounds_count);
-  printf("(##vector-in-bounds %" PRId64 ")\n", ___vector_in_bounds_count);
-  printf("(##vector-length %" PRId64 ")\n", ___vector_length_count);
-  printf("(##string-length %" PRId64 ")\n", ___string_length_count);
+  printf("(#gvm:ifjump %ld)\n", ___jumpif_count);
+  printf("(##string-in-bounds %ld)\n", ___string_in_bounds_count);
+  printf("(##vector-in-bounds %ld)\n", ___vector_in_bounds_count);
+  printf("(##vector-length %ld)\n", ___vector_length_count);
+  printf("(##string-length %ld)\n", ___string_length_count);
 }
 #undef ___IF
 #define ___IF(x) { ___jumpif_count++; if (x) {
