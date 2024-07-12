@@ -827,7 +827,7 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
                   compiler_optimizations=compiler_optimizations,
                   arguments=base_arguments)
 
-        executable, primitive_count, compile_times = compile(compiler, file, v, safe_arithmetic, compiler_optimizations, timeout)
+        executable, primitive_count, compile_times = compile(compiler, file, v, safe_arithmetic, compiler_optimizations, timeout, only_executable=repetitions == 0)
 
         scheme_compile_time = compile_times[SCHEME_COMPILE_TIME]
         c_compile_time = compile_times[C_COMPILE_TIME]
@@ -860,18 +860,19 @@ def run_and_save_benchmark(compiler, file, version_limits, safe_arithmetic, repe
 
         typechecks = 0
 
-        for prim, value in primitive_count.items():
-            p = PrimitiveCount(name=prim, value=value, run=run)
-            typechecks += p.typecheck_weight * value
+        if primitive_count:
+            for prim, value in primitive_count.items():
+                p = PrimitiveCount(name=prim, value=value, run=run)
+                typechecks += p.typecheck_weight * value
 
         logger.debug(f"number of typechecks: {typechecks}")
         StaticMeasure(name="typechecks", value=typechecks, run=run)
 
-        total_primitives = sum(primitive_count.values())
+        total_primitives = sum(primitive_count.values()) if primitive_count  else 0
         logger.debug(f"executed primitives: {total_primitives}")
         StaticMeasure(name='primitives', value=total_primitives, run=run)
 
-        if primitive_count.size_in_gvm_instructions:
+        if primitive_count and primitive_count.size_in_gvm_instructions:
             logger.debug(f"gvm instruction size: {primitive_count.size_in_gvm_instructions}")
             StaticMeasure(name='gvm-size', value=primitive_count.size_in_gvm_instructions, run=run)
         else:
