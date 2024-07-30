@@ -10,8 +10,8 @@ for file in ${scm_files[@]}; do
     order=$((order + 1))
 
     # Gambit
-    out_V0=$(BBV_PARAMETERS=$@ && ../compile -S gambit -D ${gambit} -V 0 -O3 -f ${file} -P)
-    out_V3=$(BBV_PARAMETERS=$@ && ../compile -S gambit -D ${gambit} -V 3 -O3 -f ${file} -P)
+    out_V0=env BBV_PARAMETERS=$@ ../compile -S gambit -D ${gambit} -V 0 -O3 -f ${file} -P
+    out_V3=env BBV_PARAMETERS=$@ ../compile -S gambit -D ${gambit} -V 3 -O3 -f ${file} -P
 
     checks_V0=$(echo "$out_V0" | grep -oE '\(#.*?[0-9]+\)')
     checks_V3=$(echo "$out_V3" | grep -oE '\(#.*?[0-9]+\)')
