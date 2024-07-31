@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script performs a search for a genome (a set of integer parameters)
 # that minimizes some evaluation function computed by a shell script.

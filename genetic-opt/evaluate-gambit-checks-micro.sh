@@ -1,4 +1,4 @@
-set -euo pipefail
+#!/bin/bash
 
 scm_files=$(find ../tests/paper/micro -type f -regex '^.*/[^.]*\.scm$')
 log_file="evaluate-gambit-checks-micro.log"
@@ -11,11 +11,16 @@ nfiles=$(echo "$scm_files" | wc -l)
 params="$@"
 
 echo "=== NEW RUN ON $(date)" >> $log_file
+echo "=== PARAMS: $params" >> $log_file
 
 # BBV runs
 for file in ${scm_files[@]}; do
+    echo "=== FILE: $file" >> $log_file
+    echo "../compile -S gambit -D ${gambit} -V 0 -O3 -f ${file} -P" >> $log_file
     # Gambit
     out_V0=$(env BBV_PARAMETERS="$params" ../compile -S gambit -D ${gambit} -V 0 -O3 -f ${file} -P 2>> $log_file)
+
+    echo "../compile -S gambit -D ${gambit} -V 3 -O3 -f ${file} -P" >> $log_file
     out_V3=$(env BBV_PARAMETERS="$params" ../compile -S gambit -D ${gambit} -V 3 -O3 -f ${file} -P 2>> $log_file)
 
     checks_V0=$(echo "$out_V0" | grep -oE '\(#.*?[0-9]+\)')
