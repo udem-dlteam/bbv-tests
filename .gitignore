@@ -4,3 +4,6 @@
 *.exe
 *.csv
 *.code-workspace
+bigloo/bbv.o
+gambit/lib.c
+gambit/main.c
