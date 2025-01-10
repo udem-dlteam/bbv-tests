@@ -965,8 +965,11 @@ def get_system_from_name_or_default(system_name=None):
     return system
 
 
-def get_compiler_from_name(compiler_name):
-    compiler = select(c for c in Compiler if c.name == compiler_name).order_by(desc(Compiler.commit_timestamp)).first()
+def get_compiler_from_name(compiler_name, compiler_commit=None):
+    if compiler_commit is None:
+        compiler = select(c for c in Compiler if c.name == compiler_name).order_by(desc(Compiler.commit_timestamp)).first()
+    else:
+        compiler = select(c for c in Compiler if c.name == compiler_name and c.commit_sha == compiler_commit).order_by(desc(Compiler.commit_timestamp)).first()
 
     if not compiler:
         raise ValueError(f"could not find compiler {repr(compiler_name)}")
@@ -1451,9 +1454,9 @@ def choose_heatmap_output_path(output, measure, system_name, compiler_name):
         raise ValueError(f"output must be a folder of .png target, got {output}")
 
 @db_session
-def make_heatmap(system_name, compiler_name, benchmark_names, version_limits, output):
+def make_heatmap(system_name, compiler_name, compiler_commit, benchmark_names, version_limits, output):
     system = get_system_from_name_or_default(system_name)
-    compiler = get_compiler_from_name(compiler_name)
+    compiler = get_compiler_from_name(compiler_name, compiler_commit)
 
     if benchmark_names is None:
         benchmark_names = list(select(b.name for b in Benchmark).distinct())
@@ -2273,6 +2276,12 @@ if __name__ == "__main__":
                             default="gambit",
                             help="Benchmark compiler")
     
+    heatmap_parser.add_argument('-cc', '--compiler-commit',
+                            metavar="COMMIT",
+                            dest="compiler_commit",
+                            default=None,
+                            help="Benchmark compiler commit")
+    
     heatmap_parser.add_argument('-b', '--benchmarks',
                             metavar="BENCHMARK",
                             nargs="+",
@@ -2330,6 +2339,7 @@ if __name__ == "__main__":
     elif args.command == 'heatmap':
         make_heatmap(system_name=args.system_name,
                       compiler_name=args.compiler_name,
+                      compiler_commit=args.compiler_commit,
                       benchmark_names=args.benchmark_names,
                       version_limits=args.version_limits,
                       output=args.output)
