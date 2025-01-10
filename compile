@@ -30,6 +30,7 @@ INPUT_FILE=             # file to compile
 OPTIM_LEVEL=0           # optimization level
 SAFE_ARITHMETIC=1       # safe/unsafe arithmetic
 PRIMITIVE_COUNT=0       # enables primitive (0 to disable)
+AVOID_MERGE=0           # enables merge avoidance of jump cascade
 DUMP_JSON_TRACE=0       # dump BBV trace in json
 SHOW_EXPANSION=0        # show macro expansion
 GENERATE_CFG=0          # enable cfg generation
@@ -43,7 +44,7 @@ SYSTEM=                 # system (gambit or bigloo)
 CUSTOM_OUTPUT_FILE=     # user's output file
 
 # Parse parameters
-while getopts "f:S:D:o:V:B:O:UPJGWIEchv" opt; do
+while getopts "f:S:D:o:V:B:O:UPAJGWIEchv" opt; do
   case $opt in
     f)
       INPUT_FILE=$(readlink -f $OPTARG)
@@ -101,6 +102,9 @@ while getopts "f:S:D:o:V:B:O:UPJGWIEchv" opt; do
       ;;
     P)
       PRIMITIVE_COUNT=1
+      ;;
+    A)
+      AVOID_MERGE=1
       ;;
     J)
       DUMP_JSON_TRACE=1
@@ -311,9 +315,14 @@ case "$SYSTEM" in
       PRELUDE="(##include \"$SCRIPT_DIR/gambit/bbv-count.scm\") $PRELUDE"
     fi
 
+    AVOID_MERGE_FLAG=""
+    if [ "$AVOID_MERGE" = "1" ]; then
+      AVOID_MERGE_FLAG="-avoid-merge-jump-cascade"
+    fi
+
     # Compilation
     (cd $INPUT_FILE_DIRNAME && \
-      "${WITH_SCHEME_COMPTIME[@]}" $GAMBITCOMP $EXPANSION_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE)
+      "${WITH_SCHEME_COMPTIME[@]}" $GAMBITCOMP $EXPANSION_FLAG $AVOID_MERGE_FLAG -prelude "$PRELUDE" $FLAGS -c $INPUT_FILE)
     $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/lib.c $SCRIPT_DIR/gambit/lib.scm
     $GAMBITCOMP -prelude "$PRELUDE" -c $CC_FLAGS -o $SCRIPT_DIR/gambit/main.c $SCRIPT_DIR/gambit/main.scm
     "${WITH_C_COMPTIME[@]}" $GAMBITCOMP -exe $CC_FLAGS -o $OUTPUT_FILE_EXE $SCRIPT_DIR/gambit/lib.c $OUTPUT_FILE_C $SCRIPT_DIR/gambit/main.c
