@@ -137,6 +137,7 @@ while getopts "f:S:D:o:V:B:O:UPAJGWIEchv" opt; do
       echo "  -D <dir>          Specify compiler directory"
       echo "  -V <limit>        Set the version limit"
       echo "  -O <level>        Set optimization level (1, 2, 3)"
+      echo "  -A                Avoid merge of jump cascade"
       echo "  -U                Use unsafe arithmetic"
       echo "  -P                Count primitive usage"
       echo "  -J                Dump BBV algorithm trace in json"

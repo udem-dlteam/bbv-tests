@@ -546,7 +546,7 @@ def get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optim
     primitive_count_flag = '-P' if primitive_count else ''
     arithmetic_flag = '-U' if not safe_arithmetic else ''
     path_flag = f'-D {compiler.path}' if compiler.path else ''
-    return f"{COMPILE_SCRIPT} -S {compiler.name} {path_flag} -V {vlimit} {arithmetic_flag} {optimization_flag} {primitive_count_flag} -f {file}"
+    return f"{COMPILE_SCRIPT} -A -S {compiler.name} {path_flag} -V {vlimit} {arithmetic_flag} {optimization_flag} {primitive_count_flag} -f {file}"
 
 def compile_other(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, timeout=None, only_executable=False):
     command = get_compiler_command(compiler, file, vlimit, safe_arithmetic, compiler_optimizations, False)
